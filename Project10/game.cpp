@@ -1,66 +1,48 @@
-#include "main.h"
-#include "DxLib.h"
+#include "game.h"
 
-#include <stdio.h> // sprintf_sを使うために必要
-
-
-
-// 共通の描画関数（これを定義しておけばどこからでも呼べる）
-void GameManager::DrawCenteredText(int x, int y, const char* label, int value, unsigned int color) {
-    char buf[64];
-    sprintf_s(buf, "%s: %d", label, value);
-    int w = GetDrawStringWidth(buf, strlen(buf));
-    DrawString(x - w / 2, y, buf, color);
-}
-
-
-// 更新処理
 void GameManager::Update() {
-    // 99秒のカウントダウン処理
-    static int frameCounter = 0;
-    if (++frameCounter >= 120) { // DxLibの標準は60fpsなので60で1秒です
-        if (time > 0) time--;
-        frameCounter = 0;
+    if (timeLimit > 0) {
+        timeLimit--;
     }
-
-    // フェーズ管理
-    if (time > 54) phase = 1;
-    else if (time > 24) phase = 2;
-    else phase = 3;
+    else {
+        // 0になった時の処理（ここを後で「試合終了」にする）
+        timeLimit = 0;
+    }
 }
 
+void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
+    ReplayFrame frame;
+    frame.pos[0] = p1;
+    frame.pos[1] = p2;
+    frame.action = act;
+    replayData.push_back(frame);
+}
 
-// 描画処理
 void GameManager::DrawUI() {
-    // 共通関数を使って描画（中央起点）
-    DrawCenteredText(600, 20, "TIME", time, GetColor(255, 255, 0));
-    DrawCenteredText(160, 50, "P1 Score", p1Score, GetColor(255, 255, 255));
-    DrawCenteredText(1000, 50, "P2 Score", p2Score, GetColor(255, 255, 255));
-
-
-    
-}
-// プレイヤー担当者が呼ぶ関数
-void GameManager::AddEvent(int pId, int type, int value) {
-    eventQueue.push_back({ type, pId, value });
-}
-
-// 毎フレームのUpdateの最後などで呼ぶ処理
-void GameManager::ProcessEvents() {
-    for (auto& e : eventQueue) {
-        if (e.type == EV_SCORE) {
-            if (e.playerId == 1) p1Score += e.value;
-            else p2Score += e.value;
-        }
-        else if (e.type == EV_DEATH) {
-            if (e.playerId == 1) p1Deaths++;
-            else p2Deaths++;
-        }
-        else if (e.type == EV_KILL) {
-            if (e.playerId == 1) p1Kills++;
-            else p2Kills++;
-        }
+    // 1. secondsの宣言は1回だけにする（60で割るのが正しいです）
+    int seconds = timeLimit / 100;
+    SetFontSize(20);
+    // 2. 色の判定
+    unsigned int timerColor;
+    if (seconds <= 10 && (timeLimit / 10) % 2 == 0) {
+        timerColor = GetColor(255, 0, 0); // 点滅（赤）
     }
-    eventQueue.clear();
-}
+    else if (seconds <= 45) {
+        timerColor = GetColor(255, 0, 0); // 赤
+    }
+    else {
+        timerColor = GetColor(255, 255, 0); // 最初は黄色
+    }
 
+    // 3. 表示の切り替え（重ならないように if-else で完全に分ける）
+    if (seconds > 0) {
+        DrawFormatString(400, 20, timerColor, "LIMIT : %d", seconds);
+    }
+    else {
+        DrawString(400, 20, "FINISH!", GetColor(255, 0, 0));
+    }
+
+    // スコア表示
+    DrawFormatString(100, 50, GetColor(0, 255, 100), "P1 Score: %d", p1Score);
+    DrawFormatString(700, 50, GetColor(0, 255, 100), "P2 Score: %d", p2Score);
+}

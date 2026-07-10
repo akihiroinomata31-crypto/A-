@@ -155,6 +155,7 @@
     <ClCompile Include="Mapps.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="game.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
   </ItemGroup>
