@@ -1,14 +1,1 @@
-﻿  main.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(42,6): warning C4101: 'WallNum': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(43,6): warning C4101: 'FloorNum': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(41,27): warning C4101: 'HitDim': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(47,24): warning C4101: 'Poly': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(56,6): warning C4101: 'SEattackHandle': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(48,17): warning C4101: 'LineRes': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(26,21): warning C4101: 'wpPosEnd': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(56,22): warning C4101: 'SEjumpHandle': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(44,24): warning C4101: 'Wall': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(45,24): warning C4101: 'Floor': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(26,9): warning C4101: 'wpPosStart': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(56,36): warning C4101: 'SEdamageHandle': ローカル変数は 1 度も使われていません。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.cpp(122): error C4700: 初期化されていないローカル変数 'sky' が使用されます
+﻿  Project10.vcxproj -> C:\Users\akihi\OneDrive\Desktop\workspace\Project10\x64\Debug\Project10.exe

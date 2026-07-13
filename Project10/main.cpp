@@ -18,7 +18,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int		anim_neutral;
 
 	
-	int		stagedata;
+	int		stagedata{};
 	int sky;
 	float skyRot = 0;
 	SCharaInfo charainfo[MAX_CHARA];
@@ -39,8 +39,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	// ステージコリジョン情報
 	MV1_COLL_RESULT_POLY_DIM HitDim;
-	int WallNum;
-	int FloorNum;										// 床ポリゴンと判断されたポリゴンの数
+	
+											// 床ポリゴンと判断されたポリゴンの数
 	MV1_COLL_RESULT_POLY* Wall[CHARA_MAX_HITCOLL];
 	MV1_COLL_RESULT_POLY* Floor[CHARA_MAX_HITCOLL];
 	int HitFlag = 0;
@@ -52,8 +52,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 
-	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEファイル名
-	int SEattackHandle, SEjumpHandle, SEdamageHandle;						// BGMサウンドハンドル	
+	//char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEファイル名
+	int SEattackHandle, SEjumpHandle;						// BGMサウンドハンドル	
 
 
 //キャラ情報
@@ -111,14 +111,17 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	rootflm = MV1SearchFrame(charainfo[0].model1, "root");
 	MV1SetFrameUserLocalMatrix(charainfo[0].model1, rootflm, MGetIdent());
 
-
-
-
+	printfDx("stagedata = %d\n", stagedata);
+	printfDx("TextureNum = %d\n", MV1GetTextureNum(stagedata));
+	WaitKey();
+	
 	// ステージ情報の読み込み
-	stagedata = MV1LoadModel("..\\Data\\Stage\\Tower_g.mv1");
+	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage.mv1");
 	if (stagedata == -1) return -1;
 	MV1SetPosition(stagedata, stagepos);
-	//sky = MV1LoadModel("..\\Data\\Stage\\Stage00_sky.mv1");
+	
+	
+	sky = MV1LoadModel("..\\Data\\Stage\\Stage00_sky.mv1");
 	if (sky == -1) return -1;
 	MV1SetPosition(sky, VGet(0, -1000, 0));
 
@@ -138,16 +141,17 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	SetDrawScreen(DX_SCREEN_BACK);
 	//カメラの初期化
 	SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
-
+	printfDx("ゲーム開始前\n");
+	WaitKey();
 	
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
 	
 
 
 		//カメラ追従
-		ctgt = VAdd(charainfo[0].pos, VGet(0.0f, 0.0f, 0.0f));
-		cpos = VAdd(ctgt, VGet(0.0f, 400.0f, -800.0f));
-		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
+		ctgt = VAdd(charainfo[0].pos, VGet(0.0f, 150.0f, 0.0f));
+		cpos = VAdd(ctgt, VGet(0.0f, 600.0f, 1200.0f));
+		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
 
 
 		// 画面の消去

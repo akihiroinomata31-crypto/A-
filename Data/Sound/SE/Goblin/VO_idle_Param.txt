@@ -1,2 +1,0 @@
-float Volume = 1.25
-float Radius = 4000.0
