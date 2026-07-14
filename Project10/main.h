@@ -4,8 +4,7 @@
 #include <DxLib.h>
 
 
-
-#define PC_WIDTH 100.0f
+#define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
 #define MAX_CHARA 5
 #define CHARA_ENUM_DEFAULT_SIZE		500.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
@@ -15,16 +14,34 @@
 #define MOVE_SPEED					3.0f
 #define GRAVITY						0.5f
 
+#define SOUND_DIRECTORY_PATH "..\\Data\\Sound\\"
+#define ATTACK_FIRST_ENDTIME 15.0f
+#define ATTACK_SECOND_ENDTIME 15.0f
+#define ATTACK_THIERD_ENDTIME 30.0f
 
 
-
-
+enum Direction
+{
+	DOWN = 0,
+	LEFT = 1,
+	UP = 2,
+	RIGHT = 3
+};
 
 // --- キャラの状態
 enum CharaMode
 { // --- キャラの状態
 	STAND,
-	
+	RUN,
+	JUMPIN,
+	JUMPLOOP,
+	JUMPOUT,
+	FALL,
+	ATTACK,
+	ATTACKOUT,
+	DAMAGE,
+	DOWNMODE,
+	NONE,
 };
 /* ------------------------------------------------------------------------
 |
@@ -44,7 +61,7 @@ struct SCharaInfo
 {
 	int model1;
 
-	//Direction direction;
+	Direction direction;
 	int attachidx;
 	float playtime = 0, anim_totaltime;
 	VECTOR pos;
@@ -65,6 +82,6 @@ struct SCharaInfo
 
 // 当たり判定の幅、高さ
 // 当たり判定の中心座標
-
-extern  int		anim_neutral;
+void CheckAttackHit(SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage);
+extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
 
