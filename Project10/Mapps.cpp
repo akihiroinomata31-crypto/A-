@@ -5,6 +5,7 @@ class Map {
 public:
     int stagedata;
     int sky;
+
     float skyRot = 0.0f;
     const float radius = 300.0f;
 
