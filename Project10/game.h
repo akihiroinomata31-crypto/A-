@@ -19,6 +19,6 @@ public:
     void AddDeath() { deathCount++; }
     // ƒŠƒvƒŒƒC‚ğ‹L˜^‚·‚éŠÖ”‚ğ’Ç‰Á
     void RecordFrame(VECTOR p1, VECTOR p2, int act);
-
+    void Update(SCharaInfo* enemyList);
     void ActivateEnemy(SCharaInfo* enemyList, float x, float z);
 };

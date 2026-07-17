@@ -1,28 +1,26 @@
 #include "game.h"
 #include "main.h"
 
-void GameManager::Update() {
+void GameManager::Update(SCharaInfo* enemyList) {
     if (timeLimit > 0) {
         timeLimit--;
 
         spawnTimer++;
+        // 120フレームごとに1体出現させる（5体一気出しを防ぐ）
         if (spawnTimer >= 120) {
-            for (int i = 0; i < 5; i++) {
-                // 敵配列 charainfo[1]以降を敵専用として管理する場合
-                // ここで敵の出現位置をランダムに決定して初期化する
-                float randX = (float)(GetRand(1600) - 800); // マップ範囲に合わせて調整
-                float randZ = (float)(GetRand(1600) - 800);
 
-                // 敵をアクティブにする処理をここで行う
-                //ActivateEnemy(enemyList,randX, randZ);
-            }
+            // ランダムな位置を決定
+            float randX = (float)(GetRand(1600) - 800);
+            float randZ = (float)(GetRand(1600) - 800);
+
+            // 敵をアクティブにする（1体のみ生成）
+            ActivateEnemy(enemyList, randX, randZ);
+
             spawnTimer = 0;
         }
     }
     else {
-        // 0になった時の処理（ここを後で「試合終了」にする）
         timeLimit = 0;
-
     }
 }
 
@@ -82,6 +80,23 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
             MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
 
             break; // 1体生成したらループを抜ける
+        }
+    }
+}
+void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
+    // 1番目からMAX_CHARA-1まで探す
+    for (int i = 1; i < MAX_CHARA; i++) {
+        // mode が NONE ならその枠は空いているとみなす
+        if (enemyList[i].mode == NONE) {
+            enemyList[i].pos = VGet(x, 0.0f, z);
+            enemyList[i].mode = STAND; // 待機状態へ
+            enemyList[i].enemyHP = 1;
+
+            // モデル位置更新と表示
+            MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
+            MV1SetVisible(enemyList[i].model1, TRUE);
+
+            break; // 1体見つけたらループを抜ける
         }
     }
 }

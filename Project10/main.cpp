@@ -9,8 +9,6 @@
 
 
 
-
-
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
 
@@ -32,12 +30,16 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int isBGMPlaying = 1;
 
 
+	int enemyCount = 0;          // 現在の敵の数
+	int spawnTimer = 0;          // 出現までのカウント用
+	const int SPAWN_INTERVAL = 300; // 出現間隔
+
 	int attackIndex = 0;//攻撃段階の添え字
 	bool isAttackBuffered = false;//攻撃先行入力フラグ
 	float attackInEndTime[3] = { ATTACK_FIRST_ENDTIME,ATTACK_SECOND_ENDTIME,ATTACK_THIERD_ENDTIME };
 
-
-	VECTOR stagepos = VGet(0.0f, 0.0f, 0.0f);
+	GameManager game;
+	VECTOR stagepos = VGet(0.0f, 2000.0f, 0.0f);
 
 	VECTOR cpos, ctgt;
 	// カメラポジション cpos:カメラ位置　ctgt:カメラ注視点
@@ -57,7 +59,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	// キャラがヒットした床のポリゴン表示の座標
 	VECTOR PolyCharaHitField[3];
-	GameManager game;
+
 
 
 	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMファイル名
@@ -686,9 +688,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 		//カメラ追従
-		ctgt = VAdd(charainfo[0].pos, VGet(0.0f, 600.0f, 0.0f));
-		cpos = VAdd(ctgt, VGet(0.0f, 400.0f, -1200.0f));
-		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
+		ctgt = VAdd(charainfo[0].pos, VGet(0.0f, 0.0f, 0.0f));
+		cpos = VAdd(ctgt, VGet(0.0f, 300.0f, -1200.0f));
+		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
 
 
 		// 画面の消去
@@ -705,10 +707,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		skyRot += 0.001f;
 		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
 		MV1DrawModel(sky);
+
 		game.Update();
 
 		game.DrawUI();
-
 
 		// 表画面と裏画面の切り替え
 		ScreenFlip();
@@ -749,4 +751,3 @@ void CheckAttackHit(SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* tar
 		}
 	}
 }
-

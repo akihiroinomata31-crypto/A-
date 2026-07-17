@@ -1,2 +1,5 @@
-﻿  main.cpp
-  Project10.vcxproj -> C:\Users\akihi\OneDrive\Desktop\workspace\Project10\x64\Debug\Project10.exe
+﻿  game.cpp
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.cpp(86,74): error C2084: 関数 'void GameManager::ActivateEnemy(SCharaInfo *,float,float)' は既に本体を持っています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.cpp(70): message : 'ActivateEnemy' の以前の定義を確認してください
+  main.cpp
+  コードを生成中...
