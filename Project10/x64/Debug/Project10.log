@@ -1,10 +1,5 @@
 ﻿  game.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.h(25,9): error C2086: 'int GameManager::p1Score': 再定義されました。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.h(25,22): error C2086: 'int GameManager::p2Score': 再定義されました。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\game.cpp(12,48): warning C4267: '引数': 'size_t' から 'int' に変換しました。データが失われているかもしれません。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.cpp(86,74): error C2084: 関数 'void GameManager::ActivateEnemy(SCharaInfo *,float,float)' は既に本体を持っています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.cpp(70): message : 'ActivateEnemy' の以前の定義を確認してください
   main.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.h(25,9): error C2086: 'int GameManager::p1Score': 再定義されました。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\main.h(25,22): error C2086: 'int GameManager::p2Score': 再定義されました。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\map.h(13,22): warning C4244: '初期化中': 'double' から 'float' への変換です。データが失われる可能性があります。
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\map.h(14,22): warning C4244: '初期化中': 'double' から 'float' への変換です。データが失われる可能性があります。
   コードを生成中...
