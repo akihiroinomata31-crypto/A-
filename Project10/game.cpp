@@ -1,6 +1,17 @@
 #include "game.h"
 #include "main.h"
 
+<<<<<<< HEAD
+=======
+void GameManager::Update() {
+    if (timeLimit > 0) {
+        timeLimit--;
+    }
+    else {
+        timeLimit = 0;
+    }
+}
+>>>>>>> df1f6e507ac3ff7df26707db6a4a675d27465e77
 
 void GameManager::Update(SCharaInfo* enemyList) {
     if (timeLimit > 0) {
@@ -85,7 +96,10 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
         }
     }
 }
+<<<<<<< HEAD
 void GameManager::AddScore(int score)
 {
     p1Score += score;
 }
+=======
+>>>>>>> df1f6e507ac3ff7df26707db6a4a675d27465e77

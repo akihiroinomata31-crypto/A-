@@ -1,0 +1,116 @@
+#pragma once
+
+#include "DxLib.h"
+
+#include <algorithm>
+
+namespace CharacterCombat {
+
+constexpr int kPlayerAttackPower = 150;
+constexpr int kPlayerSpecialPower = 300;
+constexpr int kMobHp = 200;
+constexpr int kBossHp = 1000;
+
+constexpr float kMobScale = 1.0f;
+constexpr float kPlayerScale = 1.1f;
+constexpr float kBossScale = 2.0f;
+
+enum class CharacterType {
+    Player,
+    Mob,
+    Boss,
+};
+
+enum class AttackType {
+    Normal,
+    Special,
+};
+
+struct CharacterStatus {
+    CharacterType type = CharacterType::Mob;
+    int hp = kMobHp;
+    int maxHp = kMobHp;
+    float scale = kMobScale;
+    bool alive = true;
+};
+
+struct AttackResult {
+    bool hit = false;
+    bool defeated = false;
+    int damage = 0;
+    int remainingHp = 0;
+};
+
+inline CharacterStatus MakePlayerStatus() {
+    CharacterStatus status;
+    status.type = CharacterType::Player;
+    status.hp = 1;
+    status.maxHp = 1;
+    status.scale = kPlayerScale;
+    return status;
+}
+
+inline CharacterStatus MakeMobStatus() {
+    CharacterStatus status;
+    status.type = CharacterType::Mob;
+    status.hp = kMobHp;
+    status.maxHp = kMobHp;
+    status.scale = kMobScale;
+    return status;
+}
+
+inline CharacterStatus MakeBossStatus() {
+    CharacterStatus status;
+    status.type = CharacterType::Boss;
+    status.hp = kBossHp;
+    status.maxHp = kBossHp;
+    status.scale = kBossScale;
+    return status;
+}
+
+inline int GetAttackDamage(AttackType attackType) {
+    return attackType == AttackType::Special ? kPlayerSpecialPower : kPlayerAttackPower;
+}
+
+inline int GetHitsToDefeat(int hp, AttackType attackType) {
+    const int damage = GetAttackDamage(attackType);
+    if (hp <= 0 || damage <= 0) {
+        return 0;
+    }
+    return (hp + damage - 1) / damage;
+}
+
+inline AttackResult ApplyAttack(CharacterStatus& target, AttackType attackType) {
+    AttackResult result;
+
+    if (!target.alive) {
+        return result;
+    }
+
+    result.hit = true;
+    result.damage = GetAttackDamage(attackType);
+    target.hp = std::max(0, target.hp - result.damage);
+    result.remainingHp = target.hp;
+
+    if (target.hp == 0) {
+        target.alive = false;
+        result.defeated = true;
+    }
+
+    return result;
+}
+
+inline bool IsCharacterDefeated(const CharacterStatus& status) {
+    return !status.alive || status.hp <= 0;
+}
+
+inline void ResetCharacter(CharacterStatus& status) {
+    status.hp = status.maxHp;
+    status.alive = true;
+}
+
+inline void ApplyModelScale(int modelHandle, const CharacterStatus& status) {
+    MV1SetScale(modelHandle, VGet(status.scale, status.scale, status.scale));
+}
+
+} // namespace CharacterCombat
