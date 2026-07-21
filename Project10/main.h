@@ -3,7 +3,6 @@
 // 全角を半角に直す
 #include <DxLib.h>
 
-
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
 #define MAX_CHARA 6
@@ -18,8 +17,8 @@
 #define ATTACK_FIRST_ENDTIME 15.0f
 #define ATTACK_SECOND_ENDTIME 15.0f
 #define ATTACK_THIERD_ENDTIME 30.0f
-
-
+class GameManager;
+struct SCharaInfo;
 enum Direction
 {
 	DOWN = 0,
@@ -51,6 +50,8 @@ typedef struct
 {
 	float	Width, Height;
 	VECTOR CenterPosition;
+	
+
 } SCharaHitInfo;
 
 
@@ -82,6 +83,14 @@ struct SCharaInfo
 
 // 当たり判定の幅、高さ
 // 当たり判定の中心座標
-void CheckAttackHit(SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage);
 extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
-
+extern void CheckAttackHit(
+	GameManager& game,
+	SCharaInfo* charainfo,
+	SCharaInfo* attacker,
+	SCharaInfo* target,
+	VECTOR start,
+	VECTOR end,
+	int SEdamageHandle,
+	int anim_damage
+);

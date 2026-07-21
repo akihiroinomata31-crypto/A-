@@ -1,6 +1,7 @@
 #include "game.h"
 #include "main.h"
 
+
 void GameManager::Update(SCharaInfo* enemyList) {
     if (timeLimit > 0) {
         timeLimit--;
@@ -68,22 +69,6 @@ void GameManager::DrawUI() {
 }
 
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
-    // 1番目(配列の添え字1)以降の枠を探す
-    for (int i = 1; i < MAX_CHARA; i++) {
-        // もしその敵が「未出現(NONE)」の状態なら、そこに新しい敵を割り当てる
-        if (enemyList[i].mode == NONE) {
-            enemyList[i].pos = VGet(x, 0.0f, z);
-            enemyList[i].mode = STAND; // 出現して待機状態にする
-            enemyList[i].enemyHP = 1;  // HPを初期化
-
-            // モデルの位置を更新
-            MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
-
-            break; // 1体生成したらループを抜ける
-        }
-    }
-}
-void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
     // 1番目からMAX_CHARA-1まで探す
     for (int i = 1; i < MAX_CHARA; i++) {
         // mode が NONE ならその枠は空いているとみなす
@@ -99,4 +84,8 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
             break; // 1体見つけたらループを抜ける
         }
     }
+}
+void GameManager::AddScore(int score)
+{
+    p1Score += score;
 }
