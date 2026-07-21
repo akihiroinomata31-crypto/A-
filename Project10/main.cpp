@@ -1,9 +1,36 @@
 // DXライブラリーのインクルード
 #include <DxLib.h>
 #include <math.h>
+#include <stdio.h>
 
 #include "main.h"
 #include "game.h"
+
+namespace {
+
+const int PLAYER_ATTACK_ANIM_COUNT = 3;
+
+int LoadPlayerAssetModel(const char* fileName) {
+	char path[256];
+
+	// 先に新しく置いた Player フォルダを読む。
+	sprintf_s(path, sizeof(path), "..\\Player\\%s", fileName);
+	int handle = MV1LoadModel(path);
+	if (handle != -1) {
+		return handle;
+	}
+
+	// 見つからない場合は、既存の Data\\Player フォルダから読む。
+	sprintf_s(path, sizeof(path), "..\\Data\\Player\\%s", fileName);
+	handle = MV1LoadModel(path);
+	if (handle == -1) {
+		printfDx("Player asset load failed: %s\n", fileName);
+	}
+
+	return handle;
+}
+
+} // namespace
 
 
 
@@ -18,7 +45,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	MATRIX wpmatrix, sayamatrix;
 	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
 
-	int anim_attack[1];
+	int anim_attack[PLAYER_ATTACK_ANIM_COUNT];
 	int		stagedata;
 	int sky;
 	float skyRot = 0;
@@ -80,6 +107,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		charainfo[i].charahitinfo.Height = PC_HEIGHT;
 		charainfo[i].charahitinfo.Width = PC_WIDTH;
 		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+		charainfo[i].isHit = false;
 	}
 	charainfo[0].mode = FALL;
 	//charainfo[0].direction = UP;
@@ -119,11 +147,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 	//モデル読み込み
-	charainfo[0].model1 = MV1LoadModel("..\\Data\\Player\\PC.mv1");
-	MV1SetPosition(charainfo[0].model1, charainfo[0].pos);
-	if (charainfo[1].model1 == -1) {
+	charainfo[0].model1 = LoadPlayerAssetModel("PC.mv1");
+	if (charainfo[0].model1 == -1) {
 		printfDx("プレイヤーのモデル読み込み失敗！\n");
+		return -1;
 	}
+	MV1SetPosition(charainfo[0].model1, charainfo[0].pos);
 	charainfo[1].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
 	MV1SetPosition(charainfo[1].model1, charainfo[1].pos);
 	if (charainfo[1].model1 == -1) {
@@ -133,20 +162,33 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	//ルートフレーム
 	//プレイヤー
 	rootflm = MV1SearchFrame(charainfo[0].model1, "root");
-	MV1SetFrameUserLocalMatrix(charainfo[0].model1, rootflm, MGetIdent());
+	if (rootflm != -1) {
+		MV1SetFrameUserLocalMatrix(charainfo[0].model1, rootflm, MGetIdent());
+	}
+	else {
+		printfDx("Player frame not found: root\n");
+	}
 	//敵
 	rootflm = MV1SearchFrame(charainfo[1].model1, "root");
 	if (rootflm != -1) {
 		MV1SetFrameUserLocalMatrix(charainfo[1].model1, rootflm, MGetIdent());
 	}
 	//武器モデル
-	wpmodel = MV1LoadModel("..\\Data\\Player\\Sabel.mv1");
+	wpmodel = LoadPlayerAssetModel("Sabel.mv1");
+	if (wpmodel == -1) return -1;
 	//武器フレーム
 	wpflm = MV1SearchFrame(charainfo[0].model1, "wp");
+	if (wpflm == -1) {
+		printfDx("Player frame not found: wp\n");
+	}
 	//鞘モデル
-	sayamodel = MV1LoadModel("..\\Data\\Player\\saya.mv1");
+	sayamodel = LoadPlayerAssetModel("Saya.mv1");
+	if (sayamodel == -1) return -1;
 	//鞘フレーム
 	saya = MV1SearchFrame(charainfo[0].model1, "sayabone");
+	if (saya == -1) {
+		printfDx("Player frame not found: sayabone\n");
+	}
 
 
 
@@ -169,21 +211,25 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 
-	anim_neutral = MV1LoadModel("..\\Data\\Player\\Anim_Neutral.mv1");
+	anim_neutral = LoadPlayerAssetModel("Anim_Neutral.mv1");
 	if (anim_neutral == -1) return -1;
-	anim_run = MV1LoadModel("..\\Data\\Player\\Anim_Run.mv1");
+	anim_run = LoadPlayerAssetModel("Anim_Run.mv1");
 	if (anim_run == -1) return -1;
-	anim_jumpin = MV1LoadModel("..\\Data\\Player\\Anim_Jump_In.mv1");
+	anim_jumpin = LoadPlayerAssetModel("Anim_Jump_In.mv1");
 	if (anim_jumpin == -1) return -1;
-	anim_jumploop = MV1LoadModel("..\\Data\\Player\\Anim_Jump_Loop.mv1");
+	anim_jumploop = LoadPlayerAssetModel("Anim_Jump_Loop.mv1");
 	if (anim_jumploop == -1) return -1;
-	anim_jumpout = MV1LoadModel("..\\Data\\Player\\Anim_Jump_Out.mv1");
+	anim_jumpout = LoadPlayerAssetModel("Anim_Jump_Out.mv1");
 	if (anim_jumpout == -1) return -1;
-	anim_attack[0] = MV1LoadModel("..\\Data\\Player\\Anim_Attack1.mv1");
+	anim_attack[0] = LoadPlayerAssetModel("Anim_Attack1.mv1");
 	if (anim_attack[0] == -1) return -1;
-	anim_damage = MV1LoadModel("..\\Data\\Player\\Anim_Damage.mv1");
+	anim_attack[1] = LoadPlayerAssetModel("Anim_Attack2.mv1");
+	if (anim_attack[1] == -1) return -1;
+	anim_attack[2] = LoadPlayerAssetModel("Anim_Attack3.mv1");
+	if (anim_attack[2] == -1) return -1;
+	anim_damage = LoadPlayerAssetModel("Anim_Damage.mv1");
 	if (anim_damage == -1) return -1;
-	anim_down = MV1LoadModel("..\\Data\\Player\\Anim_Down_Loop.mv1");
+	anim_down = LoadPlayerAssetModel("Anim_Down_Loop.mv1");
 	if (anim_down == -1) return -1;
 	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// 被撃アニメ
 	if (anim_down == -1) return -1;
@@ -248,6 +294,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				if ((charainfo[0].mode == JUMPOUT) || (charainfo[0].mode == ATTACKOUT)) {
 					if (charainfo[0].mode == ATTACKOUT) {
 						attackIndex = 0;
+						charainfo[0].isHit = false;
 					}
 					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
 					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_neutral);
@@ -295,6 +342,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 					//モード遷移
 					charainfo[0].mode = ATTACK;
+					charainfo[0].isHit = false;
 					//アニメーション遷移
 					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
 					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_attack[attackIndex]);
@@ -442,8 +490,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					//モード遷移
 					attackIndex = attackIndex < 2 ? attackIndex + 1 : 0;
 					isAttackBuffered = false;
+					charainfo[0].isHit = false;
 					//アニメーション遷移
 					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
+					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_attack[attackIndex]);
 
 					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(
 						charainfo[0].model1, charainfo[0].attachidx);
@@ -662,18 +712,22 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		MV1SetPosition(charainfo[0].model1, charainfo[0].pos);
 		//鞘の座標更新
-		sayamatrix = MV1GetFrameLocalWorldMatrix(charainfo[0].model1, saya);
-		MV1SetMatrix(sayamodel, sayamatrix);
+		if (saya != -1) {
+			sayamatrix = MV1GetFrameLocalWorldMatrix(charainfo[0].model1, saya);
+			MV1SetMatrix(sayamodel, sayamatrix);
+		}
 		//武器の座標更新
-		wpmatrix = MV1GetFrameLocalWorldMatrix(charainfo[0].model1, wpflm);
-		MV1SetMatrix(wpmodel, wpmatrix);
-		//攻撃判定の更新
-		wpPosStart = VGet(0.0f, 0.0f, 0.0f);
-		wpPosEnd = VGet(0.0f, -90.0f, 0.0f);
-		wpPosStart = VTransform(wpPosStart, wpmatrix);
-		wpPosEnd = VTransform(wpPosEnd, wpmatrix);
+		if (wpflm != -1) {
+			wpmatrix = MV1GetFrameLocalWorldMatrix(charainfo[0].model1, wpflm);
+			MV1SetMatrix(wpmodel, wpmatrix);
+			//攻撃判定の更新
+			wpPosStart = VGet(0.0f, 0.0f, 0.0f);
+			wpPosEnd = VGet(0.0f, -90.0f, 0.0f);
+			wpPosStart = VTransform(wpPosStart, wpmatrix);
+			wpPosEnd = VTransform(wpPosEnd, wpmatrix);
 
-		CheckAttackHit(charainfo, &charainfo[0], &charainfo[1], wpPosStart, wpPosEnd, SEdamageHandle, anim_damage);
+			CheckAttackHit(charainfo, &charainfo[0], &charainfo[1], wpPosStart, wpPosEnd, SEdamageHandle, anim_damage);
+		}
 
 		MV1SetAttachAnimTime(charainfo[1].model1, charainfo[1].attachidx, charainfo[1].playtime);
 
@@ -701,8 +755,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		//モデル描画
 		MV1DrawModel(charainfo[0].model1);
 		MV1DrawModel(charainfo[1].model1);
-		MV1DrawModel(wpmodel);
-		MV1DrawModel(sayamodel);
+		if (wpmodel != -1) {
+			MV1DrawModel(wpmodel);
+		}
+		if (sayamodel != -1) {
+			MV1DrawModel(sayamodel);
+		}
 		MV1DrawModel(stagedata);
 		skyRot += 0.001f;
 		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
@@ -727,12 +785,18 @@ void CheckAttackHit(SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* tar
 	// 攻撃中かつ、ターゲットがダウン/ダメージ硬直中でない場合のみ判定
 	if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
 	{
+		if (attacker->isHit == true) {
+			return;
+		}
+
 		// 半径を 30.0f に拡大 (当たらない場合はここを大きく調整してください)
 		if (HitCheck_Capsule_Capsule(start, end, 30.0f,
-			target->charahitinfo.CenterPosition,
-			VAdd(target->charahitinfo.CenterPosition, VGet(0, target->charahitinfo.Height, 0)),
+			target->pos,
+			VAdd(target->pos, VGet(0, target->charahitinfo.Height, 0)),
 			target->charahitinfo.Width / 2 + 30.0f))
 		{
+			attacker->isHit = true;
+
 			// 被弾アニメーションへ遷移
 			MV1DetachAnim(target->model1, target->attachidx);
 			target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
