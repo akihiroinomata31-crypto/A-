@@ -9,6 +9,11 @@
 namespace {
 
 const int PLAYER_ATTACK_ANIM_COUNT = 3;
+const int PLAYER_COUNT = 2;
+const int PLAYER1_INDEX = 0;
+const int PLAYER2_INDEX = 1;
+const int TEST_ENEMY_INDEX = 2;
+const float PLAYER_MODEL_SCALE = 1.1f;
 
 int LoadPlayerAssetModel(const char* fileName) {
 	char path[256];
@@ -30,6 +35,273 @@ int LoadPlayerAssetModel(const char* fileName) {
 	return handle;
 }
 
+struct PlayerInputConfig {
+	int padType;
+	int upKey;
+	int downKey;
+	int leftKey;
+	int rightKey;
+	int attackKey;
+	int jumpKey;
+};
+
+struct PlayerRuntimeState {
+	int key = 0;
+	int prevAttackButton = 0;
+	int attackIndex = 0;
+	bool isAttackBuffered = false;
+	bool moveInput = false;
+};
+
+bool IsKeyDown(int keyCode) {
+	return keyCode >= 0 && CheckHitKey(keyCode) != 0;
+}
+
+bool CanControlPlayerMode(int mode) {
+	return mode == STAND || mode == RUN || mode == ATTACK || mode == ATTACKOUT;
+}
+
+void ResetMove(SCharaInfo& chara) {
+	chara.move.x = 0.0f;
+	chara.move.y = 0.0f;
+	chara.move.z = 0.0f;
+}
+
+void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime = 0.0f) {
+	MV1DetachAnim(chara.model1, chara.attachidx);
+	chara.attachidx = MV1AttachAnim(chara.model1, 0, animHandle);
+	chara.anim_totaltime = MV1GetAttachAnimTotalTime(chara.model1, chara.attachidx);
+	chara.playtime = playtime;
+}
+
+void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
+	// 移動方向に合わせてキャラクターの向きを変える。
+	if (fabsf(inputX) > fabsf(inputZ)) {
+		player.direction = inputX < 0.0f ? Direction::LEFT : Direction::RIGHT;
+	}
+	else {
+		player.direction = inputZ < 0.0f ? Direction::DOWN : Direction::UP;
+	}
+}
+
+void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle) {
+	state.attackIndex = 0;
+	state.isAttackBuffered = false;
+	player.mode = ATTACK;
+	player.isHit = false;
+	SetCharacterAnimation(player, animAttack[state.attackIndex]);
+	PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
+}
+
+void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
+	if (player.mode != JUMPOUT) {
+		player.playtime += 0.3f;
+	}
+	else {
+		player.playtime += 0.1f;
+	}
+
+	if (player.mode != FALL && player.mode != JUMPIN && player.mode != JUMPLOOP
+		&& player.mode != ATTACK) {
+		if (player.playtime > player.anim_totaltime) {
+			if ((player.mode == JUMPOUT) || (player.mode == ATTACKOUT)) {
+				if (player.mode == ATTACKOUT) {
+					state.attackIndex = 0;
+					player.isHit = false;
+				}
+				SetCharacterAnimation(player, animNeutral);
+				player.mode = STAND;
+			}
+			player.playtime = 0.0f;
+		}
+	}
+
+	MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
+}
+
+void UpdatePlayerInput(
+	SCharaInfo& player,
+	PlayerRuntimeState& state,
+	const PlayerInputConfig& input,
+	const int animAttack[],
+	int animNeutral,
+	int animRun,
+	int animJumpIn,
+	int seAttackHandle,
+	int seJumpHandle
+) {
+	// プレイヤーを操作できる状態か確認する。
+	state.moveInput = false;
+	bool attackPressed = false;
+
+	if (CanControlPlayerMode(player.mode)) {
+		state.key = GetJoypadInputState(input.padType);
+		if (state.key < 0) {
+			// パッド未接続時は入力なしとして扱う。
+			state.key = 0;
+		}
+		// 攻撃ボタンは押した瞬間だけ反応させる。
+		const int currentAttackButton = ((state.key & PAD_INPUT_10) != 0 || IsKeyDown(input.attackKey)) ? 1 : 0;
+		attackPressed = (currentAttackButton == 1 && state.prevAttackButton == 0);
+		state.prevAttackButton = currentAttackButton;
+	}
+	else {
+		state.key = 0;
+		state.prevAttackButton = 0;
+	}
+
+	if (player.mode == STAND || player.mode == RUN) {
+		ResetMove(player);
+
+		if (attackPressed) {
+			StartPlayerAttack(player, state, animAttack, seAttackHandle);
+		}
+		else {
+			// キーボードとゲームパッド入力を移動量に変換する。
+			float inputX = 0.0f;
+			float inputZ = 0.0f;
+
+			if ((state.key & PAD_INPUT_DOWN) || IsKeyDown(input.downKey)) {
+				inputZ -= MOVE_SPEED;
+			}
+			if ((state.key & PAD_INPUT_UP) || IsKeyDown(input.upKey)) {
+				inputZ += MOVE_SPEED;
+			}
+			if ((state.key & PAD_INPUT_LEFT) || IsKeyDown(input.leftKey)) {
+				inputX -= MOVE_SPEED;
+			}
+			if ((state.key & PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey)) {
+				inputX += MOVE_SPEED;
+			}
+
+			if (inputX != 0.0f || inputZ != 0.0f) {
+				state.moveInput = true;
+				player.move.x = inputX;
+				player.move.z = inputZ;
+				SetDirectionByMove(player, inputX, inputZ);
+			}
+
+			if (IsKeyDown(input.jumpKey)) {
+				player.mode = JUMPIN;
+				SetCharacterAnimation(player, animJumpIn, 0.3f);
+				MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
+				PlaySoundMem(seJumpHandle, DX_PLAYTYPE_NORMAL);
+			}
+		}
+	}
+
+	// 攻撃中にもう一度押したら次の攻撃を予約する。
+	if (player.mode == ATTACK && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
+		state.isAttackBuffered = true;
+	}
+
+	MV1SetRotationXYZ(player.model1, VGet(0.0f, DX_PI_F * 0.5f * player.direction, 0.0f));
+
+	// 入力の有無で待機/走りアニメを切り替える。
+	if (!state.moveInput) {
+		if (player.mode == RUN) {
+			ResetMove(player);
+			player.mode = STAND;
+			SetCharacterAnimation(player, animNeutral);
+		}
+	}
+	else {
+		if (player.mode == STAND) {
+			player.mode = RUN;
+			SetCharacterAnimation(player, animRun);
+		}
+	}
+}
+
+void ApplyAttackStepMove(SCharaInfo& player, PlayerRuntimeState& state, const PlayerInputConfig& input) {
+	ResetMove(player);
+
+	if ((state.key & PAD_INPUT_DOWN) || IsKeyDown(input.downKey)) {
+		player.move.z = -7.0f;
+		player.direction = Direction::DOWN;
+	}
+	else if ((state.key & PAD_INPUT_UP) || IsKeyDown(input.upKey)) {
+		player.move.z = 7.0f;
+		player.direction = Direction::UP;
+	}
+	else if ((state.key & PAD_INPUT_LEFT) || IsKeyDown(input.leftKey)) {
+		player.move.x = -7.0f;
+		player.direction = Direction::LEFT;
+	}
+	else if ((state.key & PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey)) {
+		player.move.x = 7.0f;
+		player.direction = Direction::RIGHT;
+	}
+	else {
+		switch (player.direction)
+		{
+		case Direction::DOWN:
+			player.move.z = -7.0f;
+			break;
+		case Direction::UP:
+			player.move.z = 7.0f;
+			break;
+		case Direction::LEFT:
+			player.move.x = -7.0f;
+			break;
+		case Direction::RIGHT:
+			player.move.x = 7.0f;
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+void UpdatePlayerAttackState(
+	SCharaInfo& player,
+	PlayerRuntimeState& state,
+	const PlayerInputConfig& input,
+	const int animAttack[],
+	const float attackEndTime[],
+	int seAttackHandle
+) {
+	// 攻撃アニメーション中の移動と連撃遷移を処理する。
+	if (player.mode != ATTACK) {
+		return;
+	}
+
+	if (player.move.x != 0 || player.move.z != 0) {
+		switch (player.direction)
+		{
+		case Direction::DOWN:
+			player.move.z += 0.25f;
+			break;
+		case Direction::UP:
+			player.move.z -= 0.25f;
+			break;
+		case Direction::LEFT:
+			player.move.x += 0.25f;
+			break;
+		case Direction::RIGHT:
+			player.move.x -= 0.25f;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (player.playtime >= attackEndTime[state.attackIndex]) {
+		// 予約入力があれば次の攻撃アニメへつなげる。
+		if (state.isAttackBuffered && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
+			ApplyAttackStepMove(player, state, input);
+			state.attackIndex++;
+			state.isAttackBuffered = false;
+			player.isHit = false;
+			SetCharacterAnimation(player, animAttack[state.attackIndex]);
+			PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
+		}
+		else {
+			state.isAttackBuffered = false;
+			player.mode = ATTACKOUT;
+		}
+	}
+}
 } // namespace
 
 
@@ -39,10 +311,9 @@ int LoadPlayerAssetModel(const char* fileName) {
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
 
-	int key = 0;
 	int running = 0;
 	int rootflm;
-	MATRIX wpmatrix, sayamatrix;
+	MATRIX wpmatrix[PLAYER_COUNT], sayamatrix[PLAYER_COUNT];
 	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
 
 	int anim_attack[PLAYER_ATTACK_ANIM_COUNT];
@@ -50,20 +321,23 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int sky;
 	float skyRot = 0;
 	SCharaInfo charainfo[MAX_CHARA];
-	int wpmodel, wpflm;
-	int sayamodel, saya;
-	VECTOR wpPosStart, wpPosEnd;
+	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
+	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
+	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
 	int prevJKey = 0;
 	int isBGMPlaying = 1;
+	PlayerRuntimeState playerStates[PLAYER_COUNT];
+	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
+		{ DX_INPUT_KEY_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q },
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1 }
+	};
 
 
 	int enemyCount = 0;          // 現在の敵の数
 	int spawnTimer = 0;          // 出現までのカウント用
 	const int SPAWN_INTERVAL = 300; // 出現間隔
 
-	int attackIndex = 0;//攻撃段階の添え字
-	bool isAttackBuffered = false;//攻撃先行入力フラグ
-	float attackInEndTime[3] = { ATTACK_FIRST_ENDTIME,ATTACK_SECOND_ENDTIME,ATTACK_THIERD_ENDTIME };
+	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
 
 	GameManager game;
 	VECTOR stagepos = VGet(0.0f, 2000.0f, 0.0f);
@@ -101,28 +375,37 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 //キャラ情報
 
-	charainfo[0].pos = VGet(900.0f, 0.0f, -400.0f);
-	charainfo[1].pos = VGet(1000.0f, 0.0f, -400.0f);
-	for (int i = 0; i < 2; i++) {
+	// 0番を1P、1番を2P、2番をテスト用敵として使う。
+	for (int i = 0; i < MAX_CHARA; i++) {
+		charainfo[i].model1 = -1;
+		charainfo[i].attachidx = -1;
+		charainfo[i].mode = NONE;
+		charainfo[i].direction = Direction::DOWN;
+		ResetMove(charainfo[i]);
+		charainfo[i].pos = VGet(0.0f, 0.0f, 0.0f);
 		charainfo[i].charahitinfo.Height = PC_HEIGHT;
 		charainfo[i].charahitinfo.Width = PC_WIDTH;
 		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+		charainfo[i].HP = 0;
+		charainfo[i].enemyHP = 0;
 		charainfo[i].isHit = false;
 	}
-	charainfo[0].mode = FALL;
-	//charainfo[0].direction = UP;
-	charainfo[0].move.x = 0.0f;
-	charainfo[0].move.y = 0.0f;
-	charainfo[0].move.z = 0.0f;
 
-	charainfo[1].mode = STAND;
-	charainfo[1].move.x = 0.0f;
-	charainfo[1].move.z = 0.0f;
-	charainfo[1].move.y = 0.0f;
+	charainfo[PLAYER1_INDEX].pos = VGet(850.0f, 0.0f, -400.0f);
+	charainfo[PLAYER2_INDEX].pos = VGet(1050.0f, 0.0f, -400.0f);
+	charainfo[TEST_ENEMY_INDEX].pos = VGet(1000.0f, 0.0f, -150.0f);
 
-	charainfo[0].HP = 6;
-	charainfo[1].enemyHP = 6;
+	for (int i = 0; i < PLAYER_COUNT; i++) {
+		charainfo[i].mode = STAND;
+		charainfo[i].HP = 6;
+		charainfo[i].charahitinfo.Height = PC_HEIGHT * PLAYER_MODEL_SCALE;
+		charainfo[i].charahitinfo.Width = PC_WIDTH * PLAYER_MODEL_SCALE;
+		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+	}
 
+	charainfo[TEST_ENEMY_INDEX].mode = STAND;
+	charainfo[TEST_ENEMY_INDEX].enemyHP = 6;
+	charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
 
 	//モデル座標初期セット
 	VECTOR pos[2] = { VGet(450.0f, 200.0f, -350.0f),VGet(700.0f, 200.0f, -350.0f) };
@@ -147,50 +430,57 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 	//モデル読み込み
-	charainfo[0].model1 = LoadPlayerAssetModel("PC.mv1");
-	if (charainfo[0].model1 == -1) {
-		printfDx("プレイヤーのモデル読み込み失敗！\n");
-		return -1;
+	for (int i = 0; i < PLAYER_COUNT; i++) {
+		charainfo[i].model1 = LoadPlayerAssetModel("PC.mv1");
+		if (charainfo[i].model1 == -1) {
+			printfDx("プレイヤー%dのモデル読み込み失敗！\n", i + 1);
+			return -1;
+		}
+		MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
+		MV1SetScale(charainfo[i].model1, VGet(PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE));
 	}
-	MV1SetPosition(charainfo[0].model1, charainfo[0].pos);
-	charainfo[1].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
-	MV1SetPosition(charainfo[1].model1, charainfo[1].pos);
-	if (charainfo[1].model1 == -1) {
+	// 2P は仮で少し青くして、同じモデルでも見分けやすくする。
+	MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
+
+	charainfo[TEST_ENEMY_INDEX].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
+	MV1SetPosition(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].pos);
+	if (charainfo[TEST_ENEMY_INDEX].model1 == -1) {
 		printfDx("ゴブリンのモデル読み込み失敗！\n");
 	}
 
 	//ルートフレーム
-	//プレイヤー
-	rootflm = MV1SearchFrame(charainfo[0].model1, "root");
+	for (int i = 0; i < PLAYER_COUNT; i++) {
+		rootflm = MV1SearchFrame(charainfo[i].model1, "root");
+		if (rootflm != -1) {
+			MV1SetFrameUserLocalMatrix(charainfo[i].model1, rootflm, MGetIdent());
+		}
+		else {
+			printfDx("Player%d frame not found: root\n", i + 1);
+		}
+	}
+	rootflm = MV1SearchFrame(charainfo[TEST_ENEMY_INDEX].model1, "root");
 	if (rootflm != -1) {
-		MV1SetFrameUserLocalMatrix(charainfo[0].model1, rootflm, MGetIdent());
-	}
-	else {
-		printfDx("Player frame not found: root\n");
-	}
-	//敵
-	rootflm = MV1SearchFrame(charainfo[1].model1, "root");
-	if (rootflm != -1) {
-		MV1SetFrameUserLocalMatrix(charainfo[1].model1, rootflm, MGetIdent());
-	}
-	//武器モデル
-	wpmodel = LoadPlayerAssetModel("Sabel.mv1");
-	if (wpmodel == -1) return -1;
-	//武器フレーム
-	wpflm = MV1SearchFrame(charainfo[0].model1, "wp");
-	if (wpflm == -1) {
-		printfDx("Player frame not found: wp\n");
-	}
-	//鞘モデル
-	sayamodel = LoadPlayerAssetModel("Saya.mv1");
-	if (sayamodel == -1) return -1;
-	//鞘フレーム
-	saya = MV1SearchFrame(charainfo[0].model1, "sayabone");
-	if (saya == -1) {
-		printfDx("Player frame not found: sayabone\n");
+		MV1SetFrameUserLocalMatrix(charainfo[TEST_ENEMY_INDEX].model1, rootflm, MGetIdent());
 	}
 
-
+	for (int i = 0; i < PLAYER_COUNT; i++) {
+		//武器モデル
+		playerWeaponModel[i] = LoadPlayerAssetModel("Sabel.mv1");
+		if (playerWeaponModel[i] == -1) return -1;
+		//武器フレーム
+		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "wp");
+		if (playerWeaponFrame[i] == -1) {
+			printfDx("Player%d frame not found: wp\n", i + 1);
+		}
+		//鞘モデル
+		playerSayaModel[i] = LoadPlayerAssetModel("Saya.mv1");
+		if (playerSayaModel[i] == -1) return -1;
+		//鞘フレーム
+		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
+		if (playerSayaFrame[i] == -1) {
+			printfDx("Player%d frame not found: sayabone\n", i + 1);
+		}
+	}
 
 
 	// ステージ情報の読み込み
@@ -238,10 +528,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// 被撃アニメ
 	if (anim_down == -1) return -1;
 
-	charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_neutral);
-	charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[0].model1, charainfo[0].attachidx);
-	charainfo[1].attachidx = MV1AttachAnim(charainfo[1].model1, 0, enemy_anim_neutral);
-	charainfo[1].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[1].model1, charainfo[1].attachidx);
+	for (int i = 0; i < PLAYER_COUNT; i++) {
+		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
+		charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+	}
+	charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, enemy_anim_neutral);
+	charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
 
 
 	SetDrawScreen(DX_SCREEN_BACK);
@@ -281,273 +573,112 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
-
-		if (charainfo[0].mode != JUMPOUT) {
-			charainfo[0].playtime += 0.3f;
-		}
-		else {
-			charainfo[0].playtime += 0.1f;
-		}
-		if (charainfo[0].mode != FALL && charainfo[0].mode != JUMPIN && charainfo[0].mode != JUMPLOOP
-			&& charainfo[0].mode != ATTACK) {
-			if (charainfo[0].playtime > charainfo[0].anim_totaltime) {
-				if ((charainfo[0].mode == JUMPOUT) || (charainfo[0].mode == ATTACKOUT)) {
-					if (charainfo[0].mode == ATTACKOUT) {
-						attackIndex = 0;
-						charainfo[0].isHit = false;
-					}
-					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_neutral);
-					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].mode = STAND;
-				}
-				charainfo[0].playtime = 0.0f;
-			}
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			// 1P/2P の再生時間と待機復帰を共通処理する。
+			UpdatePlayerAnimationProgress(charainfo[i], playerStates[i], anim_neutral);
 		}
 		//敵アニメーション進行
-		charainfo[1].playtime += 0.5f;
-		if (charainfo[1].playtime > charainfo[1].anim_totaltime) {
-			charainfo[1].playtime = 0.0f;
-			if (charainfo[1].mode == DAMAGE) {
-				if (charainfo[1].enemyHP <= 0) {
-					MV1DetachAnim(charainfo[1].model1, charainfo[1].attachidx);
-					charainfo[1].attachidx = MV1AttachAnim(charainfo[1].model1, 0, anim_down);
-					charainfo[1].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[1].model1, charainfo[1].attachidx);
-					charainfo[1].mode = DOWNMODE;
+		charainfo[TEST_ENEMY_INDEX].playtime += 0.5f;
+		if (charainfo[TEST_ENEMY_INDEX].playtime > charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
+			charainfo[TEST_ENEMY_INDEX].playtime = 0.0f;
+			if (charainfo[TEST_ENEMY_INDEX].mode == DAMAGE) {
+				if (charainfo[TEST_ENEMY_INDEX].enemyHP <= 0) {
+					MV1DetachAnim(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
+					charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, anim_down);
+					charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
+					charainfo[TEST_ENEMY_INDEX].mode = DOWNMODE;
 				}
 				else {
-					MV1DetachAnim(charainfo[1].model1, charainfo[1].attachidx);
-					charainfo[1].attachidx = MV1AttachAnim(charainfo[1].model1, 0, enemy_anim_neutral);
-					charainfo[1].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[1].model1, charainfo[1].attachidx);
-					charainfo[1].mode = STAND;
+					MV1DetachAnim(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
+					charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, enemy_anim_neutral);
+					charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
+					charainfo[TEST_ENEMY_INDEX].mode = STAND;
 				}
 			}
 		}
-
-		MV1SetAttachAnimTime(charainfo[0].model1, charainfo[0].attachidx, charainfo[0].playtime);
 
 
 		// キー操作
-		{
-			if (charainfo[0].mode == STAND || charainfo[0].mode == RUN
-				|| charainfo[0].mode == ATTACK || charainfo[0].mode == ATTACKOUT)
-			{
-				key = GetJoypadInputState(DX_INPUT_KEY_PAD1);
-			}
-			if (charainfo[0].mode == STAND || charainfo[0].mode == RUN) {
-				if (key & PAD_INPUT_10) {
-					charainfo[0].move.x = 0.0f;
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = 0.0f;
-
-					//モード遷移
-					charainfo[0].mode = ATTACK;
-					charainfo[0].isHit = false;
-					//アニメーション遷移
-					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_attack[attackIndex]);
-					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(
-						charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].playtime = 0.0f;
-					//SE再生
-					PlaySoundMem(SEattackHandle, DX_PLAYTYPE_BACK);
-				}
-				if (CheckHitKey(KEY_INPUT_S)) {//w
-					charainfo[0].move.x = 0.0f;
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = -MOVE_SPEED; // 下を押下 手前に移動
-					charainfo[0].direction = Direction::DOWN;
-				}
-				if (CheckHitKey(KEY_INPUT_W)) {//s
-					charainfo[0].move.x = 0.0f;
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = MOVE_SPEED; // 上を押下 奥に移動
-					charainfo[0].direction = Direction::UP;
-				}
-				if (CheckHitKey(KEY_INPUT_A)) {//a
-					charainfo[0].move.x = -MOVE_SPEED; // 左を押下 左に移動
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = 0.0f;
-					charainfo[0].direction = Direction::LEFT;
-
-				}
-				if (CheckHitKey(KEY_INPUT_D)) {//d
-					charainfo[0].move.x = MOVE_SPEED; // 右を押下 右に移動
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = 0.0f;
-					charainfo[0].direction = Direction::RIGHT;
-				}
-				if (CheckHitKey(KEY_INPUT_Q)) {  // JUMPボタン Qキー
-					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].mode = JUMPIN;
-					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_jumpin);
-					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(
-						charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].playtime = 0.3f;
-					MV1SetAttachAnimTime(
-						charainfo[0].model1, charainfo[0].attachidx, charainfo[0].playtime);
-					//SE再生
-					PlaySoundMem(SEjumpHandle, DX_PLAYTYPE_NORMAL);
-				}
-				if (currentJKey == 1 && prevJKey == 0) {
-					if (isBGMPlaying) {
-						StopSoundMem(BGMSoundHandle);
-						isBGMPlaying = 0;
-					}
-					else {
-						PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP);
-						isBGMPlaying = 1;
-					}
-				}
-				prevJKey = key;
-			}
-
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			// 1P/2P の入力、移動、待機/走り切替、攻撃予約を共通処理する。
+			UpdatePlayerInput(
+				charainfo[i],
+				playerStates[i],
+				playerInputs[i],
+				anim_attack,
+				anim_neutral,
+				anim_run,
+				anim_jumpin,
+				SEattackHandle,
+				SEjumpHandle
+			);
+			UpdatePlayerAttackState(
+				charainfo[i],
+				playerStates[i],
+				playerInputs[i],
+				anim_attack,
+				attackInEndTime,
+				SEattackHandle
+			);
 		}
 
-		MV1SetRotationXYZ(charainfo[0].model1, VGet(0.0f, DX_PI_F * 0.5f * charainfo[0].direction, 0.0f));
-		if (key == 0) {
-			if (charainfo[0].mode == RUN) {
-				charainfo[0].move.x = 0.0f;
-				charainfo[0].move.y = 0.0f;
-				charainfo[0].move.z = 0.0f;
-				charainfo[0].mode = STAND;
-				MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-				charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_neutral);
-				charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[0].model1, charainfo[0].attachidx);
+		if (currentJKey == 1 && prevJKey == 0) {
+			if (isBGMPlaying) {
+				StopSoundMem(BGMSoundHandle);
+				isBGMPlaying = 0;
+			}
+			else {
+				PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP);
+				isBGMPlaying = 1;
 			}
 		}
-		else {
-			if (charainfo[0].mode == STAND) {
-				charainfo[0].mode = RUN;
-				MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-				charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_run);
-				charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[0].model1, charainfo[0].attachidx);
-			}
-		}
-		//攻撃状態
-		if (charainfo[0].mode == ATTACK) {
-			if (charainfo[0].move.x != 0 || charainfo[0].move.z != 0) {
-				switch (charainfo[0].direction)
-				{
-				case Direction::DOWN:
-					charainfo[0].move.z += 0.25f;
-					break;
-				case Direction::UP:
-					charainfo[0].move.z -= 0.25f;
-					break;
-				case Direction::LEFT:
-					charainfo[0].move.x += 0.25f;
-					break;
-				case Direction::RIGHT:
-					charainfo[0].move.x -= 0.25f;
-					break;
-				default:
-					break;
-				}
-			}
+		prevJKey = currentJKey;
 
-			if (charainfo[0].playtime >= attackInEndTime[attackIndex]) {
-				if (isAttackBuffered) {
-					//移動速度向き
-					charainfo[0].move.x = 0.0f;
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = 0.0f;
-					if (CheckHitKey(KEY_INPUT_S)) {//w
-						charainfo[0].move.z = -7.0f;
-						charainfo[0].direction = Direction::DOWN;
-					}
-					else if (CheckHitKey(KEY_INPUT_W)) {//s
-						charainfo[0].move.z = 7.0f;
-						charainfo[0].direction = Direction::UP;
-					}
-					else if (CheckHitKey(KEY_INPUT_A)) {//a
-						charainfo[0].move.x = -7.0f;
-						charainfo[0].direction = Direction::LEFT;
-					}
-					else if (CheckHitKey(KEY_INPUT_D)) {//d
-						charainfo[0].move.x = 7.0f;
-						charainfo[0].direction = Direction::RIGHT;
-					}
-					else {
-						switch (charainfo[0].direction)
-						{
-						case Direction::DOWN:
-							charainfo[0].move.z = -7.0f;
-							break;
-						case Direction::UP:
-							charainfo[0].move.z = 7.0f;
-							break;
-						case Direction::LEFT:
-							charainfo[0].move.x = -7.0f;
-							break;
-						case Direction::RIGHT:
-							charainfo[0].move.x = 7.0f;
-							break;
-						default:
-							break;
-						}
-					}
-					//モード遷移
-					attackIndex = attackIndex < 2 ? attackIndex + 1 : 0;
-					isAttackBuffered = false;
-					charainfo[0].isHit = false;
-					//アニメーション遷移
-					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_attack[attackIndex]);
-
-					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(
-						charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].playtime = 0.0f;
-					//SE再生
-					PlaySoundMem(SEattackHandle, DX_PLAYTYPE_BACK);
-				}
-				else {
-					charainfo[0].mode = ATTACKOUT;
-				}
-			}
+		int enemyTargetIndex = PLAYER1_INDEX;
+		float enemyDistP1 = VSize(VSub(charainfo[PLAYER1_INDEX].pos, charainfo[TEST_ENEMY_INDEX].pos));
+		float enemyDistP2 = VSize(VSub(charainfo[PLAYER2_INDEX].pos, charainfo[TEST_ENEMY_INDEX].pos));
+		if (enemyDistP2 < enemyDistP1) {
+			enemyTargetIndex = PLAYER2_INDEX;
 		}
-		if (charainfo[1].mode == STAND) {
-			// 距離計算
-			float dist = VSize(VSub(charainfo[0].pos, charainfo[1].pos));
+
+		if (charainfo[TEST_ENEMY_INDEX].mode == STAND) {
+			// 距離の近いプレイヤーを攻撃対象にする。
+			float dist = VSize(VSub(charainfo[enemyTargetIndex].pos, charainfo[TEST_ENEMY_INDEX].pos));
 			if (dist < 150.0f) {
-				charainfo[1].mode = ATTACK;
-				MV1DetachAnim(charainfo[1].model1, charainfo[1].attachidx);
-				charainfo[1].attachidx = MV1AttachAnim(charainfo[1].model1, 0, enemy_anim_attack);
-				charainfo[1].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[1].model1, charainfo[1].attachidx);
-				charainfo[1].playtime = 0.0f;
+				charainfo[TEST_ENEMY_INDEX].mode = ATTACK;
+				SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_attack);
 			}
 		}
 
-		else if (charainfo[1].mode == ATTACK) {
+		else if (charainfo[TEST_ENEMY_INDEX].mode == ATTACK) {
 
 			// 攻撃アニメーションの「振り下ろし」タイミング
-			if (charainfo[1].playtime >= charainfo[1].anim_totaltime * 0.4f &&
-				charainfo[1].playtime <= charainfo[1].anim_totaltime * 0.6f)
+			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.4f &&
+				charainfo[TEST_ENEMY_INDEX].playtime <= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.6f)
 			{
 				// 攻撃がまだ一度も当たっていない場合のみ判定
-				if (charainfo[1].isHit == false)
+				if (charainfo[TEST_ENEMY_INDEX].isHit == false)
 				{
-					// ヒットチェック
-					if (HitCheck_Capsule_Capsule(
-						charainfo[1].pos, VAdd(charainfo[1].pos, VGet(0, 50, 0)), 60.0f,
-						charainfo[0].pos, VAdd(charainfo[0].pos, VGet(0, PC_HEIGHT, 0)), PC_WIDTH / 2))
-					{
-						charainfo[0].HP -= 1; // ダメージ発生
-						charainfo[1].isHit = true; // フラグを立てて連続ヒットを防止
-						printfDx("プレイヤー被弾！HP:%d\n", charainfo[0].HP);
+					for (int i = 0; i < PLAYER_COUNT; i++) {
+						// テスト敵の攻撃は、範囲内のどちらのプレイヤーにも当たる。
+						if (HitCheck_Capsule_Capsule(
+							charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
+							charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)), charainfo[i].charahitinfo.Width / 2))
+						{
+							charainfo[i].HP -= 1; // ダメージ発生
+							charainfo[TEST_ENEMY_INDEX].isHit = true; // フラグを立てて連続ヒットを防止
+							printfDx("プレイヤー%d被弾！HP:%d\n", i + 1, charainfo[i].HP);
+							break;
+						}
 					}
 				}
 			}
 
 			// アニメーションが終わったらフラグをリセットして通常モードへ
-			if (charainfo[1].playtime >= charainfo[1].anim_totaltime) {
-				charainfo[1].mode = STAND;
-				MV1DetachAnim(charainfo[1].model1, charainfo[1].attachidx);
-				charainfo[1].attachidx = MV1AttachAnim(charainfo[1].model1, 0, enemy_anim_neutral);
-				charainfo[1].playtime = 0.0f;
-				charainfo[1].isHit = false;
-
-
+			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
+				charainfo[TEST_ENEMY_INDEX].mode = STAND;
+				SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
+				charainfo[TEST_ENEMY_INDEX].isHit = false;
 			}
 		}
 		HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[0].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[0].move));
@@ -587,17 +718,33 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		float MaxY_poly;
 
 		if (HitCheck_Capsule_Capsule(
-			VAdd(charainfo[0].pos, charainfo[0].move),
-			VAdd(charainfo[0].pos, charainfo[0].move),
-			charainfo[0].charahitinfo.Width / 2,
-			VAdd(charainfo[1].pos, charainfo[1].move),
-			VAdd(charainfo[1].pos, charainfo[1].move),
-			charainfo[0].charahitinfo.Width / 2)
+			VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER1_INDEX].move),
+			VAdd(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER1_INDEX].move), VGet(0, charainfo[PLAYER1_INDEX].charahitinfo.Height, 0)),
+			charainfo[PLAYER1_INDEX].charahitinfo.Width / 2,
+			VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move),
+			VAdd(VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move), VGet(0, charainfo[PLAYER2_INDEX].charahitinfo.Height, 0)),
+			charainfo[PLAYER2_INDEX].charahitinfo.Width / 2)
 			== TRUE) {
-			// 接触していたら移動量を無しに
-			charainfo[0].move.x = 0.0f;
-			charainfo[0].move.z = 0.0f;
-			charainfo[0].move.y = 0.0f;
+			// プレイヤー同士が重なりそうな場合は、横移動だけ止める。
+			charainfo[PLAYER1_INDEX].move.x = 0.0f;
+			charainfo[PLAYER1_INDEX].move.z = 0.0f;
+			charainfo[PLAYER2_INDEX].move.x = 0.0f;
+			charainfo[PLAYER2_INDEX].move.z = 0.0f;
+		}
+
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			if (charainfo[TEST_ENEMY_INDEX].mode != DOWNMODE && HitCheck_Capsule_Capsule(
+				VAdd(charainfo[i].pos, charainfo[i].move),
+				VAdd(VAdd(charainfo[i].pos, charainfo[i].move), VGet(0, charainfo[i].charahitinfo.Height, 0)),
+				charainfo[i].charahitinfo.Width / 2,
+				charainfo[TEST_ENEMY_INDEX].pos,
+				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
+				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2)
+				== TRUE) {
+				// テスト敵と重なりそうな場合は、そのプレイヤーの横移動を止める。
+				charainfo[i].move.x = 0.0f;
+				charainfo[i].move.z = 0.0f;
+			}
 		}
 		// 床ポリゴンとの当たり判定
 		if (FloorNum != 0) {
@@ -695,9 +842,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1CollResultPolyDimTerminate(HitDim);
 
 		// 移動処理
-		charainfo[0].pos.x += charainfo[0].move.x;
-		charainfo[0].pos.y += charainfo[0].move.y;
-		charainfo[0].pos.z += charainfo[0].move.z;
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			charainfo[i].pos.x += charainfo[i].move.x;
+			charainfo[i].pos.y += charainfo[i].move.y;
+			charainfo[i].pos.z += charainfo[i].move.z;
+			// 移動後の座標を攻撃判定用の中心にも反映する。
+			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+		}
 
 		cpos.x += charainfo[0].move.x;
 		cpos.y += charainfo[0].move.y;
@@ -710,39 +861,40 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
-		MV1SetPosition(charainfo[0].model1, charainfo[0].pos);
-		//鞘の座標更新
-		if (saya != -1) {
-			sayamatrix = MV1GetFrameLocalWorldMatrix(charainfo[0].model1, saya);
-			MV1SetMatrix(sayamodel, sayamatrix);
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
+			//鞘の座標更新
+			if (playerSayaFrame[i] != -1 && playerSayaModel[i] != -1) {
+				sayamatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerSayaFrame[i]);
+				MV1SetMatrix(playerSayaModel[i], sayamatrix[i]);
+			}
+			//武器の座標更新
+			if (playerWeaponFrame[i] != -1 && playerWeaponModel[i] != -1) {
+				wpmatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerWeaponFrame[i]);
+				MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
+				//攻撃判定の更新
+				wpPosStart[i] = VGet(0.0f, 0.0f, 0.0f);
+				wpPosEnd[i] = VGet(0.0f, -90.0f, 0.0f);
+				wpPosStart[i] = VTransform(wpPosStart[i], wpmatrix[i]);
+				wpPosEnd[i] = VTransform(wpPosEnd[i], wpmatrix[i]);
+
+				CheckAttackHit(charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+			}
 		}
-		//武器の座標更新
-		if (wpflm != -1) {
-			wpmatrix = MV1GetFrameLocalWorldMatrix(charainfo[0].model1, wpflm);
-			MV1SetMatrix(wpmodel, wpmatrix);
-			//攻撃判定の更新
-			wpPosStart = VGet(0.0f, 0.0f, 0.0f);
-			wpPosEnd = VGet(0.0f, -90.0f, 0.0f);
-			wpPosStart = VTransform(wpPosStart, wpmatrix);
-			wpPosEnd = VTransform(wpPosEnd, wpmatrix);
 
-			CheckAttackHit(charainfo, &charainfo[0], &charainfo[1], wpPosStart, wpPosEnd, SEdamageHandle, anim_damage);
-		}
+		MV1SetAttachAnimTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx, charainfo[TEST_ENEMY_INDEX].playtime);
 
-		MV1SetAttachAnimTime(charainfo[1].model1, charainfo[1].attachidx, charainfo[1].playtime);
-
-		if (key & PAD_INPUT_2 && charainfo[1].mode == DOWNMODE) {
-			charainfo[1].enemyHP = 6;
-
-			MV1DetachAnim(charainfo[1].model1, charainfo[1].attachidx);
-			charainfo[1].attachidx = MV1AttachAnim(charainfo[1].model1, 0, enemy_anim_neutral);
-			charainfo[1].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[1].model1, charainfo[1].attachidx);
-			charainfo[1].mode = STAND;
+		if ((playerStates[PLAYER1_INDEX].key & PAD_INPUT_2) && charainfo[TEST_ENEMY_INDEX].mode == DOWNMODE) {
+			charainfo[TEST_ENEMY_INDEX].enemyHP = 6;
+			charainfo[TEST_ENEMY_INDEX].mode = STAND;
+			SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
 		}
 
 
 		//カメラ追従
-		ctgt = VAdd(charainfo[0].pos, VGet(0.0f, 0.0f, 0.0f));
+		// 2人の中間地点を見るようにして、同じ画面内に入りやすくする。
+		VECTOR cameraCenter = VScale(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER2_INDEX].pos), 0.5f);
+		ctgt = VAdd(cameraCenter, VGet(0.0f, 0.0f, 0.0f));
 		cpos = VAdd(ctgt, VGet(0.0f, 300.0f, -1200.0f));
 		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
 
@@ -753,13 +905,17 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		// 四角形を表示 最後の引数をfalseにすると塗りつぶし無し
 		DrawBox(0, 0, 900, 600, GetColor(255, 255, 255), true);
 		//モデル描画
-		MV1DrawModel(charainfo[0].model1);
-		MV1DrawModel(charainfo[1].model1);
-		if (wpmodel != -1) {
-			MV1DrawModel(wpmodel);
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			MV1DrawModel(charainfo[i].model1);
 		}
-		if (sayamodel != -1) {
-			MV1DrawModel(sayamodel);
+		MV1DrawModel(charainfo[TEST_ENEMY_INDEX].model1);
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			if (playerWeaponModel[i] != -1) {
+				MV1DrawModel(playerWeaponModel[i]);
+			}
+			if (playerSayaModel[i] != -1) {
+				MV1DrawModel(playerSayaModel[i]);
+			}
 		}
 		MV1DrawModel(stagedata);
 		skyRot += 0.001f;
