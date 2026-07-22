@@ -1,17 +1,6 @@
 #include "game.h"
 #include "main.h"
-
-<<<<<<< HEAD
-=======
-void GameManager::Update() {
-    if (timeLimit > 0) {
-        timeLimit--;
-    }
-    else {
-        timeLimit = 0;
-    }
-}
->>>>>>> df1f6e507ac3ff7df26707db6a4a675d27465e77
+#include "player.h"
 
 void GameManager::Update(SCharaInfo* enemyList) {
     if (timeLimit > 0) {
@@ -80,8 +69,8 @@ void GameManager::DrawUI() {
 }
 
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
-    // 1”Ô–Ú‚©‚çMAX_CHARA-1‚Ü‚Å’T‚·
-    for (int i = 1; i < MAX_CHARA; i++) {
+    // ƒvƒŒƒCƒ„[˜g‚ð”ð‚¯‚ÄA“G—p‚Ì˜g‚¾‚¯‚ð’T‚·
+    for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
         // mode ‚ª NONE ‚È‚ç‚»‚Ì˜g‚Í‹ó‚¢‚Ä‚¢‚é‚Æ‚Ý‚È‚·
         if (enemyList[i].mode == NONE) {
             enemyList[i].pos = VGet(x, 0.0f, z);
@@ -96,10 +85,7 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
         }
     }
 }
-<<<<<<< HEAD
 void GameManager::AddScore(int score)
 {
     p1Score += score;
 }
-=======
->>>>>>> df1f6e507ac3ff7df26707db6a4a675d27465e77

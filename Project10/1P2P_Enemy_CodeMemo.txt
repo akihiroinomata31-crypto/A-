@@ -1,0 +1,271 @@
+1P / 2P / 敵の区別コード説明
+ファイル位置: Project10/main.cpp
+
+基本方針:
+- charainfo[0] は 1P として固定で使う。
+- charainfo[1] は 2P として固定で使う。
+- charainfo[2] は現在、テスト用敵 Goblin として使う。
+- 今後、正式な敵生成処理を作る場合は、charainfo[0] と charainfo[1] を敵として使わないこと。
+
+
+1. キャラクターのインデックス定義
+main.cpp:11-16
+
+const int PLAYER_ATTACK_ANIM_COUNT = 3;
+const int PLAYER_COUNT = 2;
+const int PLAYER1_INDEX = 0;
+const int PLAYER2_INDEX = 1;
+const int TEST_ENEMY_INDEX = 2;
+const float PLAYER_MODEL_SCALE = 1.1f;
+
+説明:
+- PLAYER_COUNT = 2 は、プレイヤー数が 2 人であることを表す。
+- PLAYER1_INDEX / PLAYER2_INDEX / TEST_ENEMY_INDEX を使うことで、charainfo[0] などの数字を直接書かずに済む。
+- charainfo[TEST_ENEMY_INDEX] は、現在のテスト用敵を指す。
+
+
+2. 1P / 2P の入力設定
+main.cpp:329-333
+
+PlayerRuntimeState playerStates[PLAYER_COUNT];
+PlayerInputConfig playerInputs[PLAYER_COUNT] = {
+    { DX_INPUT_KEY_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q },
+    { DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1 }
+};
+
+説明:
+- 1 行目は 1P 用の設定。
+  WASD で移動、Space で攻撃、Q でジャンプ、DX_INPUT_KEY_PAD1 も使う。
+- 2 行目は 2P 用の設定。
+  方向キーで移動、Enter で攻撃、ジャンプキーは一旦なし。DX_INPUT_PAD2 も使う。
+
+
+3. charainfo 初期化時の区別
+main.cpp:378-408
+
+// 0番を1P、1番を2P、2番をテスト用敵として使う。
+for (int i = 0; i < MAX_CHARA; i++) {
+    charainfo[i].model1 = -1;
+    charainfo[i].attachidx = -1;
+    charainfo[i].mode = NONE;
+    charainfo[i].direction = Direction::DOWN;
+    ResetMove(charainfo[i]);
+    charainfo[i].pos = VGet(0.0f, 0.0f, 0.0f);
+    charainfo[i].charahitinfo.Height = PC_HEIGHT;
+    charainfo[i].charahitinfo.Width = PC_WIDTH;
+    charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+    charainfo[i].HP = 0;
+    charainfo[i].enemyHP = 0;
+    charainfo[i].isHit = false;
+}
+
+charainfo[PLAYER1_INDEX].pos = VGet(850.0f, 0.0f, -400.0f);
+charainfo[PLAYER2_INDEX].pos = VGet(1050.0f, 0.0f, -400.0f);
+charainfo[TEST_ENEMY_INDEX].pos = VGet(1000.0f, 0.0f, -150.0f);
+
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    charainfo[i].mode = STAND;
+    charainfo[i].HP = 6;
+    charainfo[i].charahitinfo.Height = PC_HEIGHT * PLAYER_MODEL_SCALE;
+    charainfo[i].charahitinfo.Width = PC_WIDTH * PLAYER_MODEL_SCALE;
+    charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+}
+
+charainfo[TEST_ENEMY_INDEX].mode = STAND;
+charainfo[TEST_ENEMY_INDEX].enemyHP = 6;
+charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
+
+説明:
+- まず全ての charainfo を NONE として初期化する。
+- その後、0 番と 1 番だけをプレイヤーとして設定する。
+- 2 番をテスト用敵として設定する。
+- プレイヤーは HP を使い、テスト用敵は enemyHP を使う。
+
+
+4. モデル読み込み時の区別
+main.cpp:432-448
+
+//モデル読み込み
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    charainfo[i].model1 = LoadPlayerAssetModel("PC.mv1");
+    if (charainfo[i].model1 == -1) {
+        printfDx("プレイヤー%dのモデル読み込み失敗！\n", i + 1);
+        return -1;
+    }
+    MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
+    MV1SetScale(charainfo[i].model1, VGet(PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE));
+}
+// 2P は仮で少し青くして、同じモデルでも見分けやすくする。
+MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
+
+charainfo[TEST_ENEMY_INDEX].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
+MV1SetPosition(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].pos);
+if (charainfo[TEST_ENEMY_INDEX].model1 == -1) {
+    printfDx("ゴブリンのモデル読み込み失敗！\n");
+}
+
+説明:
+- for (int i = 0; i < PLAYER_COUNT; i++) は 1P と 2P だけを処理する。
+- 2 人のプレイヤーはどちらも PC.mv1 を読み込む。
+- テスト用敵は別で Goblin.mv1 を読み込む。
+- 2P には仮で青色を少し加算し、1P と見分けやすくしている。
+
+
+5. アニメーション読み込み / 取り付け時の区別
+main.cpp:531-536
+
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
+    charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+}
+charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, enemy_anim_neutral);
+charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
+
+説明:
+- プレイヤーはループでプレイヤー用の待機アニメ anim_neutral を取り付ける。
+- 敵は別で enemy_anim_neutral を取り付ける。
+
+
+6. プレイヤー入力 / 移動 / 攻撃処理
+main.cpp:601-623
+
+// キー操作
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    // 1P/2P の入力、移動、待機/走り切替、攻撃予約を共通処理する。
+    UpdatePlayerInput(
+        charainfo[i],
+        playerStates[i],
+        playerInputs[i],
+        anim_attack,
+        anim_neutral,
+        anim_run,
+        anim_jumpin,
+        SEattackHandle,
+        SEjumpHandle
+    );
+    UpdatePlayerAttackState(
+        charainfo[i],
+        playerStates[i],
+        playerInputs[i],
+        anim_attack,
+        attackInEndTime,
+        SEattackHandle
+    );
+}
+
+説明:
+- このループは i = 0 と i = 1 だけを処理する。
+- つまり、1P と 2P だけがプレイヤー入力を受け取る。
+- TEST_ENEMY_INDEX はこのプレイヤー入力処理には入らない。
+
+
+7. 敵が攻撃対象を選ぶ処理
+main.cpp:637-650
+
+int enemyTargetIndex = PLAYER1_INDEX;
+float enemyDistP1 = VSize(VSub(charainfo[PLAYER1_INDEX].pos, charainfo[TEST_ENEMY_INDEX].pos));
+float enemyDistP2 = VSize(VSub(charainfo[PLAYER2_INDEX].pos, charainfo[TEST_ENEMY_INDEX].pos));
+if (enemyDistP2 < enemyDistP1) {
+    enemyTargetIndex = PLAYER2_INDEX;
+}
+
+if (charainfo[TEST_ENEMY_INDEX].mode == STAND) {
+    // 距離の近いプレイヤーを攻撃対象にする。
+    float dist = VSize(VSub(charainfo[enemyTargetIndex].pos, charainfo[TEST_ENEMY_INDEX].pos));
+    if (dist < 150.0f) {
+        charainfo[TEST_ENEMY_INDEX].mode = ATTACK;
+        SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_attack);
+    }
+}
+
+説明:
+- テスト用敵は、自分と 1P / 2P の距離を比較する。
+- 近い方のプレイヤーを enemyTargetIndex に入れる。
+- これはテスト用敵の仮処理なので、正式な敵システムではこの考え方を拡張できる。
+
+
+8. 敵の攻撃が 1P / 2P に当たる処理
+main.cpp:662-671
+
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    // テスト敵の攻撃は、範囲内のどちらのプレイヤーにも当たる。
+    if (HitCheck_Capsule_Capsule(
+        charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
+        charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)), charainfo[i].charahitinfo.Width / 2))
+    {
+        charainfo[i].HP -= 1; // ダメージ発生
+        charainfo[TEST_ENEMY_INDEX].isHit = true; // フラグを立てて連続ヒットを防止
+        printfDx("プレイヤー%d被弾！HP:%d\n", i + 1, charainfo[i].HP);
+        break;
+    }
+}
+
+説明:
+- 敵が攻撃するとき、1P と 2P の両方をチェックする。
+- 当たったプレイヤーの HP を減らす。
+
+
+9. プレイヤーがテスト用敵を攻撃する処理
+main.cpp:864-881
+
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
+    //鞘の座標更新
+    if (playerSayaFrame[i] != -1 && playerSayaModel[i] != -1) {
+        sayamatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerSayaFrame[i]);
+        MV1SetMatrix(playerSayaModel[i], sayamatrix[i]);
+    }
+    //武器の座標更新
+    if (playerWeaponFrame[i] != -1 && playerWeaponModel[i] != -1) {
+        wpmatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerWeaponFrame[i]);
+        MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
+        //攻撃判定の更新
+        wpPosStart[i] = VGet(0.0f, 0.0f, 0.0f);
+        wpPosEnd[i] = VGet(0.0f, -90.0f, 0.0f);
+        wpPosStart[i] = VTransform(wpPosStart[i], wpmatrix[i]);
+        wpPosEnd[i] = VTransform(wpPosEnd[i], wpmatrix[i]);
+
+        CheckAttackHit(charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+    }
+}
+
+説明:
+- i = 0 / 1 なので、1P と 2P の武器位置をそれぞれ更新する。
+- CheckAttackHit の攻撃者は &charainfo[i]。
+- 攻撃対象は &charainfo[TEST_ENEMY_INDEX]。
+
+
+10. カメラと描画
+main.cpp:895-918
+
+// 2人の中間地点を見るようにして、同じ画面内に入りやすくする。
+VECTOR cameraCenter = VScale(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER2_INDEX].pos), 0.5f);
+ctgt = VAdd(cameraCenter, VGet(0.0f, 0.0f, 0.0f));
+cpos = VAdd(ctgt, VGet(0.0f, 300.0f, -1200.0f));
+SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
+
+//モデル描画
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    MV1DrawModel(charainfo[i].model1);
+}
+MV1DrawModel(charainfo[TEST_ENEMY_INDEX].model1);
+for (int i = 0; i < PLAYER_COUNT; i++) {
+    if (playerWeaponModel[i] != -1) {
+        MV1DrawModel(playerWeaponModel[i]);
+    }
+    if (playerSayaModel[i] != -1) {
+        MV1DrawModel(playerSayaModel[i]);
+    }
+}
+
+説明:
+- カメラは 1P と 2P の中間地点を見る。
+- プレイヤーはループで 1P / 2P を描画する。
+- 敵は TEST_ENEMY_INDEX として別で描画する。
+
+
+チームメンバーへの注意:
+1. 現在は charainfo[1] を敵として使わない。
+2. プレイヤー関連の処理は基本的に i < PLAYER_COUNT のループで処理する。
+3. 敵関連の仮処理は TEST_ENEMY_INDEX、つまり charainfo[2] を使っている。
+4. 今後複数の敵を作る場合は、charainfo[2] 以降を使うか、別の enemyList を作るとよい。
