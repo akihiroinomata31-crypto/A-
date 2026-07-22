@@ -16,8 +16,14 @@ public:
     int spawnTimer = 0;
     //void Update();
     void DrawUI();
-    int deathCount = 0; // 死んだ回数
-    void AddDeath() { deathCount++; }
+    // プレイヤー1と2でそれぞれカウントするために配列にする
+    int deathCount[2] = { 0, 0 };
+
+    void AddDeath(int playerIndex) {
+        if (playerIndex >= 0 && playerIndex < 2) {
+            deathCount[playerIndex]++;
+        }
+    }
     //int p1Score = 0;
 
     void AddScore(int score);
@@ -26,4 +32,6 @@ public:
     void RecordFrame(VECTOR p1, VECTOR p2, int act);
     void Update(SCharaInfo* enemyList);
     void ActivateEnemy(SCharaInfo* enemyList, float x, float z);
+    void UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players);
+    void Update(SCharaInfo* enemyList, SCharaInfo* players);
 };

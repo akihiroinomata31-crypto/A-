@@ -1,33 +1,28 @@
 #include "game.h"
 #include "main.h"
 
-<<<<<<< HEAD
-=======
-void GameManager::Update() {
-    if (timeLimit > 0) {
-        timeLimit--;
-    }
-    else {
-        timeLimit = 0;
-    }
-}
->>>>>>> df1f6e507ac3ff7df26707db6a4a675d27465e77
+
 
 void GameManager::Update(SCharaInfo* enemyList) {
     if (timeLimit > 0) {
         timeLimit--;
 
         spawnTimer++;
-        // 120フレームごとに1体出現させる（5体一気出しを防ぐ）
+        // 120フレーム（2秒）ごとに処理を行う
         if (spawnTimer >= 120) {
 
-            // ランダムな位置を決定
-            float randX = (float)(GetRand(1600) - 800);
-            float randZ = (float)(GetRand(1600) - 800);
+            // 5体出現させるためのループ
+            for (int i = 0; i < 5; i++) {
+                // ループの中で毎回 GetRand を呼ぶので、
+                // i = 0, 1, 2, 3, 4 でそれぞれ異なるランダムな値が入ります
+                float randX = (float)(GetRand(1600) - 800);
+                float randZ = (float)(GetRand(1600) - 800);
 
-            // 敵をアクティブにする（1体のみ生成）
-            ActivateEnemy(enemyList, randX, randZ);
+                // 個別の座標を渡してスポーンさせる
+                ActivateEnemy(enemyList, randX, randZ);
+            }
 
+            // タイマーをリセットして次の2秒へ
             spawnTimer = 0;
         }
     }
@@ -35,7 +30,6 @@ void GameManager::Update(SCharaInfo* enemyList) {
         timeLimit = 0;
     }
 }
-
 void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
     ReplayFrame frame;
     frame.pos[0] = p1;
@@ -75,8 +69,10 @@ void GameManager::DrawUI() {
     DrawFormatString(100, 50, GetColor(0, 255, 100), "P1 Score: %d", p1Score);
     DrawFormatString(700, 50, GetColor(0, 255, 100), "P2 Score: %d", p2Score);
 
-    DrawFormatString(100, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount);
-    DrawFormatString(700, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount);
+    DrawFormatString(100, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount[0]);
+
+    // プレイヤー2の死亡回数
+    DrawFormatString(700, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount[1]);
 }
 
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
@@ -96,10 +92,72 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
         }
     }
 }
-<<<<<<< HEAD
+
 void GameManager::AddScore(int score)
 {
     p1Score += score;
 }
-=======
->>>>>>> df1f6e507ac3ff7df26707db6a4a675d27465e77
+
+// game.cpp
+
+// 引数に SCharaInfo* players を追加してください
+void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
+    // --- スポーン処理 ---
+    if (timeLimit > 0) {
+        timeLimit--;
+        spawnTimer++;
+        if (spawnTimer >= 120) {
+            for (int i = 0; i < 5; i++) {
+                float randX = (float)(GetRand(1600) - 800);
+                float randZ = (float)(GetRand(1600) - 800);
+                ActivateEnemy(enemyList, randX, randZ);
+            }
+            spawnTimer = 0;
+        }
+    }
+    else {
+        timeLimit = 0;
+    }
+
+    // --- AI更新処理 ---
+    for (int i = 1; i < MAX_CHARA; i++) {
+        // 生きている敵（NONE以外）に対してAIを実行
+        if (enemyList[i].mode != NONE && enemyList[i].mode != DOWNMODE) {
+            UpdateEnemyAI(enemyList[i], players);
+        }
+    }
+}
+
+// 敵AIの本体
+void GameManager::UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players) {
+    // ターゲット検索（P1とP2で近い方を狙う）
+    float distP1 = VSize(VSub(players[0].pos, enemy.pos));
+    float distP2 = VSize(VSub(players[1].pos, enemy.pos));
+    SCharaInfo& target = (distP1 < distP2) ? players[0] : players[1];
+    float dist = (distP1 < distP2) ? distP1 : distP2;
+
+    // 向きを変える
+    VECTOR dir = VSub(target.pos, enemy.pos);
+    dir.y = 0;
+    float angle = atan2f(dir.x, dir.z);
+    MV1SetRotationXYZ(enemy.model1, VGet(0.0f, angle, 0.0f));
+
+    // 移動と攻撃
+    if (dist > 150.0f) {
+        if (enemy.mode != ATTACK) {
+            enemy.mode = STAND;
+            VECTOR moveDir = VNorm(dir);
+            enemy.pos = VAdd(enemy.pos, VScale(moveDir, 2.0f)); // スピード調整
+            MV1SetPosition(enemy.model1, enemy.pos);
+        }
+    }
+    else {
+        // 攻撃範囲内なら攻撃（ここではアニメーション切り替えはmain.cppにあるので注意が必要です）
+        // GameManagerからSetCharacterAnimationを呼ぶなら、ここに記述してください
+        if (enemy.mode == STAND) {
+            enemy.mode = ATTACK;
+            enemy.playtime = 0.0f;
+            // 攻撃開始の処理...
+        }
+    }
+}

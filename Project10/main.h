@@ -27,6 +27,8 @@ enum Direction
 	RIGHT = 3
 };
 
+
+
 // --- ƒLƒƒƒ‰‚Ìó‘Ô
 enum CharaMode
 { // --- ƒLƒƒƒ‰‚Ìó‘Ô
@@ -50,7 +52,7 @@ typedef struct
 {
 	float	Width, Height;
 	VECTOR CenterPosition;
-	
+
 
 } SCharaHitInfo;
 
