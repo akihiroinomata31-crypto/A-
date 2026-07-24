@@ -1,4 +1,8 @@
-﻿  main.cpp
+﻿  draw.cpp
   game.cpp
-  コードを生成中...
-  Project10.vcxproj -> C:\Users\akihi\OneDrive\Desktop\Project10\x64\Debug\Project10.exe
+  Mapps.cpp
+  player.cpp
+  正在生成代码...
+  main.cpp
+  LINK : 没有找到 C:\Users\dendi\OneDrive\デスクトップ\A-\x64\Debug\Project10.exe 或上一个增量链接没有生成它；正在执行完全链接
+  Project10.vcxproj -> C:\Users\dendi\OneDrive\デスクトップ\A-\x64\Debug\Project10.exe

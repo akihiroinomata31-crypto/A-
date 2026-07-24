@@ -21,6 +21,8 @@ struct PlayerInputConfig {
 	int rightKey;
 	int attackKey;
 	int jumpKey;
+	int attackPadButton;
+	int jumpPadButton;
 };
 
 // 1l•ª‚Ì‘€ì’†ó‘ÔB
@@ -28,6 +30,7 @@ struct PlayerInputConfig {
 struct PlayerRuntimeState {
 	int key = 0;
 	int prevAttackButton = 0;
+	int prevJumpButton = 0;
 	int attackIndex = 0;
 	bool isAttackBuffered = false;
 	bool moveInput = false;

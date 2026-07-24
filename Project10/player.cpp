@@ -13,6 +13,57 @@ bool CanControlPlayerMode(int mode) {
 	return mode == STAND || mode == RUN || mode == ATTACK || mode == ATTACKOUT;
 }
 
+constexpr int PAD_ANALOG_DEAD_ZONE = 400;
+
+bool IsPadButtonDown(int padState, int padButton) {
+	return padButton != 0 && (padState & padButton) != 0;
+}
+
+bool IsPadOrKeyDown(int padState, int padButton, int keyCode) {
+	return IsPadButtonDown(padState, padButton) || IsKeyDown(keyCode);
+}
+
+void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& input, float& inputX, float& inputZ) {
+	// 方向キー、十字キー、左スティックをまとめて移動入力に変換する。
+	bool moveDown = IsPadButtonDown(state.key, PAD_INPUT_DOWN) || IsKeyDown(input.downKey);
+	bool moveUp = IsPadButtonDown(state.key, PAD_INPUT_UP) || IsKeyDown(input.upKey);
+	bool moveLeft = IsPadButtonDown(state.key, PAD_INPUT_LEFT) || IsKeyDown(input.leftKey);
+	bool moveRight = IsPadButtonDown(state.key, PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey);
+
+	int analogX = 0;
+	int analogY = 0;
+	if (GetJoypadAnalogInput(&analogX, &analogY, input.padType) == 0) {
+		if (analogX < -PAD_ANALOG_DEAD_ZONE) {
+			moveLeft = true;
+		}
+		else if (analogX > PAD_ANALOG_DEAD_ZONE) {
+			moveRight = true;
+		}
+
+		if (analogY < -PAD_ANALOG_DEAD_ZONE) {
+			moveUp = true;
+		}
+		else if (analogY > PAD_ANALOG_DEAD_ZONE) {
+			moveDown = true;
+		}
+	}
+
+	inputX = 0.0f;
+	inputZ = 0.0f;
+	if (moveDown) {
+		inputZ -= MOVE_SPEED;
+	}
+	if (moveUp) {
+		inputZ += MOVE_SPEED;
+	}
+	if (moveLeft) {
+		inputX -= MOVE_SPEED;
+	}
+	if (moveRight) {
+		inputX += MOVE_SPEED;
+	}
+}
+
 void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
 	// 移動方向に合わせてキャラクターの向きを変える。
 	if (fabsf(inputX) > fabsf(inputZ)) {
@@ -35,40 +86,29 @@ void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int 
 void ApplyAttackStepMove(SCharaInfo& player, PlayerRuntimeState& state, const PlayerInputConfig& input) {
 	ResetMove(player);
 
-	if ((state.key & PAD_INPUT_DOWN) || IsKeyDown(input.downKey)) {
+	float inputX = 0.0f;
+	float inputZ = 0.0f;
+	GetMoveInput(state, input, inputX, inputZ);
+	if (inputX != 0.0f || inputZ != 0.0f) {
+		SetDirectionByMove(player, inputX, inputZ);
+	}
+
+	switch (player.direction)
+	{
+	case Direction::DOWN:
 		player.move.z = -7.0f;
-		player.direction = Direction::DOWN;
-	}
-	else if ((state.key & PAD_INPUT_UP) || IsKeyDown(input.upKey)) {
+		break;
+	case Direction::UP:
 		player.move.z = 7.0f;
-		player.direction = Direction::UP;
-	}
-	else if ((state.key & PAD_INPUT_LEFT) || IsKeyDown(input.leftKey)) {
+		break;
+	case Direction::LEFT:
 		player.move.x = -7.0f;
-		player.direction = Direction::LEFT;
-	}
-	else if ((state.key & PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey)) {
+		break;
+	case Direction::RIGHT:
 		player.move.x = 7.0f;
-		player.direction = Direction::RIGHT;
-	}
-	else {
-		switch (player.direction)
-		{
-		case Direction::DOWN:
-			player.move.z = -7.0f;
-			break;
-		case Direction::UP:
-			player.move.z = 7.0f;
-			break;
-		case Direction::LEFT:
-			player.move.x = -7.0f;
-			break;
-		case Direction::RIGHT:
-			player.move.x = 7.0f;
-			break;
-		default:
-			break;
-		}
+		break;
+	default:
+		break;
 	}
 }
 
@@ -127,6 +167,7 @@ void UpdatePlayerInput(
 	// プレイヤーを操作できる状態か確認する。
 	state.moveInput = false;
 	bool attackPressed = false;
+	bool jumpPressed = false;
 
 	if (CanControlPlayerMode(player.mode)) {
 		state.key = GetJoypadInputState(input.padType);
@@ -134,14 +175,18 @@ void UpdatePlayerInput(
 			// パッド未接続時は入力なしとして扱う。
 			state.key = 0;
 		}
-		// 攻撃ボタンは押した瞬間だけ反応させる。
-		const int currentAttackButton = ((state.key & PAD_INPUT_10) != 0 || IsKeyDown(input.attackKey)) ? 1 : 0;
+		// 攻撃/ジャンプは押した瞬間だけ反応させる。
+		const int currentAttackButton = IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ? 1 : 0;
+		const int currentJumpButton = IsPadOrKeyDown(state.key, input.jumpPadButton, input.jumpKey) ? 1 : 0;
 		attackPressed = (currentAttackButton == 1 && state.prevAttackButton == 0);
+		jumpPressed = (currentJumpButton == 1 && state.prevJumpButton == 0);
 		state.prevAttackButton = currentAttackButton;
+		state.prevJumpButton = currentJumpButton;
 	}
 	else {
 		state.key = 0;
 		state.prevAttackButton = 0;
+		state.prevJumpButton = 0;
 	}
 
 	if (player.mode == STAND || player.mode == RUN) {
@@ -151,22 +196,10 @@ void UpdatePlayerInput(
 			StartPlayerAttack(player, state, animAttack, seAttackHandle);
 		}
 		else {
-			// キーボードとゲームパッド入力を移動量に変換する。
+			// キーボード、十字キー、左スティック入力を移動量に変換する。
 			float inputX = 0.0f;
 			float inputZ = 0.0f;
-
-			if ((state.key & PAD_INPUT_DOWN) || IsKeyDown(input.downKey)) {
-				inputZ -= MOVE_SPEED;
-			}
-			if ((state.key & PAD_INPUT_UP) || IsKeyDown(input.upKey)) {
-				inputZ += MOVE_SPEED;
-			}
-			if ((state.key & PAD_INPUT_LEFT) || IsKeyDown(input.leftKey)) {
-				inputX -= MOVE_SPEED;
-			}
-			if ((state.key & PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey)) {
-				inputX += MOVE_SPEED;
-			}
+			GetMoveInput(state, input, inputX, inputZ);
 
 			if (inputX != 0.0f || inputZ != 0.0f) {
 				state.moveInput = true;
@@ -175,7 +208,7 @@ void UpdatePlayerInput(
 				SetDirectionByMove(player, inputX, inputZ);
 			}
 
-			if (IsKeyDown(input.jumpKey)) {
+			if (jumpPressed) {
 				player.mode = JUMPIN;
 				SetCharacterAnimation(player, animJumpIn, 0.3f);
 				MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
