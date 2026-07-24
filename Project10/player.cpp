@@ -176,7 +176,8 @@ void UpdatePlayerInput(
 			state.key = 0;
 		}
 		// UŒ‚/ƒWƒƒƒ“ƒv‚Í‰Ÿ‚µ‚½uŠÔ‚¾‚¯”½‰‚³‚¹‚éB
-		const int currentAttackButton = IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ? 1 : 0;
+		const int currentAttackButton = (IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ||
+			IsPadButtonDown(state.key, PAD_INPUT_10)) ? 1 : 0;
 		const int currentJumpButton = IsPadOrKeyDown(state.key, input.jumpPadButton, input.jumpKey) ? 1 : 0;
 		attackPressed = (currentAttackButton == 1 && state.prevAttackButton == 0);
 		jumpPressed = (currentJumpButton == 1 && state.prevJumpButton == 0);

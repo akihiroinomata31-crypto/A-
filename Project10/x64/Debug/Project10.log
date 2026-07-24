@@ -1,8 +1,17 @@
-﻿  draw.cpp
-  game.cpp
-  Mapps.cpp
+﻿  game.cpp
   player.cpp
   正在生成代码...
   main.cpp
-  LINK : 没有找到 C:\Users\dendi\OneDrive\デスクトップ\A-\x64\Debug\Project10.exe 或上一个增量链接没有生成它；正在执行完全链接
-  Project10.vcxproj -> C:\Users\dendi\OneDrive\デスクトップ\A-\x64\Debug\Project10.exe
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003: 指定的任务可执行文件“CL.exe”未能运行。System.IO.IOException: 要求された操作はユーザー マップ セクションで開いたファイルでは実行できません。
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003: 
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.FileStream.Init(String path, FileMode mode, FileAccess access, Int32 rights, Boolean useRights, FileShare share, Int32 bufferSize, FileOptions options, SECURITY_ATTRIBUTES secAttrs, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize, FileOptions options, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.StreamWriter.CreateFile(String path, Boolean append, Boolean checkHost)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.StreamWriter..ctor(String path, Boolean append, Encoding encoding, Int32 bufferSize, Boolean checkHost)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.File.InternalWriteAllText(String path, String contents, Encoding encoding, Boolean checkHost)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 System.IO.File.WriteAllText(String path, String contents, Encoding encoding)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 Microsoft.Build.Utilities.CanonicalTrackedOutputFiles.SaveTlog(DependencyFilter includeInTLog)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 Microsoft.Build.CPPTasks.CL.PostExecuteTool(Int32 exitCode)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 Microsoft.Build.CPPTasks.TrackedVCToolTask.ExecuteTool(String pathToTool, String responseFileCommands, String commandLineCommands)
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(687,5): error MSB6003:    在 Microsoft.Build.Utilities.ToolTask.Execute()

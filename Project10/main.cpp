@@ -56,9 +56,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
 		// 1P: キーボード(WASD) + 1Pゲームパッド。
-		{ DX_INPUT_KEY_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q, PAD_INPUT_10, PAD_INPUT_1 },
+		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_2 },
 		// 2P: キーボード(矢印) + 2Pゲームパッド。
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1, PAD_INPUT_10, PAD_INPUT_1 }
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1, PAD_INPUT_1, PAD_INPUT_2 }
 	};
 
 
@@ -446,15 +446,23 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		float MaxY;
 		float MaxY_poly;
 
-		if (HitCheck_Capsule_Capsule(
+		const bool isPlayerOverlappingNow = HitCheck_Capsule_Capsule(
+			charainfo[PLAYER1_INDEX].pos,
+			VAdd(charainfo[PLAYER1_INDEX].pos, VGet(0, charainfo[PLAYER1_INDEX].charahitinfo.Height, 0)),
+			charainfo[PLAYER1_INDEX].charahitinfo.Width / 2,
+			charainfo[PLAYER2_INDEX].pos,
+			VAdd(charainfo[PLAYER2_INDEX].pos, VGet(0, charainfo[PLAYER2_INDEX].charahitinfo.Height, 0)),
+			charainfo[PLAYER2_INDEX].charahitinfo.Width / 2) == TRUE;
+		const bool willPlayerOverlapNext = HitCheck_Capsule_Capsule(
 			VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER1_INDEX].move),
 			VAdd(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER1_INDEX].move), VGet(0, charainfo[PLAYER1_INDEX].charahitinfo.Height, 0)),
 			charainfo[PLAYER1_INDEX].charahitinfo.Width / 2,
 			VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move),
 			VAdd(VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move), VGet(0, charainfo[PLAYER2_INDEX].charahitinfo.Height, 0)),
-			charainfo[PLAYER2_INDEX].charahitinfo.Width / 2)
-			== TRUE) {
-			// プレイヤー同士が重なりそうな場合は、横移動だけ止める。
+			charainfo[PLAYER2_INDEX].charahitinfo.Width / 2) == TRUE;
+		if (!isPlayerOverlappingNow && willPlayerOverlapNext) {
+			// 新しくプレイヤー同士が重なりそうな場合だけ、横移動を止める。
+			// 既に重なっている場合は、離れるための移動を許可する。
 			charainfo[PLAYER1_INDEX].move.x = 0.0f;
 			charainfo[PLAYER1_INDEX].move.z = 0.0f;
 			charainfo[PLAYER2_INDEX].move.x = 0.0f;
@@ -462,15 +470,22 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			if (charainfo[TEST_ENEMY_INDEX].mode != DOWNMODE && HitCheck_Capsule_Capsule(
+			const bool isEnemyOverlappingNow = HitCheck_Capsule_Capsule(
+				charainfo[i].pos,
+				VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)),
+				charainfo[i].charahitinfo.Width / 2,
+				charainfo[TEST_ENEMY_INDEX].pos,
+				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
+				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2) == TRUE;
+			const bool willEnemyOverlapNext = HitCheck_Capsule_Capsule(
 				VAdd(charainfo[i].pos, charainfo[i].move),
 				VAdd(VAdd(charainfo[i].pos, charainfo[i].move), VGet(0, charainfo[i].charahitinfo.Height, 0)),
 				charainfo[i].charahitinfo.Width / 2,
 				charainfo[TEST_ENEMY_INDEX].pos,
 				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
-				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2)
-				== TRUE) {
-				// テスト敵と重なりそうな場合は、そのプレイヤーの横移動を止める。
+				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2) == TRUE;
+			if (charainfo[TEST_ENEMY_INDEX].mode != DOWNMODE && !isEnemyOverlappingNow && willEnemyOverlapNext) {
+				// 新しくテスト敵と重なりそうな場合だけ、そのプレイヤーの横移動を止める。
 				charainfo[i].move.x = 0.0f;
 				charainfo[i].move.z = 0.0f;
 			}
