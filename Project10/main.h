@@ -5,7 +5,7 @@
 
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
-#define MAX_CHARA 6
+#define MAX_CHARA 100
 #define CHARA_ENUM_DEFAULT_SIZE		500.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
 #define CHARA_MAX_HITCOLL			2048		// 処理するコリジョンポリゴンの最大数
 
@@ -63,7 +63,8 @@ typedef struct
 struct SCharaInfo
 {
 	int model1;
-
+	int timeLimit = 1000; // ゲーム制限時間など（必要であれば適宜設定）
+	int spawnTimer = 0;   // スポーンカウント用
 	Direction direction;
 	int attachidx;
 	float playtime = 0, anim_totaltime;
@@ -86,6 +87,7 @@ struct SCharaInfo
 // 当たり判定の幅、高さ
 // 当たり判定の中心座標
 extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
+
 extern void CheckAttackHit(
 	GameManager& game,
 	SCharaInfo* charainfo,

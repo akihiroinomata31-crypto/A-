@@ -3,31 +3,90 @@
 
 
 
-void GameManager::Update(SCharaInfo* enemyList) {
+#include "player.h"
+
+
+
+void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
+    // --- 1. スポーン処理 (2秒で5体) ---
     if (timeLimit > 0) {
         timeLimit--;
-
         spawnTimer++;
-        // 120フレーム（2秒）ごとに処理を行う
-        if (spawnTimer >= 120) {
 
-            // 5体出現させるためのループ
-            for (int i = 0; i < 5; i++) {
-                // ループの中で毎回 GetRand を呼ぶので、
-                // i = 0, 1, 2, 3, 4 でそれぞれ異なるランダムな値が入ります
-                float randX = (float)(GetRand(1600) - 800);
-                float randZ = (float)(GetRand(1600) - 800);
+        if (spawnTimer >= 180) {
+            float baseX = (float)(GetRand(1600) - 800);
+            float baseZ = (float)(GetRand(1600) - 800);
 
-                // 個別の座標を渡してスポーンさせる
-                ActivateEnemy(enemyList, randX, randZ);
+            // 5体を少しずつずらした位置に生成
+            float offsetX[] = { -1300.0f, -4600.0f,500.0f, 50.0f, -800.0f };
+            float offsetZ[] = { 800.0f, 50.0f, -700.0f, -50.0f, 1250.0f };
+
+            for (int i = 0; i < 3; i++) {
+                // ActivateEnemy内でループするので、引数を渡すだけにする
+                ActivateEnemy(enemyList, baseX + offsetX[i], baseZ + offsetZ[i]);
             }
-
-            // タイマーをリセットして次の2秒へ
             spawnTimer = 0;
         }
     }
+    // --- 2. AI更新処理 ---
+    // 敵用のインデックスから開始
+    for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+        // NONEではない（＝生きている）敵に対してAIを実行
+        if (enemyList[i].mode != NONE && enemyList[i].mode != DOWNMODE) {
+            // カンマを半角に修正し、変数名をplayersに統一
+            UpdateEnemyAI(enemyList[i], players);
+        }
+    }
+}
+void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
+
+
+
+    for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+        if (enemyList[i].mode == NONE) {
+
+            // 1. 引数で受け取った x, z をそのまま使って位置を決定
+            enemyList[i].pos = VGet(x, 0.0f, z);
+            enemyList[i].mode = STAND;
+            enemyList[i].enemyHP = 6;
+            enemyList[i].playtime = 0.0f;
+            // 2. モデルの位置を更新
+            MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
+            MV1SetVisible(enemyList[i].model1, TRUE);
+            
+            return; // 1体見つけて生成したら終了
+        }
+    }
+}
+// 敵AIの本体
+void GameManager::UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players) {
+    // P1とP2のうち近い方をターゲットにする
+    float distP1 = VSize(VSub(players[0].pos, enemy.pos));
+    float distP2 = VSize(VSub(players[1].pos, enemy.pos));
+    SCharaInfo& target = (distP1 < distP2) ? players[0] : players[1];
+    float dist = (distP1 < distP2) ? distP1 : distP2;
+
+    // 向きを変える
+    VECTOR dir = VSub(target.pos, enemy.pos);
+    dir.y = 0;
+    float angle = atan2f(dir.x, dir.z);
+    MV1SetRotationXYZ(enemy.model1, VGet(0.0f, angle, 0.0f));
+
+    // 移動処理
+    if (dist > 150.0f) {
+        if (enemy.mode != ATTACK) {
+            enemy.mode = STAND;
+            VECTOR moveDir = VNorm(dir);
+            enemy.pos = VAdd(enemy.pos, VScale(moveDir, 2.0f));
+            MV1SetPosition(enemy.model1, enemy.pos);
+        }
+    }
     else {
-        timeLimit = 0;
+        // 攻撃範囲内
+        if (enemy.mode == STAND) {
+            enemy.mode = ATTACK;
+            enemy.playtime = 0.0f;
+        }
     }
 }
 void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
@@ -75,89 +134,20 @@ void GameManager::DrawUI() {
     DrawFormatString(700, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount[1]);
 }
 
-void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
-    // 1番目からMAX_CHARA-1まで探す
-    for (int i = 1; i < MAX_CHARA; i++) {
-        // mode が NONE ならその枠は空いているとみなす
-        if (enemyList[i].mode == NONE) {
-            enemyList[i].pos = VGet(x, 0.0f, z);
-            enemyList[i].mode = STAND; // 待機状態へ
-            enemyList[i].enemyHP = 1;
 
-            // モデル位置更新と表示
-            MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
-            MV1SetVisible(enemyList[i].model1, TRUE);
 
-            break; // 1体見つけたらループを抜ける
-        }
+
+void GameManager::AddScore(int playerIndex, int score) {
+    if (playerIndex == 0) {
+        p1Score += score;
+    }
+    else {
+        p2Score += score;
     }
 }
 
-void GameManager::AddScore(int score)
-{
-    p1Score += score;
-}
+
 
 // game.cpp
 
-// 引数に SCharaInfo* players を追加してください
-void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
-    // --- スポーン処理 ---
-    if (timeLimit > 0) {
-        timeLimit--;
-        spawnTimer++;
-        if (spawnTimer >= 120) {
-            for (int i = 0; i < 5; i++) {
-                float randX = (float)(GetRand(1600) - 800);
-                float randZ = (float)(GetRand(1600) - 800);
-                ActivateEnemy(enemyList, randX, randZ);
-            }
-            spawnTimer = 0;
-        }
-    }
-    else {
-        timeLimit = 0;
-    }
 
-    // --- AI更新処理 ---
-    for (int i = 1; i < MAX_CHARA; i++) {
-        // 生きている敵（NONE以外）に対してAIを実行
-        if (enemyList[i].mode != NONE && enemyList[i].mode != DOWNMODE) {
-            UpdateEnemyAI(enemyList[i], players);
-        }
-    }
-}
-
-// 敵AIの本体
-void GameManager::UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players) {
-    // ターゲット検索（P1とP2で近い方を狙う）
-    float distP1 = VSize(VSub(players[0].pos, enemy.pos));
-    float distP2 = VSize(VSub(players[1].pos, enemy.pos));
-    SCharaInfo& target = (distP1 < distP2) ? players[0] : players[1];
-    float dist = (distP1 < distP2) ? distP1 : distP2;
-
-    // 向きを変える
-    VECTOR dir = VSub(target.pos, enemy.pos);
-    dir.y = 0;
-    float angle = atan2f(dir.x, dir.z);
-    MV1SetRotationXYZ(enemy.model1, VGet(0.0f, angle, 0.0f));
-
-    // 移動と攻撃
-    if (dist > 150.0f) {
-        if (enemy.mode != ATTACK) {
-            enemy.mode = STAND;
-            VECTOR moveDir = VNorm(dir);
-            enemy.pos = VAdd(enemy.pos, VScale(moveDir, 2.0f)); // スピード調整
-            MV1SetPosition(enemy.model1, enemy.pos);
-        }
-    }
-    else {
-        // 攻撃範囲内なら攻撃（ここではアニメーション切り替えはmain.cppにあるので注意が必要です）
-        // GameManagerからSetCharacterAnimationを呼ぶなら、ここに記述してください
-        if (enemy.mode == STAND) {
-            enemy.mode = ATTACK;
-            enemy.playtime = 0.0f;
-            // 攻撃開始の処理...
-        }
-    }
-}

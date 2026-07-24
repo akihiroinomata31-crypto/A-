@@ -26,7 +26,7 @@ public:
     }
     //int p1Score = 0;
 
-    void AddScore(int score);
+    void AddScore(int playerIndex, int score);
    
     // ƒŠƒvƒŒƒC‚ğ‹L˜^‚·‚éŠÖ”‚ğ’Ç‰Á
     void RecordFrame(VECTOR p1, VECTOR p2, int act);

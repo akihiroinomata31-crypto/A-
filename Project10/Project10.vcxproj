@@ -155,6 +155,7 @@
     <ClCompile Include="game.cpp" />
     <ClCompile Include="Mapps.cpp" />
     <ClCompile Include="player.cpp" />
+    <ClCompile Include="winer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />

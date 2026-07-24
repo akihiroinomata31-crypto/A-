@@ -1,4 +1,5 @@
-#pragma once
+
+
 #pragma once
 
 #include "main.h"
@@ -65,4 +66,7 @@ void UpdatePlayerAttackState(
 	const int animAttack[],
 	const float attackEndTime[],
 	int seAttackHandle
+
 );
+
+

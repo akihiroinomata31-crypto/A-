@@ -1,4 +1,4 @@
-// DXƒ‰ƒCƒuƒ‰ƒŠ[‚ÌƒCƒ“ƒNƒ‹[ƒh
+ï»¿// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªãƒ¼ã®ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰
 #include <DxLib.h>
 #include <math.h>
 #include <stdio.h>
@@ -12,14 +12,14 @@ namespace {
 	int LoadPlayerAssetModel(const char* fileName) {
 		char path[256];
 
-		// æ‚ÉV‚µ‚­’u‚¢‚½ Player ƒtƒHƒ‹ƒ_‚ğ“Ç‚ŞB
+		// å…ˆã«æ–°ã—ãç½®ã„ãŸ Player ãƒ•ã‚©ãƒ«ãƒ€ã‚’èª­ã‚€ã€‚
 		sprintf_s(path, sizeof(path), "..\\Player\\%s", fileName);
 		int handle = MV1LoadModel(path);
 		if (handle != -1) {
 			return handle;
 		}
 
-		// Œ©‚Â‚©‚ç‚È‚¢ê‡‚ÍAŠù‘¶‚Ì Data\\Player ƒtƒHƒ‹ƒ_‚©‚ç“Ç‚ŞB
+		// è¦‹ã¤ã‹ã‚‰ãªã„å ´åˆã¯ã€æ—¢å­˜ã® Data\\Player ãƒ•ã‚©ãƒ«ãƒ€ã‹ã‚‰èª­ã‚€ã€‚
 		sprintf_s(path, sizeof(path), "..\\Data\\Player\\%s", fileName);
 		handle = MV1LoadModel(path);
 		if (handle == -1) {
@@ -61,9 +61,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	};
 
 
-	int enemyCount = 0;          // Œ»İ‚Ì“G‚Ì”
-	int spawnTimer = 0;          // oŒ»‚Ü‚Å‚ÌƒJƒEƒ“ƒg—p
-	const int SPAWN_INTERVAL = 300; // oŒ»ŠÔŠu
+	int enemyCount = 0;          // ç¾åœ¨ã®æ•µã®æ•°
+//	int spawnTimer = 0;          // å‡ºç¾ã¾ã§ã®ã‚«ã‚¦ãƒ³ãƒˆç”¨
+	const int SPAWN_INTERVAL = 300; // å‡ºç¾é–“éš”
 
 	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
 
@@ -71,39 +71,42 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	VECTOR stagepos = VGet(0.0f, 2000.0f, 0.0f);
 
 	VECTOR cpos, ctgt;
-	// ƒJƒƒ‰ƒ|ƒWƒVƒ‡ƒ“ cpos:ƒJƒƒ‰ˆÊ’u@ctgt:ƒJƒƒ‰’‹“_
+	// ã‚«ãƒ¡ãƒ©ãƒã‚¸ã‚·ãƒ§ãƒ³ cpos:ã‚«ãƒ¡ãƒ©ä½ç½®ã€€ctgt:ã‚«ãƒ¡ãƒ©æ³¨è¦–ç‚¹
 	cpos = VGet(0.0f, 1000.0f, -800.0f);
 	ctgt = VGet(0.0f, 500.0f, 0.0f);
 
 
-	// ƒXƒe[ƒWƒRƒŠƒWƒ‡ƒ“î•ñ
+	// ã‚¹ãƒ†ãƒ¼ã‚¸ã‚³ãƒªã‚¸ãƒ§ãƒ³æƒ…å ±
 	MV1_COLL_RESULT_POLY_DIM HitDim;
 	int WallNum;
-	int FloorNum;										// °ƒ|ƒŠƒSƒ“‚Æ”»’f‚³‚ê‚½ƒ|ƒŠƒSƒ“‚Ì”
+	int FloorNum;										// åºŠãƒãƒªã‚´ãƒ³ã¨åˆ¤æ–­ã•ã‚ŒãŸãƒãƒªã‚´ãƒ³ã®æ•°
 	MV1_COLL_RESULT_POLY* Wall[CHARA_MAX_HITCOLL];
 	MV1_COLL_RESULT_POLY* Floor[CHARA_MAX_HITCOLL];
 	int HitFlag = 0;
+	int timeLimit = 1000; // ã‚²ãƒ¼ãƒ åˆ¶é™æ™‚é–“ãªã©ï¼ˆå¿…è¦ã§ã‚ã‚Œã°é©å®œè¨­å®šï¼‰
+	static int spawnTimer = 0;
+	spawnTimer++; // æ¯ãƒ•ãƒ¬ãƒ¼ãƒ åŠ ç®—
 	MV1_COLL_RESULT_POLY* Poly;
 	HITRESULT_LINE LineRes;
 
-	// ƒLƒƒƒ‰‚ªƒqƒbƒg‚µ‚½°‚Ìƒ|ƒŠƒSƒ“•\¦‚ÌÀ•W
+	// ã‚­ãƒ£ãƒ©ãŒãƒ’ãƒƒãƒˆã—ãŸåºŠã®ãƒãƒªã‚´ãƒ³è¡¨ç¤ºã®åº§æ¨™
 	VECTOR PolyCharaHitField[3];
 
 
 
-	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMƒtƒ@ƒCƒ‹–¼
-	char String[256];						// ƒƒ‚ƒŠ“WŠJ‚·‚éÛ‚Ég‚¤•¶š—ñ
-	int BGMSoundHandle;						// BGMƒTƒEƒ“ƒhƒnƒ“ƒhƒ‹
+	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMãƒ•ã‚¡ã‚¤ãƒ«å
+	char String[256];						// ãƒ¡ãƒ¢ãƒªå±•é–‹ã™ã‚‹éš›ã«ä½¿ã†æ–‡å­—åˆ—
+	int BGMSoundHandle;						// BGMã‚µã‚¦ãƒ³ãƒ‰ãƒãƒ³ãƒ‰ãƒ«
 	int BGMLoopStartPosition = -1;
 	int BGMLoopEndPosition = -1;
 
-	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEƒtƒ@ƒCƒ‹–¼
-	int SEattackHandle, SEjumpHandle, SEdamageHandle;						// BGMƒTƒEƒ“ƒhƒnƒ“ƒhƒ‹	
+	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEãƒ•ã‚¡ã‚¤ãƒ«å
+	int SEattackHandle, SEjumpHandle, SEdamageHandle;						// BGMã‚µã‚¦ãƒ³ãƒ‰ãƒãƒ³ãƒ‰ãƒ«	
 
 
-//ƒLƒƒƒ‰î•ñ
+//ã‚­ãƒ£ãƒ©æƒ…å ±
 
-	// 0”Ô‚ğ1PA1”Ô‚ğ2PA2”Ô‚ğƒeƒXƒg—p“G‚Æ‚µ‚Äg‚¤B
+	// 0ç•ªã‚’1Pã€1ç•ªã‚’2Pã€2ç•ªã‚’ãƒ†ã‚¹ãƒˆç”¨æ•µã¨ã—ã¦ä½¿ã†ã€‚
 	for (int i = 0; i < MAX_CHARA; i++) {
 		charainfo[i].model1 = -1;
 		charainfo[i].attachidx = -1;
@@ -135,48 +138,58 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	charainfo[TEST_ENEMY_INDEX].enemyHP = 6;
 	charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
 
-	//ƒ‚ƒfƒ‹À•W‰ŠúƒZƒbƒg
+	//ãƒ¢ãƒ‡ãƒ«åº§æ¨™åˆæœŸã‚»ãƒƒãƒˆ
 	VECTOR pos[2] = { VGet(450.0f, 200.0f, -350.0f),VGet(700.0f, 200.0f, -350.0f) };
 
 	VECTOR cposdistance = VSub(cpos, pos[0]);
 	VECTOR ctgtdistance = VSub(ctgt, pos[0]);
 
-	//ƒTƒEƒ“ƒhƒtƒ@ƒCƒ‹‚Ì“Ç‚İƒXƒgƒŠ[ƒ~ƒ“ƒOİ’è‚É‚·‚é
+	//ã‚µã‚¦ãƒ³ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«ã®èª­è¾¼ã¿ã‚¹ãƒˆãƒªãƒ¼ãƒŸãƒ³ã‚°è¨­å®šã«ã™ã‚‹
 	SetCreateSoundDataType(DX_SOUNDDATATYPE_FILE);
 
-	// ƒEƒCƒ“ƒhƒEƒ‚[ƒh‚ÌØ‚è‘Ö‚¦
+	// ã‚¦ã‚¤ãƒ³ãƒ‰ã‚¦ãƒ¢ãƒ¼ãƒ‰ã®åˆ‡ã‚Šæ›¿ãˆ
 	ChangeWindowMode(TRUE);
 
-	// ƒEƒCƒ“ƒhƒEƒTƒCƒY‚Ì•ÏX
+	// ã‚¦ã‚¤ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚ºã®å¤‰æ›´
 	SetGraphMode(900, 600, 32);
 
-	// DXƒ‰ƒCƒuƒ‰ƒŠ‚Ì‰Šú‰»
+	// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®åˆæœŸåŒ–
 	if (DxLib_Init() == -1) {
 		return -1;
 	}
 
 
 
-	//ƒ‚ƒfƒ‹“Ç‚İ‚İ
+	//ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].model1 = LoadPlayerAssetModel("PC.mv1");
 		if (charainfo[i].model1 == -1) {
-			printfDx("ƒvƒŒƒCƒ„[%d‚Ìƒ‚ƒfƒ‹“Ç‚İ‚İ¸”sI\n", i + 1);
+			printfDx("ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼%dã®ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n", i + 1);
 			return -1;
 		}
 		MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 		MV1SetScale(charainfo[i].model1, VGet(PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE));
 	}
-	// 2P ‚Í‰¼‚Å­‚µÂ‚­‚µ‚ÄA“¯‚¶ƒ‚ƒfƒ‹‚Å‚àŒ©•ª‚¯‚â‚·‚­‚·‚éB
+	// 2P ã¯ä»®ã§å°‘ã—é’ãã—ã¦ã€åŒã˜ãƒ¢ãƒ‡ãƒ«ã§ã‚‚è¦‹åˆ†ã‘ã‚„ã™ãã™ã‚‹ã€‚
 	MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
 
-	charainfo[TEST_ENEMY_INDEX].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
-	MV1SetPosition(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].pos);
-	if (charainfo[TEST_ENEMY_INDEX].model1 == -1) {
-		printfDx("ƒSƒuƒŠƒ“‚Ìƒ‚ƒfƒ‹“Ç‚İ‚İ¸”sI\n");
+	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+		// 1. ãƒ¢ãƒ‡ãƒ«ã‚’èª­ã¿è¾¼ã‚€
+		charainfo[i].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
+
+		// 2. èª­ã¿è¾¼ã¿ã‚¨ãƒ©ãƒ¼ãƒã‚§ãƒƒã‚¯
+		if (charainfo[i].model1 == -1) {
+			printfDx("ã‚´ãƒ–ãƒªãƒ³ã®ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿å¤±æ•—ï¼(index:%d)\n", i);
+		}
+
+		// 3. æœ€åˆã¯è¡¨ç¤ºã—ãªã„ã‚ˆã†ã«ã™ã‚‹
+		MV1SetVisible(charainfo[i].model1, FALSE);
+
+		// 4. æœ€åˆã¯ä½•ã‚‚ã—ã¦ã„ãªã„çŠ¶æ…‹ã«ã™ã‚‹
+		charainfo[i].mode = NONE;
 	}
 
-	//ƒ‹[ƒgƒtƒŒ[ƒ€
+	//ãƒ«ãƒ¼ãƒˆãƒ•ãƒ¬ãƒ¼ãƒ 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		rootflm = MV1SearchFrame(charainfo[i].model1, "root");
 		if (rootflm != -1) {
@@ -192,18 +205,18 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
-		//•Šíƒ‚ƒfƒ‹
+		//æ­¦å™¨ãƒ¢ãƒ‡ãƒ«
 		playerWeaponModel[i] = LoadPlayerAssetModel("Sabel.mv1");
 		if (playerWeaponModel[i] == -1) return -1;
-		//•ŠíƒtƒŒ[ƒ€
+		//æ­¦å™¨ãƒ•ãƒ¬ãƒ¼ãƒ 
 		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "wp");
 		if (playerWeaponFrame[i] == -1) {
 			printfDx("Player%d frame not found: wp\n", i + 1);
 		}
-		//âƒ‚ƒfƒ‹
+		//é˜ãƒ¢ãƒ‡ãƒ«
 		playerSayaModel[i] = LoadPlayerAssetModel("Saya.mv1");
 		if (playerSayaModel[i] == -1) return -1;
-		//âƒtƒŒ[ƒ€
+		//é˜ãƒ•ãƒ¬ãƒ¼ãƒ 
 		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
 		if (playerSayaFrame[i] == -1) {
 			printfDx("Player%d frame not found: sayabone\n", i + 1);
@@ -211,7 +224,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 
-	// ƒXƒe[ƒWî•ñ‚Ì“Ç‚İ‚İ
+	// ã‚¹ãƒ†ãƒ¼ã‚¸æƒ…å ±ã®èª­ã¿è¾¼ã¿
 	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage.mv1");
 	if (stagedata == -1) return -1;
 	MV1SetPosition(stagedata, stagepos);
@@ -219,12 +232,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (sky == -1) return -1;
 	MV1SetPosition(sky, VGet(0, -1000, 0));
 
-	// ƒ‚ƒfƒ‹‘S‘Ì‚ÌƒRƒŠƒWƒ‡ƒ“î•ñ‚ÌƒZƒbƒgƒAƒbƒv
+	// ãƒ¢ãƒ‡ãƒ«å…¨ä½“ã®ã‚³ãƒªã‚¸ãƒ§ãƒ³æƒ…å ±ã®ã‚»ãƒƒãƒˆã‚¢ãƒƒãƒ—
 	MV1SetupCollInfo(stagedata, -1);
 
 	int MeshNum;
 
-	// ƒ‚ƒfƒ‹‚ÉŠÜ‚Ü‚ê‚éƒƒbƒVƒ…‚Ì”‚ğæ“¾‚·‚é
+	// ãƒ¢ãƒ‡ãƒ«ã«å«ã¾ã‚Œã‚‹ãƒ¡ãƒƒã‚·ãƒ¥ã®æ•°ã‚’å–å¾—ã™ã‚‹
 	MeshNum = MV1GetMeshNum(stagedata);
 
 
@@ -249,11 +262,11 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (anim_damage == -1) return -1;
 	anim_down = LoadPlayerAssetModel("Anim_Down_Loop.mv1");
 	if (anim_down == -1) return -1;
-	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// ”íŒ‚ƒAƒjƒ
+	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// è¢«æ’ƒã‚¢ãƒ‹ãƒ¡
 	if (anim_down == -1) return -1;
-	enemy_anim_walk = MV1LoadModel("..\\Data\\Goblin\\Anim_Walk.mv1");		// ”íŒ‚ƒAƒjƒ
+	enemy_anim_walk = MV1LoadModel("..\\Data\\Goblin\\Anim_Walk.mv1");		// è¢«æ’ƒã‚¢ãƒ‹ãƒ¡
 	if (anim_down == -1) return -1;
-	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// ”íŒ‚ƒAƒjƒ
+	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// è¢«æ’ƒã‚¢ãƒ‹ãƒ¡
 	if (anim_down == -1) return -1;
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -265,80 +278,84 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 	SetDrawScreen(DX_SCREEN_BACK);
-	//ƒJƒƒ‰‚Ì‰Šú‰»
+	//ã‚«ãƒ¡ãƒ©ã®åˆæœŸåŒ–
 	SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
 
-	// ‚a‚f‚l—p‚ÌƒTƒEƒ“ƒhƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
+	// ï¼¢ï¼§ï¼­ç”¨ã®ã‚µã‚¦ãƒ³ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
 	sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
 	BGMSoundHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (BGMSoundHandle == -1) {
 		return false;
 	}
-	// —LŒø‚Èƒ‹[ƒvƒ|ƒCƒ“ƒg‚ª‚ ‚éê‡‚Íƒ‹[ƒvÄ¶‚·‚é
+	// æœ‰åŠ¹ãªãƒ«ãƒ¼ãƒ—ãƒã‚¤ãƒ³ãƒˆãŒã‚ã‚‹å ´åˆã¯ãƒ«ãƒ¼ãƒ—å†ç”Ÿã™ã‚‹
 	PlaySoundMem(BGMSoundHandle,
 		BGMLoopStartPosition >= 0 ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK);
 
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Weapon\\Sword\\%s", SEattack_FilePath);
 	SEattackHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (SEattackHandle == -1) {
 		return false;
 	}
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEdamage_FilePath);
 	SEdamageHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (SEdamageHandle == -1) {
 		return false;
 	}
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEjump_FilePath);
 	SEjumpHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (SEjumpHandle == -1) {
 		return false;
 	}
 
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
+
+
+
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
+
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// 1P/2P ‚ÌÄ¶ŠÔ‚Æ‘Ò‹@•œ‹A‚ğ‹¤’Êˆ—‚·‚éB
+			// 1P/2P ã®å†ç”Ÿæ™‚é–“ã¨å¾…æ©Ÿå¾©å¸°ã‚’å…±é€šå‡¦ç†ã™ã‚‹ã€‚
 			UpdatePlayerAnimationProgress(charainfo[i], playerStates[i], anim_neutral);
 		}
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// HP‚ª0ˆÈ‰º‚ÅA‚Ü‚¾DOWNMODE‚É‚È‚Á‚Ä‚¢‚È‚¢ê‡
+			// HPãŒ0ä»¥ä¸‹ã§ã€ã¾ã DOWNMODEã«ãªã£ã¦ã„ãªã„å ´åˆ
 			if (charainfo[i].HP <= 0 && charainfo[i].mode != DOWNMODE) {
 
-				// ó‘Ô‚ğDOWNMODE‚Ö
+				// çŠ¶æ…‹ã‚’DOWNMODEã¸
 				charainfo[i].mode = DOWNMODE;
 
-				// €–SƒAƒjƒ[ƒVƒ‡ƒ“ˆ—‚È‚Ç
+				// æ­»äº¡ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å‡¦ç†ãªã©
 				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
 				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
 				charainfo[i].playtime = 0.0f;
 
-				// š‚±‚±‚ÅƒJƒEƒ“ƒg‚·‚é
+				// â˜…ã“ã“ã§ã‚«ã‚¦ãƒ³ãƒˆã™ã‚‹
 				game.AddDeath(i);
 			}
 		}
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// €–Só‘Ô(DOWNMODE)‚ÅAƒWƒƒƒ“ƒvƒ{ƒ^ƒ“i1P:SPACE, 2P:RETURNj‚ª‰Ÿ‚³‚ê‚½‚ç
+			// æ­»äº¡çŠ¶æ…‹(DOWNMODE)ã§ã€ã‚¸ãƒ£ãƒ³ãƒ—ãƒœã‚¿ãƒ³ï¼ˆ1P:SPACE, 2P:RETURNï¼‰ãŒæŠ¼ã•ã‚ŒãŸã‚‰
 			if (charainfo[i].mode == DOWNMODE && CheckHitKey(playerInputs[i].jumpKey) == 1) {
 
-				// 1. HP‚ğ‰ñ•œ
+				// 1. HPã‚’å›å¾©
 				charainfo[i].HP = 6;
 
-				// 2. ƒ‚[ƒh‚ğ STAND ‚É–ß‚·
+				// 2. ãƒ¢ãƒ¼ãƒ‰ã‚’ STAND ã«æˆ»ã™
 				charainfo[i].mode = STAND;
 
-				// 3. ƒAƒjƒ[ƒVƒ‡ƒ“‚ğ’Êí‚É–ß‚·
+				// 3. ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’é€šå¸¸ã«æˆ»ã™
 				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
 				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
 				charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 				charainfo[i].playtime = 0.0f;
 			}
 		}
-		//“GƒAƒjƒ[ƒVƒ‡ƒ“is
+		//æ•µã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³é€²è¡Œ
 		charainfo[TEST_ENEMY_INDEX].playtime += 0.5f;
 		if (charainfo[TEST_ENEMY_INDEX].playtime > charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
 			charainfo[TEST_ENEMY_INDEX].playtime = 0.0f;
@@ -359,9 +376,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-		// ƒL[‘€ì
+		// ã‚­ãƒ¼æ“ä½œ
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// 1P/2P ‚Ì“ü—ÍAˆÚ“®A‘Ò‹@/‘–‚èØ‘ÖAUŒ‚—\–ñ‚ğ‹¤’Êˆ—‚·‚éB
+			// 1P/2P ã®å…¥åŠ›ã€ç§»å‹•ã€å¾…æ©Ÿ/èµ°ã‚Šåˆ‡æ›¿ã€æ”»æ’ƒäºˆç´„ã‚’å…±é€šå‡¦ç†ã™ã‚‹ã€‚
 			UpdatePlayerInput(
 				charainfo[i],
 				playerStates[i],
@@ -403,7 +420,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		if (charainfo[TEST_ENEMY_INDEX].mode == STAND) {
-			// ‹——£‚Ì‹ß‚¢ƒvƒŒƒCƒ„[‚ğUŒ‚‘ÎÛ‚É‚·‚éB
+			// è·é›¢ã®è¿‘ã„ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‚’æ”»æ’ƒå¯¾è±¡ã«ã™ã‚‹ã€‚
 			float dist = VSize(VSub(charainfo[enemyTargetIndex].pos, charainfo[TEST_ENEMY_INDEX].pos));
 			if (dist < 150.0f) {
 				charainfo[TEST_ENEMY_INDEX].mode = ATTACK;
@@ -413,29 +430,29 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 		else if (charainfo[TEST_ENEMY_INDEX].mode == ATTACK) {
 
-			// UŒ‚ƒAƒjƒ[ƒVƒ‡ƒ“‚ÌuU‚è‰º‚ë‚µvƒ^ƒCƒ~ƒ“ƒO
+			// æ”»æ’ƒã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®ã€ŒæŒ¯ã‚Šä¸‹ã‚ã—ã€ã‚¿ã‚¤ãƒŸãƒ³ã‚°
 			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.4f &&
 				charainfo[TEST_ENEMY_INDEX].playtime <= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.6f)
 			{
-				// UŒ‚‚ª‚Ü‚¾ˆê“x‚à“–‚½‚Á‚Ä‚¢‚È‚¢ê‡‚Ì‚İ”»’è
+				// æ”»æ’ƒãŒã¾ã ä¸€åº¦ã‚‚å½“ãŸã£ã¦ã„ãªã„å ´åˆã®ã¿åˆ¤å®š
 				if (charainfo[TEST_ENEMY_INDEX].isHit == false)
 				{
 					for (int i = 0; i < PLAYER_COUNT; i++) {
-						// ƒeƒXƒg“G‚ÌUŒ‚‚ÍA”ÍˆÍ“à‚Ì‚Ç‚¿‚ç‚ÌƒvƒŒƒCƒ„[‚É‚à“–‚½‚éB
+						// ãƒ†ã‚¹ãƒˆæ•µã®æ”»æ’ƒã¯ã€ç¯„å›²å†…ã®ã©ã¡ã‚‰ã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã«ã‚‚å½“ãŸã‚‹ã€‚
 						if (HitCheck_Capsule_Capsule(
 							charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
 							charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)), charainfo[i].charahitinfo.Width / 2))
 						{
-							charainfo[i].HP -= 1; // ƒ_ƒ[ƒW”­¶
-							charainfo[TEST_ENEMY_INDEX].isHit = true; // ƒtƒ‰ƒO‚ğ—§‚Ä‚Ä˜A‘±ƒqƒbƒg‚ğ–h~
-							printfDx("ƒvƒŒƒCƒ„[%d”í’eIHP:%d\n", i + 1, charainfo[i].HP);
+							charainfo[i].HP -= 1; // ãƒ€ãƒ¡ãƒ¼ã‚¸ç™ºç”Ÿ
+							charainfo[TEST_ENEMY_INDEX].isHit = true; // ãƒ•ãƒ©ã‚°ã‚’ç«‹ã¦ã¦é€£ç¶šãƒ’ãƒƒãƒˆã‚’é˜²æ­¢
+							printfDx("ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼%dè¢«å¼¾ï¼HP:%d\n", i + 1, charainfo[i].HP);
 							break;
 						}
 					}
 				}
 			}
 
-			// ƒAƒjƒ[ƒVƒ‡ƒ“‚ªI‚í‚Á‚½‚çƒtƒ‰ƒO‚ğƒŠƒZƒbƒg‚µ‚Ä’Êíƒ‚[ƒh‚Ö
+			// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ãŒçµ‚ã‚ã£ãŸã‚‰ãƒ•ãƒ©ã‚°ã‚’ãƒªã‚»ãƒƒãƒˆã—ã¦é€šå¸¸ãƒ¢ãƒ¼ãƒ‰ã¸
 			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
 				charainfo[TEST_ENEMY_INDEX].mode = STAND;
 				SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
@@ -445,32 +462,32 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[0].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[0].move));
 		WallNum = 0;
 		FloorNum = 0;
-		// ŒŸo‚³‚ê‚½ƒ|ƒŠƒSƒ“‚Ì”‚¾‚¯ŒJ‚è•Ô‚µ
+		// æ¤œå‡ºã•ã‚ŒãŸãƒãƒªã‚´ãƒ³ã®æ•°ã ã‘ç¹°ã‚Šè¿”ã—
 		for (int i = 0; i < HitDim.HitNum; i++) {
-			// ‚w‚y•½–Ê‚É‚’¼‚©‚Ç‚¤‚©‚Íƒ|ƒŠƒSƒ“‚Ì–@ü‚Ì‚x¬•ª‚ª‚O‚ÉŒÀ‚è‚È‚­‹ß‚¢‚©‚Ç‚¤‚©‚Å”»’f‚·‚é
+			// ï¼¸ï¼ºå¹³é¢ã«å‚ç›´ã‹ã©ã†ã‹ã¯ãƒãƒªã‚´ãƒ³ã®æ³•ç·šã®ï¼¹æˆåˆ†ãŒï¼ã«é™ã‚Šãªãè¿‘ã„ã‹ã©ã†ã‹ã§åˆ¤æ–­ã™ã‚‹
 			if (HitDim.Dim[i].Normal.y < 0.000001f && HitDim.Dim[i].Normal.y > -0.000001f) {
-				printf("•Çˆµ‚¢\n");
-				// •Çƒ|ƒŠƒSƒ“‚Æ”»’f‚³‚ê‚½ê‡‚Å‚àAƒLƒƒƒ‰ƒNƒ^[‚Ì‚xÀ•W{‚PD‚O‚†‚æ‚è‚‚¢ƒ|ƒŠƒSƒ“‚Ì‚İ“–‚½‚è”»’è‚ğs‚¤
+				printf("å£æ‰±ã„\n");
+				// å£ãƒãƒªã‚´ãƒ³ã¨åˆ¤æ–­ã•ã‚ŒãŸå ´åˆã§ã‚‚ã€ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼ã®ï¼¹åº§æ¨™ï¼‹ï¼‘ï¼ï¼ï½†ã‚ˆã‚Šé«˜ã„ãƒãƒªã‚´ãƒ³ã®ã¿å½“ãŸã‚Šåˆ¤å®šã‚’è¡Œã†
 				if (HitDim.Dim[i].Position[0].y > charainfo[0].pos.y + 1.0f ||
 					HitDim.Dim[i].Position[1].y > charainfo[0].pos.y + 1.0f ||
 					HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f) {
-					// ƒ|ƒŠƒSƒ“‚Ì”‚ª—ñ‹“‚Å‚«‚éŒÀŠE”‚É’B‚µ‚Ä‚¢‚È‚©‚Á‚½‚çƒ|ƒŠƒSƒ“‚ğ”z—ñ‚É’Ç‰Á
+					// ãƒãƒªã‚´ãƒ³ã®æ•°ãŒåˆ—æŒ™ã§ãã‚‹é™ç•Œæ•°ã«é”ã—ã¦ã„ãªã‹ã£ãŸã‚‰ãƒãƒªã‚´ãƒ³ã‚’é…åˆ—ã«è¿½åŠ 
 					if (WallNum < CHARA_MAX_HITCOLL) {
-						// ƒ|ƒŠƒSƒ“‚Ì\‘¢‘Ì‚ÌƒAƒhƒŒƒX‚ğ•Çƒ|ƒŠƒSƒ“ƒ|ƒCƒ“ƒ^”z—ñ‚É•Û‘¶‚·‚é
+						// ãƒãƒªã‚´ãƒ³ã®æ§‹é€ ä½“ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’å£ãƒãƒªã‚´ãƒ³ãƒã‚¤ãƒ³ã‚¿é…åˆ—ã«ä¿å­˜ã™ã‚‹
 						Wall[WallNum] = &HitDim.Dim[i];
 
-						// •Çƒ|ƒŠƒSƒ“‚Ì”‚ğ‰ÁZ‚·‚é
+						// å£ãƒãƒªã‚´ãƒ³ã®æ•°ã‚’åŠ ç®—ã™ã‚‹
 						WallNum++;
 					}
 				}
 			}
 			else {
-				// ƒ|ƒŠƒSƒ“‚Ì”‚ª—ñ‹“‚Å‚«‚éŒÀŠE”‚É’B‚µ‚Ä‚¢‚È‚©‚Á‚½‚çƒ|ƒŠƒSƒ“‚ğ”z—ñ‚É’Ç‰Á
+				// ãƒãƒªã‚´ãƒ³ã®æ•°ãŒåˆ—æŒ™ã§ãã‚‹é™ç•Œæ•°ã«é”ã—ã¦ã„ãªã‹ã£ãŸã‚‰ãƒãƒªã‚´ãƒ³ã‚’é…åˆ—ã«è¿½åŠ 
 				if (FloorNum < CHARA_MAX_HITCOLL) {
-					// ƒ|ƒŠƒSƒ“‚Ì\‘¢‘Ì‚ÌƒAƒhƒŒƒX‚ğ°ƒ|ƒŠƒSƒ“ƒ|ƒCƒ“ƒ^”z—ñ‚É•Û‘¶‚·‚é
+					// ãƒãƒªã‚´ãƒ³ã®æ§‹é€ ä½“ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’åºŠãƒãƒªã‚´ãƒ³ãƒã‚¤ãƒ³ã‚¿é…åˆ—ã«ä¿å­˜ã™ã‚‹
 					Floor[FloorNum] = &HitDim.Dim[i];
 
-					// °ƒ|ƒŠƒSƒ“‚Ì”‚ğ‰ÁZ‚·‚é
+					// åºŠãƒãƒªã‚´ãƒ³ã®æ•°ã‚’åŠ ç®—ã™ã‚‹
 					FloorNum++;
 				}
 			}
@@ -486,7 +503,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			VAdd(VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move), VGet(0, charainfo[PLAYER2_INDEX].charahitinfo.Height, 0)),
 			charainfo[PLAYER2_INDEX].charahitinfo.Width / 2)
 			== TRUE) {
-			// ƒvƒŒƒCƒ„[“¯m‚ªd‚È‚è‚»‚¤‚Èê‡‚ÍA‰¡ˆÚ“®‚¾‚¯~‚ß‚éB
+			// ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼åŒå£«ãŒé‡ãªã‚Šãã†ãªå ´åˆã¯ã€æ¨ªç§»å‹•ã ã‘æ­¢ã‚ã‚‹ã€‚
 			charainfo[PLAYER1_INDEX].move.x = 0.0f;
 			charainfo[PLAYER1_INDEX].move.z = 0.0f;
 			charainfo[PLAYER2_INDEX].move.x = 0.0f;
@@ -502,30 +519,30 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
 				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2)
 				== TRUE) {
-				// ƒeƒXƒg“G‚Æd‚È‚è‚»‚¤‚Èê‡‚ÍA‚»‚ÌƒvƒŒƒCƒ„[‚Ì‰¡ˆÚ“®‚ğ~‚ß‚éB
+				// ãƒ†ã‚¹ãƒˆæ•µã¨é‡ãªã‚Šãã†ãªå ´åˆã¯ã€ãã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®æ¨ªç§»å‹•ã‚’æ­¢ã‚ã‚‹ã€‚
 				charainfo[i].move.x = 0.0f;
 				charainfo[i].move.z = 0.0f;
 			}
 		}
-		// °ƒ|ƒŠƒSƒ“‚Æ‚Ì“–‚½‚è”»’è
+		// åºŠãƒãƒªã‚´ãƒ³ã¨ã®å½“ãŸã‚Šåˆ¤å®š
 		if (FloorNum != 0) {
-			// °ƒ|ƒŠƒSƒ“‚É“–‚½‚Á‚½‚©‚Ç‚¤‚©‚Ìƒtƒ‰ƒO‚ğ“|‚µ‚Ä‚¨‚­
+			// åºŠãƒãƒªã‚´ãƒ³ã«å½“ãŸã£ãŸã‹ã©ã†ã‹ã®ãƒ•ãƒ©ã‚°ã‚’å€’ã—ã¦ãŠã
 			HitFlag = 0;
-			// ˆê”Ô‚‚¢°ƒ|ƒŠƒSƒ“‚É‚Ô‚Â‚¯‚éˆ×‚Ì”»’è—p•Ï”‚ğ‰Šú‰»
+			// ä¸€ç•ªé«˜ã„åºŠãƒãƒªã‚´ãƒ³ã«ã¶ã¤ã‘ã‚‹ç‚ºã®åˆ¤å®šç”¨å¤‰æ•°ã‚’åˆæœŸåŒ–
 			MaxY = 0.0f;
 			MaxY_poly = 0.0f;
 
-			// °ƒ|ƒŠƒSƒ“‚Ì”‚¾‚¯ŒJ‚è•Ô‚µ
+			// åºŠãƒãƒªã‚´ãƒ³ã®æ•°ã ã‘ç¹°ã‚Šè¿”ã—
 			for (int i = 0; i < FloorNum; i++) {
-				// i”Ô–Ú‚Ì°ƒ|ƒŠƒSƒ“‚ÌƒAƒhƒŒƒX‚ğ°ƒ|ƒŠƒSƒ“ƒ|ƒCƒ“ƒ^”z—ñ‚©‚çæ“¾
+				// iç•ªç›®ã®åºŠãƒãƒªã‚´ãƒ³ã®ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’åºŠãƒãƒªã‚´ãƒ³ãƒã‚¤ãƒ³ã‚¿é…åˆ—ã‹ã‚‰å–å¾—
 				Poly = Floor[i];
 
 				VECTOR cal_pos1 = VAdd(charainfo[0].pos, VGet(0.0f, PC_HEIGHT, 0.0f));
 				VECTOR cal_pos2 = VAdd(charainfo[0].pos, VGet(0.0f, -5.0f, 0.0f));
-				// ‘–‚Á‚Ä‚¢‚éê‡‚Í“ª‚Ìæ‚©‚ç‚»‚±‚»‚±’á‚¢ˆÊ’u‚ÌŠÔ‚Å“–‚½‚Á‚Ä‚¢‚é‚©‚ğ”»’è( ŒXÎ‚Å—‰ºó‘Ô‚ÉˆÚs‚µ‚Ä‚µ‚Ü‚í‚È‚¢ˆ× )
+				// èµ°ã£ã¦ã„ã‚‹å ´åˆã¯é ­ã®å…ˆã‹ã‚‰ãã“ãã“ä½ã„ä½ç½®ã®é–“ã§å½“ãŸã£ã¦ã„ã‚‹ã‹ã‚’åˆ¤å®š( å‚¾æ–œã§è½ä¸‹çŠ¶æ…‹ã«ç§»è¡Œã—ã¦ã—ã¾ã‚ãªã„ç‚º )
 				LineRes = HitCheck_Line_Triangle(cal_pos1, cal_pos2, Poly->Position[0], Poly->Position[1], Poly->Position[2]);
 
-				// “–‚½‚Á‚Ä‚¢‚È‚©‚Á‚½‚ç‰½‚à‚µ‚È‚¢
+				// å½“ãŸã£ã¦ã„ãªã‹ã£ãŸã‚‰ä½•ã‚‚ã—ãªã„
 				if (LineRes.HitFlag == TRUE) {
 					PolyCharaHitField[0] = Poly->Position[0];
 					PolyCharaHitField[1] = Poly->Position[1];
@@ -535,15 +552,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					continue;
 				}
 
-				// Šù‚É“–‚½‚Á‚½ƒ|ƒŠƒSƒ“‚ª‚ ‚èAŠ‚Â¡‚Ü‚ÅŒŸo‚µ‚½°ƒ|ƒŠƒSƒ“‚æ‚è’á‚¢ê‡‚Í‰½‚à‚µ‚È‚¢
+				// æ—¢ã«å½“ãŸã£ãŸãƒãƒªã‚´ãƒ³ãŒã‚ã‚Šã€ä¸”ã¤ä»Šã¾ã§æ¤œå‡ºã—ãŸåºŠãƒãƒªã‚´ãƒ³ã‚ˆã‚Šä½ã„å ´åˆã¯ä½•ã‚‚ã—ãªã„
 				if (HitFlag == 1 && MaxY > LineRes.Position.y) {
 					continue;
 				}
 
-				// ƒ|ƒŠƒSƒ“‚É“–‚½‚Á‚½ƒtƒ‰ƒO‚ğ—§‚Ä‚é
+				// ãƒãƒªã‚´ãƒ³ã«å½“ãŸã£ãŸãƒ•ãƒ©ã‚°ã‚’ç«‹ã¦ã‚‹
 				HitFlag = 1;
 
-				// ÚG‚µ‚½‚xÀ•W‚ğ•Û‘¶‚·‚é
+				// æ¥è§¦ã—ãŸï¼¹åº§æ¨™ã‚’ä¿å­˜ã™ã‚‹
 				MaxY = LineRes.Position.y;
 				MaxY_poly = Poly->Position[1].y;
 			}
@@ -574,14 +591,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 						charainfo[0].model1, charainfo[0].attachidx);
 					charainfo[0].mode = JUMPLOOP;
 					charainfo[0].move.y = 15.0f;
-					//ƒWƒƒƒ“ƒv’¼Œã‚Ì’n–Ê‚ß‚è‚İ‚ğ”ğ‚¯‚é‚½‚ß
+					//ã‚¸ãƒ£ãƒ³ãƒ—ç›´å¾Œã®åœ°é¢ã‚ã‚Šè¾¼ã¿ã‚’é¿ã‘ã‚‹ãŸã‚
 					charainfo[0].pos.y += charainfo[0].move.y;
 				}
 			}
 		}
 		else
 		{
-			// ƒAƒjƒ‚Ìƒ‹[ƒvŠÇ—
+			// ã‚¢ãƒ‹ãƒ¡ã®ãƒ«ãƒ¼ãƒ—ç®¡ç†
 			if (charainfo[0].mode != JUMPLOOP && charainfo[0].mode != FALL) {
 				MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
 				charainfo[0].mode = FALL;
@@ -593,21 +610,21 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-		// ƒWƒƒƒ“ƒv’†‚¾‚Á‚½‚çd—Í’Ç‰Á‚³‚¹‚é
+		// ã‚¸ãƒ£ãƒ³ãƒ—ä¸­ã ã£ãŸã‚‰é‡åŠ›è¿½åŠ ã•ã›ã‚‹
 		if (charainfo[0].mode == FALL || charainfo[0].mode == JUMPLOOP) {
 			charainfo[0].move.y -= GRAVITY;
 		}
 
 
-		// ŒŸo‚µ‚½ƒLƒƒƒ‰ƒNƒ^[‚ÌüˆÍ‚Ìƒ|ƒŠƒSƒ“î•ñ‚ğŠJ•ú‚·‚é
+		// æ¤œå‡ºã—ãŸã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼ã®å‘¨å›²ã®ãƒãƒªã‚´ãƒ³æƒ…å ±ã‚’é–‹æ”¾ã™ã‚‹
 		MV1CollResultPolyDimTerminate(HitDim);
 
-		// ˆÚ“®ˆ—
+		// ç§»å‹•å‡¦ç†
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			charainfo[i].pos.x += charainfo[i].move.x;
 			charainfo[i].pos.y += charainfo[i].move.y;
 			charainfo[i].pos.z += charainfo[i].move.z;
-			// ˆÚ“®Œã‚ÌÀ•W‚ğUŒ‚”»’è—p‚Ì’†S‚É‚à”½‰f‚·‚éB
+			// ç§»å‹•å¾Œã®åº§æ¨™ã‚’æ”»æ’ƒåˆ¤å®šç”¨ã®ä¸­å¿ƒã«ã‚‚åæ˜ ã™ã‚‹ã€‚
 			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		}
 
@@ -624,22 +641,25 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
-			//â‚ÌÀ•WXV
+			//é˜ã®åº§æ¨™æ›´æ–°
 			if (playerSayaFrame[i] != -1 && playerSayaModel[i] != -1) {
 				sayamatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerSayaFrame[i]);
 				MV1SetMatrix(playerSayaModel[i], sayamatrix[i]);
 			}
-			//•Ší‚ÌÀ•WXV
+			//æ­¦å™¨ã®åº§æ¨™æ›´æ–°
 			if (playerWeaponFrame[i] != -1 && playerWeaponModel[i] != -1) {
 				wpmatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerWeaponFrame[i]);
 				MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
-				//UŒ‚”»’è‚ÌXV
+				//æ”»æ’ƒåˆ¤å®šã®æ›´æ–°
 				wpPosStart[i] = VGet(0.0f, 0.0f, 0.0f);
 				wpPosEnd[i] = VGet(0.0f, -90.0f, 0.0f);
 				wpPosStart[i] = VTransform(wpPosStart[i], wpmatrix[i]);
 				wpPosEnd[i] = VTransform(wpPosEnd[i], wpmatrix[i]);
-
-				CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+				for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
+					// ç”Ÿæˆã•ã‚Œã¦ã„ãªã„æ•µï¼ˆNONEï¼‰ã¯ã‚¹ã‚­ãƒƒãƒ—
+					if (charainfo[e].mode == NONE) continue;
+					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+				}
 			}
 		}
 
@@ -652,24 +672,62 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-		//ƒJƒƒ‰’Ç]
-		// 2l‚Ì’†ŠÔ’n“_‚ğŒ©‚é‚æ‚¤‚É‚µ‚ÄA“¯‚¶‰æ–Ê“à‚É“ü‚è‚â‚·‚­‚·‚éB
+		//ã‚«ãƒ¡ãƒ©è¿½å¾“
+		// 2äººã®ä¸­é–“åœ°ç‚¹ã‚’è¦‹ã‚‹ã‚ˆã†ã«ã—ã¦ã€åŒã˜ç”»é¢å†…ã«å…¥ã‚Šã‚„ã™ãã™ã‚‹ã€‚
 		VECTOR cameraCenter = VScale(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER2_INDEX].pos), 0.5f);
-		ctgt = VAdd(cameraCenter, VGet(0.0f, 400.0f, 0.0f));
-		cpos = VAdd(ctgt, VGet(0.0f, 300.0f, -1200.0f));
+		ctgt = VAdd(cameraCenter, VGet(0.0f, 0.0f, 200.0f));
+		cpos = VAdd(ctgt, VGet(0.0f, 1800.0f, -2000.0f));
 		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
 
 
-		// ‰æ–Ê‚ÌÁ‹
+		// ç”»é¢ã®æ¶ˆå»
 		ClearDrawScreen();
 
-		// lŠpŒ`‚ğ•\¦ ÅŒã‚Ìˆø”‚ğfalse‚É‚·‚é‚Æ“h‚è‚Â‚Ô‚µ–³‚µ
+
+
+		// å››è§’å½¢ã‚’è¡¨ç¤º æœ€å¾Œã®å¼•æ•°ã‚’falseã«ã™ã‚‹ã¨å¡—ã‚Šã¤ã¶ã—ç„¡ã—
 		DrawBox(0, 0, 900, 600, GetColor(255, 255, 255), true);
-		//ƒ‚ƒfƒ‹•`‰æ
+		//ãƒ¢ãƒ‡ãƒ«æç”»
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			MV1DrawModel(charainfo[i].model1);
 		}
-		MV1DrawModel(charainfo[TEST_ENEMY_INDEX].model1);
+
+
+		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+			// ç”Ÿæˆã•ã‚Œã¦ã„ãªã„æ•µã¯ã‚¹ã‚­ãƒƒãƒ—
+			if (charainfo[i].mode == NONE) continue;
+
+			MV1DrawModel(charainfo[i].model1);
+
+			// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³æ™‚é–“ã®åŠ ç®—
+			charainfo[i].playtime += 0.5f;
+
+			// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³çµ‚äº†åˆ¤å®šï¼ˆã“ã“ã§ã™ã¹ã¦ã®æ•µã®çŠ¶æ…‹é·ç§»ã‚’ç®¡ç†ã™ã‚‹ï¼‰
+			if (charainfo[i].playtime > charainfo[i].anim_totaltime) {
+				charainfo[i].playtime = 0.0f;
+
+				// ãƒ€ãƒ¡ãƒ¼ã‚¸ä¸­ã®å‡¦ç†
+				if (charainfo[i].mode == DAMAGE) {
+					if (charainfo[i].enemyHP <= 0) {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
+						charainfo[i].mode = DOWNMODE;
+					}
+					else {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
+						charainfo[i].mode = STAND;
+					}
+					charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+				}
+				// å¿…è¦ã«å¿œã˜ã¦ã“ã“ã« ATTACK â†’ STAND ã¸ã®æˆ»ã‚Šå‡¦ç†ã‚‚è¿½åŠ ã—ã¦ãã ã•ã„
+			}
+			MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+		}
+
+
+
+
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			if (playerWeaponModel[i] != -1) {
 				MV1DrawModel(playerWeaponModel[i]);
@@ -683,15 +741,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
 		MV1DrawModel(sky);
 
-		game.Update(charainfo);
-
+		game.Update(charainfo, charainfo);
+		
 		game.DrawUI();
 
-		// •\‰æ–Ê‚Æ— ‰æ–Ê‚ÌØ‚è‘Ö‚¦
+		// è¡¨ç”»é¢ã¨è£ç”»é¢ã®åˆ‡ã‚Šæ›¿ãˆ
 		ScreenFlip();
 
 	}
-	// DXƒ‰ƒCƒuƒ‰ƒŠ‚ÌI—¹ˆ—
+	// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®çµ‚äº†å‡¦ç†
 	DxLib_End();
 
 	return 0;
@@ -699,14 +757,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage) {
-	// UŒ‚’†‚©‚ÂAƒ^[ƒQƒbƒg‚ªƒ_ƒEƒ“/ƒ_ƒ[ƒWd’¼’†‚Å‚È‚¢ê‡‚Ì‚İ”»’è
+	// æ”»æ’ƒä¸­ã‹ã¤ã€ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãŒãƒ€ã‚¦ãƒ³/ãƒ€ãƒ¡ãƒ¼ã‚¸ç¡¬ç›´ä¸­ã§ãªã„å ´åˆã®ã¿åˆ¤å®š
 	if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
 	{
 		if (attacker->isHit == true) {
 			return;
 		}
 
-		// ”¼Œa‚ğ 30.0f ‚ÉŠg‘å (“–‚½‚ç‚È‚¢ê‡‚Í‚±‚±‚ğ‘å‚«‚­’²®‚µ‚Ä‚­‚¾‚³‚¢)
+		// åŠå¾„ã‚’ 30.0f ã«æ‹¡å¤§ (å½“ãŸã‚‰ãªã„å ´åˆã¯ã“ã“ã‚’å¤§ããèª¿æ•´ã—ã¦ãã ã•ã„)
 		if (HitCheck_Capsule_Capsule(start, end, 30.0f,
 			target->pos,
 			VAdd(target->pos, VGet(0, target->charahitinfo.Height, 0)),
@@ -714,28 +772,38 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 		{
 			attacker->isHit = true;
 
-			// ”í’eƒAƒjƒ[ƒVƒ‡ƒ“‚Ö‘JˆÚ
+			// è¢«å¼¾ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã¸é·ç§»
 			MV1DetachAnim(target->model1, target->attachidx);
 			target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
 			target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
 			target->playtime = 0.0f;
 			target->mode = DAMAGE;
 
-			// SEÄ¶
+			// SEå†ç”Ÿ
 			PlaySoundMem(SEdamageHandle, DX_PLAYTYPE_BACK);
 
-			// HPŒ¸­
-			if (target == &charainfo[0]) {
+			if (target == &charainfo[0] || target == &charainfo[1]) {
+				// ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãŒãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®å ´åˆ
 				target->HP--;
 			}
 			else {
+				// ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãŒæ•µã®å ´åˆ
 				target->enemyHP--;
+
+				// æ•µãŒå€’ã‚ŒãŸã‹ãƒã‚§ãƒƒã‚¯
 				if (target->enemyHP <= 0) {
-					game.AddScore(100);
+
+					// æ”»æ’ƒè€…ãŒãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼1ã ã£ãŸã‚‰
+					if (attacker == &charainfo[0]) {
+						game.AddScore(0, 100); // P1ã«100ç‚¹åŠ ç®—
+					}
+					// æ”»æ’ƒè€…ãŒãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼2ã ã£ãŸã‚‰
+					else if (attacker == &charainfo[1]) {
+						game.AddScore(1, 100); // P2ã«100ç‚¹åŠ ç®—
+					}
 				}
 			}
-
-			printfDx("ƒqƒbƒgIc‚èHP:%d\n", (target == &charainfo[0] ? target->HP : target->enemyHP));
+			printfDx("ãƒ’ãƒƒãƒˆï¼æ®‹ã‚ŠHP:%d\n", (target == &charainfo[0] ? target->HP : target->enemyHP));
 		}
 	}
 }
