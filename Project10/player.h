@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 #include "main.h"
@@ -18,12 +16,13 @@ constexpr float PLAYER_MODEL_SCALE = 1.1f;
 struct PlayerInputConfig {
 	int padType;
 	int upKey;
-
 	int downKey;
 	int leftKey;
 	int rightKey;
 	int attackKey;
 	int jumpKey;
+	int attackPadButton;
+	int jumpPadButton;
 };
 
 // 1l•ª‚Ì‘€ì’†ó‘ÔB
@@ -31,6 +30,7 @@ struct PlayerInputConfig {
 struct PlayerRuntimeState {
 	int key = 0;
 	int prevAttackButton = 0;
+	int prevJumpButton = 0;
 	int attackIndex = 0;
 	bool isAttackBuffered = false;
 	bool moveInput = false;
@@ -66,7 +66,4 @@ void UpdatePlayerAttackState(
 	const int animAttack[],
 	const float attackEndTime[],
 	int seAttackHandle
-
 );
-
-

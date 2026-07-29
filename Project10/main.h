@@ -17,6 +17,15 @@
 #define ATTACK_FIRST_ENDTIME 15.0f
 #define ATTACK_SECOND_ENDTIME 15.0f
 #define ATTACK_THIERD_ENDTIME 30.0f
+
+#define MAIN_H
+#define MAIN_H
+
+// 他のインクルードなどはそのまま
+
+// ここに extern をつけて宣言を追加
+extern int enemy_anim_attack;
+extern int enemy_anim_neutral;
 class GameManager;
 struct SCharaInfo;
 enum Direction

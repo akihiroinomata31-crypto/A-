@@ -10,15 +10,15 @@ struct ReplayFrame {
 class GameManager {
 public:
 
-    int timeLimit = 99 * 100;
+    int timeLimit = 99 * 150;
     int p1Score = 0, p2Score = 0;
     std::vector<ReplayFrame> replayData;
     int spawnTimer = 0;
     //void Update();
-    void DrawUI();
+    void DrawUI(int pIdx, int sw, int sh);
     // プレイヤー1と2でそれぞれカウントするために配列にする
     int deathCount[2] = { 0, 0 };
-
+    int gameState = 0;
     void AddDeath(int playerIndex) {
         if (playerIndex >= 0 && playerIndex < 2) {
             deathCount[playerIndex]++;
@@ -35,3 +35,5 @@ public:
     void UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players);
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
 };
+extern int enemy_anim_attack;
+extern int enemy_anim_neutral;

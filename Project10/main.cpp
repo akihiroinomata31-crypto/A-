@@ -54,10 +54,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int prevJKey = 0;
 	int isBGMPlaying = 1;
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
-	PlayerInputConfig 
-		playerInputs[PLAYER_COUNT] = {
-		{ DX_INPUT_KEY_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q },
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1 }
+	
+	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
+		// 1P: キーボード(WASD) + 1Pゲームパッド。
+		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_2 },
+		// 2P: キーボード(矢印) + 2Pゲームパッド。
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1, PAD_INPUT_1, PAD_INPUT_2 }
 	};
 
 
@@ -355,24 +357,38 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				charainfo[i].playtime = 0.0f;
 			}
 		}
-		//敵アニメーション進行
-		charainfo[TEST_ENEMY_INDEX].playtime += 0.5f;
-		if (charainfo[TEST_ENEMY_INDEX].playtime > charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
-			charainfo[TEST_ENEMY_INDEX].playtime = 0.0f;
-			if (charainfo[TEST_ENEMY_INDEX].mode == DAMAGE) {
-				if (charainfo[TEST_ENEMY_INDEX].enemyHP <= 0) {
-					MV1DetachAnim(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, anim_down);
-					charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].mode = DOWNMODE;
-				}
-				else {
-					MV1DetachAnim(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, enemy_anim_neutral);
-					charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].mode = STAND;
+		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+			// 敵が生きている（NONEではない）場合のみ処理
+			if (charainfo[i].mode == NONE) continue;
+
+			// 敵アニメーション進行
+			charainfo[i].playtime += 0.5f;
+
+			// アニメーション終了判定
+			if (charainfo[i].playtime > charainfo[i].anim_totaltime) {
+				charainfo[i].playtime = 0.0f;
+
+				// ダメージ状態が終わった時の遷移
+				if (charainfo[i].mode == DAMAGE) {
+					if (charainfo[i].enemyHP <= 0) {
+						// ダウン状態へ移行
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].mode = DOWNMODE;
+					}
+					else {
+						// 待機状態へ戻る
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].mode = STAND;
+					}
 				}
 			}
+
+			// アニメーション時間の更新を適用
+			MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
 		}
 
 
@@ -510,18 +526,39 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			charainfo[PLAYER2_INDEX].move.z = 0.0f;
 		}
 
+		// プレイヤー・敵全体をループさせる
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			if (charainfo[TEST_ENEMY_INDEX].mode != DOWNMODE && HitCheck_Capsule_Capsule(
-				VAdd(charainfo[i].pos, charainfo[i].move),
-				VAdd(VAdd(charainfo[i].pos, charainfo[i].move), VGet(0, charainfo[i].charahitinfo.Height, 0)),
-				charainfo[i].charahitinfo.Width / 2,
-				charainfo[TEST_ENEMY_INDEX].pos,
-				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
-				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2)
-				== TRUE) {
-				// テスト敵と重なりそうな場合は、そのプレイヤーの横移動を止める。
-				charainfo[i].move.x = 0.0f;
-				charainfo[i].move.z = 0.0f;
+			// 自分が倒れているなら、移動判定自体を行わない
+			if (charainfo[i].mode == DOWNMODE) continue;
+
+			// 内側のループを MAX_CHARA (全キャラ) まで回す
+			for (int j = 0; j < MAX_CHARA; j++) {
+				// 自分自身との判定はスキップする
+				if (i == j) continue;
+
+				// 相手が「生成されていない(NONE)」なら無視する
+				if (charainfo[j].mode == NONE) continue;
+
+				// 相手が倒れているなら、当たり判定の対象外にする
+				if (charainfo[j].mode == DOWNMODE) continue;
+
+				// 当たり判定の実行（HeightとWidthのタイポを修正）
+				if (HitCheck_Capsule_Capsule(
+					VAdd(charainfo[i].pos, charainfo[i].move),
+					VAdd(VAdd(charainfo[i].pos, charainfo[i].move), VGet(0, charainfo[i].charahitinfo.Height, 0)),
+					charainfo[i].charahitinfo.Width / 2,
+					charainfo[j].pos,
+					VAdd(charainfo[j].pos, VGet(0, charainfo[j].charahitinfo.Height, 0)),
+					charainfo[j].charahitinfo.Width / 2)
+					== TRUE)
+				{
+					// 当たったら移動をリセット
+					charainfo[i].move.x = 0.0f;
+					charainfo[i].move.z = 0.0f;
+
+					// 一度当たったらそれ以上このループを回す必要はないので抜ける
+					break;
+				}
 			}
 		}
 		// 床ポリゴンとの当たり判定
@@ -627,7 +664,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			// 移動後の座標を攻撃判定用の中心にも反映する。
 			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		}
-
+		
 		cpos.x += charainfo[0].move.x;
 		cpos.y += charainfo[0].move.y;
 		cpos.z += charainfo[0].move.z;
@@ -636,11 +673,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		ctgt.y += charainfo[0].move.y;
 		ctgt.z += charainfo[0].move.z;
 		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
-
+		
 
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
+			MV1SetPosition(charainfo[i].model1, charainfo[
+				i].pos);
 			//鞘の座標更新
 			if (playerSayaFrame[i] != -1 && playerSayaModel[i] != -1) {
 				sayamatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerSayaFrame[i]);
@@ -658,7 +696,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
 					// 生成されていない敵（NONE）はスキップ
 					if (charainfo[e].mode == NONE) continue;
-					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[e], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
 				}
 			}
 		}
@@ -672,12 +710,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-		//カメラ追従
-		// 2人の中間地点を見るようにして、同じ画面内に入りやすくする。
-		VECTOR cameraCenter = VScale(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER2_INDEX].pos), 0.5f);
-		ctgt = VAdd(cameraCenter, VGet(0.0f, 0.0f, 200.0f));
-		cpos = VAdd(ctgt, VGet(0.0f, 1800.0f, -2000.0f));
-		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
 
 
 		// 画面の消去
@@ -728,22 +760,49 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 
-		for (int i = 0; i < PLAYER_COUNT; i++) {
-			if (playerWeaponModel[i] != -1) {
-				MV1DrawModel(playerWeaponModel[i]);
-			}
-			if (playerSayaModel[i] != -1) {
-				MV1DrawModel(playerSayaModel[i]);
-			}
-		}
-		MV1DrawModel(stagedata);
-		skyRot += 0.001f;
-		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
-		MV1DrawModel(sky);
+		for (int pIdx = 0; pIdx < PLAYER_COUNT; pIdx++) {
+			// 画面を左右に分ける (900x600の画面なら0-450, 450-900)
+			int startX = (pIdx == 0) ? 0 : 450;
+			int endX = (pIdx == 0) ? 450 : 900;
 
+			// 描画範囲をその半分に制限
+			SetDrawArea(startX, 0, endX, 600);
+
+			// そのプレイヤー専用のカメラを設定
+		
+			// 各プレイヤーごとに異なるオフセット（カメラの相対位置）を持つようにする
+			VECTOR cameraOffsets[2];
+			cameraOffsets[0] = VGet(0.0f, 800.0f, -1000.0f); // 1P用: 背後斜め上
+			cameraOffsets[1] = VGet(0.0f, 800.0f, -1000.0f); // 2P用: もし視点を変えたければここを変える
+
+			// ループ内での設定
+			VECTOR pPos = charainfo[pIdx].pos;
+			VECTOR cTarget = pPos;
+
+			// プレイヤーごとにオフセットを使い分ける
+			VECTOR cPos = VAdd(pPos, cameraOffsets[pIdx]);
+			SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
+
+			// そのプレイヤーの視点でモデルを描画
+			for (int i = 0; i < MAX_CHARA; i++) {
+				if (charainfo[i].mode != NONE) MV1DrawModel(charainfo[i].model1);
+			}
+			// ステージと空
+			MV1DrawModel(stagedata);
+			MV1DrawModel(sky);
+
+			// 武器と鞘
+			for (int i = 0; i < PLAYER_COUNT; i++) {
+				if (playerWeaponModel[i] != -1) MV1DrawModel(playerWeaponModel[i]);
+				if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
+			}
+
+			// UI描画 (各プレイヤーの領域内に描画される)
+			game.DrawUI(pIdx, 900, 600);
+		}
+		
 		game.Update(charainfo, charainfo);
 		
-		game.DrawUI();
 
 		// 表画面と裏画面の切り替え
 		ScreenFlip();

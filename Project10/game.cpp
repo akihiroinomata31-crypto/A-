@@ -1,4 +1,4 @@
-#include "game.h"
+ï»¿#include "game.h"
 #include "main.h"
 
 
@@ -8,32 +8,34 @@
 
 
 void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
-    // --- 1. ƒXƒ|[ƒ“ˆ— (2•b‚Å5‘Ì) ---
+    // --- 1. ã‚¹ãƒãƒ¼ãƒ³å‡¦ç† (2ç§’ã§5ä½“) ---
     if (timeLimit > 0) {
         timeLimit--;
         spawnTimer++;
+    }
+    else if (gameState == 0) { // åˆ¶é™æ™‚é–“ãŒåˆ‡ã‚ŒãŸç¬é–“ã«ä¸€åº¦ã ã‘åˆ¤å®š
+        if (p1Score > p2Score) gameState = 1;      // P1ã®å‹ã¡
+        else if (p2Score > p1Score) gameState = 2; // P2ã®å‹ã¡
+        else gameState = 3;                        // å¼•ãåˆ†ã‘
+    }
+        if (spawnTimer >= 300) { // 3ç§’ã«1å›ã«é–“éš”ã‚’åºƒã’ã‚‹
+            float baseX = (float)(GetRand(10000) - 200); // ç¯„å›²ã‚’ç‹­ã‚ã‚‹
+            float baseZ = (float)(GetRand(-10000) - 200);
+           // float baseZ = (float)(GetRand(10000) - 200);
 
-        if (spawnTimer >= 180) {
-            float baseX = (float)(GetRand(1600) - 800);
-            float baseZ = (float)(GetRand(1600) - 800);
+            // ä¸€åº¦ã«è¤‡æ•°ã‚’ç”Ÿæˆã›ãšã€1ä½“ã ã‘ç”Ÿæˆã™ã‚‹
+            ActivateEnemy(enemyList, baseX, baseZ);
 
-            // 5‘Ì‚ğ­‚µ‚¸‚Â‚¸‚ç‚µ‚½ˆÊ’u‚É¶¬
-            float offsetX[] = { -1300.0f, -4600.0f,500.0f, 50.0f, -800.0f };
-            float offsetZ[] = { 800.0f, 50.0f, -700.0f, -50.0f, 1250.0f };
-
-            for (int i = 0; i < 3; i++) {
-                // ActivateEnemy“à‚Åƒ‹[ƒv‚·‚é‚Ì‚ÅAˆø”‚ğ“n‚·‚¾‚¯‚É‚·‚é
-                ActivateEnemy(enemyList, baseX + offsetX[i], baseZ + offsetZ[i]);
-            }
             spawnTimer = 0;
         }
-    }
-    // --- 2. AIXVˆ— ---
-    // “G—p‚ÌƒCƒ“ƒfƒbƒNƒX‚©‚çŠJn
+    
+
+    // --- 2. AIæ›´æ–°å‡¦ç† ---
+    // æ•µç”¨ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‹ã‚‰é–‹å§‹
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-        // NONE‚Å‚Í‚È‚¢i¶‚«‚Ä‚¢‚éj“G‚É‘Î‚µ‚ÄAI‚ğÀs
+        // NONEã§ã¯ãªã„ï¼ˆï¼ç”Ÿãã¦ã„ã‚‹ï¼‰æ•µã«å¯¾ã—ã¦AIã‚’å®Ÿè¡Œ
         if (enemyList[i].mode != NONE && enemyList[i].mode != DOWNMODE) {
-            // ƒJƒ“ƒ}‚ğ”¼Šp‚ÉC³‚µA•Ï”–¼‚ğplayers‚É“ˆê
+            // ã‚«ãƒ³ãƒã‚’åŠè§’ã«ä¿®æ­£ã—ã€å¤‰æ•°åã‚’playersã«çµ±ä¸€
             UpdateEnemyAI(enemyList[i], players);
         }
     }
@@ -45,34 +47,43 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
         if (enemyList[i].mode == NONE) {
 
-            // 1. ˆø”‚Åó‚¯æ‚Á‚½ x, z ‚ğ‚»‚Ì‚Ü‚Üg‚Á‚ÄˆÊ’u‚ğŒˆ’è
+            // 1. å¼•æ•°ã§å—ã‘å–ã£ãŸ x, z ã‚’ãã®ã¾ã¾ä½¿ã£ã¦ä½ç½®ã‚’æ±ºå®š
             enemyList[i].pos = VGet(x, 0.0f, z);
             enemyList[i].mode = STAND;
-            enemyList[i].enemyHP = 6;
-            enemyList[i].playtime = 0.0f;
-            // 2. ƒ‚ƒfƒ‹‚ÌˆÊ’u‚ğXV
+            enemyList[i].enemyHP = 1;
+            enemyList[i].playtime = 0.1f;
+            // 2. ãƒ¢ãƒ‡ãƒ«ã®ä½ç½®ã‚’æ›´æ–°
             MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
             MV1SetVisible(enemyList[i].model1, TRUE);
             
-            return; // 1‘ÌŒ©‚Â‚¯‚Ä¶¬‚µ‚½‚çI—¹
+            return; // 1ä½“è¦‹ã¤ã‘ã¦ç”Ÿæˆã—ãŸã‚‰çµ‚äº†
         }
     }
 }
-// “GAI‚Ì–{‘Ì
+// æ•µAIã®æœ¬ä½“
 void GameManager::UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players) {
-    // P1‚ÆP2‚Ì‚¤‚¿‹ß‚¢•û‚ğƒ^[ƒQƒbƒg‚É‚·‚é
     float distP1 = VSize(VSub(players[0].pos, enemy.pos));
     float distP2 = VSize(VSub(players[1].pos, enemy.pos));
     SCharaInfo& target = (distP1 < distP2) ? players[0] : players[1];
-    float dist = (distP1 < distP2) ? distP1 : distP2;
 
-    // Œü‚«‚ğ•Ï‚¦‚é
-    VECTOR dir = VSub(target.pos, enemy.pos);
+    // --- ã€ä¿®æ­£ã“ã“ã‹ã‚‰ã€‘ã‚ªãƒ•ã‚»ãƒƒãƒˆã®è¨ˆç®— ---
+    // æ•µã®ç¾åœ¨ä½ç½®ã‚’ä½¿ã£ã¦ã€Œãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®å‘¨ã‚Šã®ã©ã®ä½ç½®ã‚’ç‹™ã†ã‹ã€ã‚’å›ºå®šã™ã‚‹
+    // ã“ã‚Œã«ã‚ˆã‚Šã€å…¨å“¡ãŒãƒãƒ©ãƒãƒ©ã®ä½ç½®ã‚’ç›®æŒ‡ã™ã‚ˆã†ã«ãªã‚Šã¾ã™
+    float offsetX = fmod(enemy.pos.x, 100.0f) - 50.0f; // -50ã€œ+50 ã®ã‚ºãƒ¬
+    float offsetZ = fmod(enemy.pos.z, 100.0f) - 50.0f;
+
+    VECTOR targetPos = VAdd(target.pos, VGet(offsetX, 0.0f, offsetZ));
+    // --- ã€ä¿®æ­£ã“ã“ã¾ã§ã€‘ ---
+
+    // å‘ãã‚’å¤‰ãˆã‚‹ï¼ˆã‚¿ãƒ¼ã‚²ãƒƒãƒˆã‚’ä¿®æ­£å¾Œã® targetPos ã«å¤‰æ›´ï¼‰
+    VECTOR dir = VSub(targetPos, enemy.pos);
     dir.y = 0;
+    float dist = VSize(dir); // ä¿®æ­£å¾Œã®è·é›¢ã‚’ä½¿ã†
+
     float angle = atan2f(dir.x, dir.z);
     MV1SetRotationXYZ(enemy.model1, VGet(0.0f, angle, 0.0f));
 
-    // ˆÚ“®ˆ—
+    // ç§»å‹•å‡¦ç†
     if (dist > 150.0f) {
         if (enemy.mode != ATTACK) {
             enemy.mode = STAND;
@@ -82,7 +93,7 @@ void GameManager::UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players) {
         }
     }
     else {
-        // UŒ‚”ÍˆÍ“à
+        // æ”»æ’ƒç¯„å›²å†…
         if (enemy.mode == STAND) {
             enemy.mode = ATTACK;
             enemy.playtime = 0.0f;
@@ -97,26 +108,28 @@ void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
     replayData.push_back(frame);
 }
 
-void GameManager::DrawUI() {
-    // 1. seconds‚ÌéŒ¾‚Í1‰ñ‚¾‚¯‚É‚·‚éi60‚ÅŠ„‚é‚Ì‚ª³‚µ‚¢‚Å‚·j
-    int seconds = timeLimit / 100;
+void GameManager::DrawUI(int pIdx, int sw, int sh) {
+    // 1. secondsã®å®£è¨€ã¯1å›ã ã‘ã«ã™ã‚‹ï¼ˆ60ã§å‰²ã‚‹ã®ãŒæ­£ã—ã„ã§ã™ï¼‰
+   
+    int xOffset = (pIdx == 0) ? 0 : sw / 2;
+    int seconds = timeLimit / 150;
     SetFontSize(20);
-    // 2. F‚Ì”»’è
+    // 2. è‰²ã®åˆ¤å®š
     unsigned int timerColor;
     if (seconds <= 10 && (timeLimit / 10) % 2 == 0) {
-        timerColor = GetColor(255, 0, 0); // “_–ÅiÔj
+        timerColor = GetColor(255, 0, 0); // ç‚¹æ»…ï¼ˆèµ¤ï¼‰
     }
     else if (seconds <= 75) {
-        timerColor = GetColor(0, 200, 200); // Ô
+        timerColor = GetColor(0, 200, 200); // èµ¤
     }
     else if (seconds <= 45) {
-        timerColor = GetColor(255, 0, 0); // Ô
+        timerColor = GetColor(255, 0, 0); // èµ¤
     }
     else {
-        timerColor = GetColor(255, 255, 0); // Å‰‚Í‰©F
+        timerColor = GetColor(255, 255, 0); // æœ€åˆã¯é»„è‰²
     }
 
-    // 3. •\¦‚ÌØ‚è‘Ö‚¦id‚È‚ç‚È‚¢‚æ‚¤‚É if-else ‚ÅŠ®‘S‚É•ª‚¯‚éj
+    // 3. è¡¨ç¤ºã®åˆ‡ã‚Šæ›¿ãˆï¼ˆé‡ãªã‚‰ãªã„ã‚ˆã†ã« if-else ã§å®Œå…¨ã«åˆ†ã‘ã‚‹ï¼‰
     if (seconds > 0) {
         DrawFormatString(400, 20, timerColor, "LIMIT : %d", seconds);
     }
@@ -124,14 +137,32 @@ void GameManager::DrawUI() {
         DrawString(400, 20, "FINISH!", GetColor(255, 0, 0));
     }
 
-    // ƒXƒRƒA•\¦
+    // çµæœè¡¨ç¤ºï¼ˆãƒ—ãƒ¬ã‚¤ä¸­ä»¥å¤–ãªã‚‰è¡¨ç¤ºï¼‰
+    if (gameState != 0) {
+        SetFontSize(60); // æ–‡å­—ã‚’å¤§ããã™ã‚‹
+        int color = GetColor(255, 255, 0);
+
+        if (gameState == 1) { // P1å‹åˆ©
+            DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
+        }
+        else if (gameState == 2) { // P2å‹åˆ©
+            DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
+        }
+        else { // å¼•ãåˆ†ã‘
+            DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
+        }
+        SetFontSize(20); // ãƒ•ã‚©ãƒ³ãƒˆã‚µã‚¤ã‚ºã‚’æˆ»ã™
+    }
+
+    // ã‚¹ã‚³ã‚¢è¡¨ç¤º
     DrawFormatString(100, 50, GetColor(0, 255, 100), "P1 Score: %d", p1Score);
     DrawFormatString(700, 50, GetColor(0, 255, 100), "P2 Score: %d", p2Score);
 
     DrawFormatString(100, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount[0]);
 
-    // ƒvƒŒƒCƒ„[2‚Ì€–S‰ñ”
+    // ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼2ã®æ­»äº¡å›æ•°
     DrawFormatString(700, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount[1]);
+
 }
 
 
