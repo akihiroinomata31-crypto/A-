@@ -8,34 +8,45 @@
 
 
 void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
-    // --- 1. スポーン処理 (2秒で5体) ---
+    // --- 1. 制限時間とタイマーの処理 ---
     if (timeLimit > 0) {
         timeLimit--;
-        spawnTimer++;
     }
     else if (gameState == 0) { // 制限時間が切れた瞬間に一度だけ判定
         if (p1Score > p2Score) gameState = 1;      // P1の勝ち
         else if (p2Score > p1Score) gameState = 2; // P2の勝ち
         else gameState = 3;                        // 引き分け
     }
-        if (spawnTimer >= 300) { // 3秒に1回に間隔を広げる
-            float baseX = (float)(GetRand(10000) - 200); // 範囲を狭める
+
+    // 現在の残り秒数を計算（150フレームで1秒の仕様）
+    int seconds = timeLimit / 150;
+
+    // --- 2. 残り75秒以下になったときの処理 ---
+    if (seconds <= 75 && gameState == 0) {
+
+        // 【重要】もし75秒になった瞬間に一度だけゴーレムを出現させたい場合
+        // （まだゴーレムが NONE 状態のときに出現させる）
+        if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
+            enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 0.0f, -150.0f); // 出現位置
+            enemyList[TEST_ENEMY_GOLEM].mode = STAND;
+            enemyList[TEST_ENEMY_GOLEM].enemyHP = 10; // ゴーレムのHPなど
+            MV1SetPosition(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].pos);
+            MV1SetVisible(enemyList[TEST_ENEMY_GOLEM].model1, TRUE);
+        }
+
+        // 通常のゴブリンの定時スポーン処理（3秒に1回など）
+        spawnTimer++;
+        if (spawnTimer >= 300) {
+            float baseX = (float)(GetRand(10000) - 200);
             float baseZ = (float)(GetRand(-10000) - 200);
-           // float baseZ = (float)(GetRand(10000) - 200);
-
-            // 一度に複数を生成せず、1体だけ生成する
             ActivateEnemy(enemyList, baseX, baseZ);
-
             spawnTimer = 0;
         }
-    
+    }
 
-    // --- 2. AI更新処理 ---
-    // 敵用のインデックスから開始
+    // --- 3. AI更新処理（敵全体） ---
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-        // NONEではない（＝生きている）敵に対してAIを実行
         if (enemyList[i].mode != NONE && enemyList[i].mode != DOWNMODE) {
-            // カンマを半角に修正し、変数名をplayersに統一
             UpdateEnemyAI(enemyList[i], players);
         }
     }
@@ -108,7 +119,7 @@ void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
     replayData.push_back(frame);
 }
 
-void GameManager::DrawUI(int pIdx, int sw, int sh) {
+void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players) {
     // 1. secondsの宣言は1回だけにする（60で割るのが正しいです）
    
     int xOffset = (pIdx == 0) ? 0 : sw / 2;
@@ -162,6 +173,21 @@ void GameManager::DrawUI(int pIdx, int sw, int sh) {
 
     // プレイヤー2の死亡回数
     DrawFormatString(700, 100, GetColor(255, 100, 200), "DEATHS: %d", deathCount[1]);
+
+    // P1 HPバー
+    DrawString(30, 10, "P1", GetColor(255, 255, 255));
+    DrawBox(60, 10, 260, 30, GetColor(80, 80, 80), TRUE);
+    int p1Width = (200 * players[0].HP) / MAX_HP;
+    if (p1Width < 0) p1Width = 0;
+    DrawBox(60, 10, 60 + p1Width, 30, GetColor(0, 255, 0), TRUE);
+
+
+    // P2 HPバー
+    DrawString(660, 10, "P2", GetColor(255, 255, 255));
+    DrawBox(690, 10, 890, 30, GetColor(80, 80, 80), TRUE);
+    int p2Width = (200 * players[1].HP) / MAX_HP;
+    if (p2Width < 0) p2Width = 0;
+    DrawBox(690, 10, 690 + p2Width, 30, GetColor(0, 255, 0), TRUE);
 
 }
 

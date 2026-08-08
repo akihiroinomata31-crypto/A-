@@ -115,25 +115,23 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		charainfo[i].mode = NONE;
 		charainfo[i].direction = Direction::DOWN;
 		ResetMove(charainfo[i]);
-		charainfo[i].pos = VGet(0.0f, 0.0f, 0.0f);
 		charainfo[i].charahitinfo.Height = PC_HEIGHT;
 		charainfo[i].charahitinfo.Width = PC_WIDTH;
-		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		charainfo[i].HP = 0;
 		charainfo[i].enemyHP = 0;
 		charainfo[i].isHit = false;
 	}
 
-	charainfo[PLAYER1_INDEX].pos = VGet(850.0f, 0.0f, -400.0f);
-	charainfo[PLAYER2_INDEX].pos = VGet(1050.0f, 0.0f, -400.0f);
-	charainfo[TEST_ENEMY_INDEX].pos = VGet(1000.0f, 0.0f, -150.0f);
-
+	charainfo[PLAYER1_INDEX].pos = VGet(1300.0f, 10.0f, 100.0f);
+	charainfo[PLAYER2_INDEX].pos = VGet(1300.0f, 0.0f, -400.0f);
+	charainfo[TEST_ENEMY_INDEX].pos = VGet(750.0f, 0.0f, -150.0f); // 敵は真ん中あたり
+	charainfo[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 0.0f, -150.0f); // 敵は真ん中あたり
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].mode = STAND;
 		charainfo[i].HP = 6;
 		charainfo[i].charahitinfo.Height = PC_HEIGHT * PLAYER_MODEL_SCALE;
 		charainfo[i].charahitinfo.Width = PC_WIDTH * PLAYER_MODEL_SCALE;
-		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos; // 座標確定後に代入
 	}
 
 	charainfo[TEST_ENEMY_INDEX].mode = STAND;
@@ -141,7 +139,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
 
 	//モデル座標初期セット
-	VECTOR pos[2] = { VGet(450.0f, 200.0f, -350.0f),VGet(700.0f, 200.0f, -350.0f) };
+	VECTOR pos[2] = { VGet(1300.0f, 10.0f, 100.0f),VGet(1300.0f, 0.0f, -400.0f )};
 
 	VECTOR cposdistance = VSub(cpos, pos[0]);
 	VECTOR ctgtdistance = VSub(ctgt, pos[0]);
@@ -174,6 +172,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 	// 2P は仮で少し青くして、同じモデルでも見分けやすくする。
 	MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
+
+	charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Golem.mv1");
+	if (charainfo[TEST_ENEMY_GOLEM].model1 == -1) {
+		printfDx("ゴーレムのモデル読み込み失敗！\n");
+	}
+	else {
+		// 最初は非表示にしておく
+		MV1SetVisible(charainfo[TEST_ENEMY_GOLEM].model1, FALSE);
+		charainfo[TEST_ENEMY_GOLEM].mode = NONE;
+		MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f)); // 必要ならサイズ調整
+	}
+	
+
 
 	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
 		// 1. モデルを読み込む
@@ -664,7 +675,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			// 移動後の座標を攻撃判定用の中心にも反映する。
 			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		}
-		
+
 		cpos.x += charainfo[0].move.x;
 		cpos.y += charainfo[0].move.y;
 		cpos.z += charainfo[0].move.z;
@@ -673,7 +684,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		ctgt.y += charainfo[0].move.y;
 		ctgt.z += charainfo[0].move.z;
 		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
-		
+
 
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -758,56 +769,58 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-
-
 		for (int pIdx = 0; pIdx < PLAYER_COUNT; pIdx++) {
-			// 画面を左右に分ける (900x600の画面なら0-450, 450-900)
+
+			// 1. 左右の画面領域（ビューポート）を決定
 			int startX = (pIdx == 0) ? 0 : 450;
 			int endX = (pIdx == 0) ? 450 : 900;
 
-			// 描画範囲をその半分に制限
 			SetDrawArea(startX, 0, endX, 600);
 
-			// そのプレイヤー専用のカメラを設定
-		
-			// 各プレイヤーごとに異なるオフセット（カメラの相対位置）を持つようにする
-			VECTOR cameraOffsets[2];
-			cameraOffsets[0] = VGet(0.0f, 800.0f, -1000.0f); // 1P用: 背後斜め上
-			cameraOffsets[1] = VGet(0.0f, 800.0f, -1000.0f); // 2P用: もし視点を変えたければここを変える
-
-			// ループ内での設定
+			// 2. 現在のプレイヤーの座標を取得
 			VECTOR pPos = charainfo[pIdx].pos;
-			VECTOR cTarget = pPos;
 
-			// プレイヤーごとにオフセットを使い分ける
-			VECTOR cPos = VAdd(pPos, cameraOffsets[pIdx]);
+			// 3. 【カメラ位置と注視点の調整】
+			VECTOR cPos, cTarget;
+
+			if (pIdx == 0) {
+				// 【プレイヤー1用（左画面）】
+				// 注視点をプレイヤーから少し右（中央寄り）にずらし、カメラ位置を左後ろに大きく離すことで、左画面の真ん中に収める
+				cTarget = VAdd(pPos, VGet(100.0f, 50.0f, 0.0f));
+				cPos = VAdd(cTarget, VGet(-150.0f, 250.0f, -500.0f));
+			}
+			else {
+				// 【プレイヤー2用（右画面）】
+				// 注視点をプレイヤーから少し左（中央寄り）にずらし、カメラ位置を右後ろに大きく離すことで、右画面の真ん中に収める
+				cTarget = VAdd(pPos, VGet(-100.0f, 50.0f, 0.0f));
+				cPos = VAdd(cTarget, VGet(150.0f, 250.0f, -500.0f));
+			}
+
+			// 4. カメラを適用
 			SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
 
-			// そのプレイヤーの視点でモデルを描画
+			// --- 以下、モデル等の描画処理 ---
 			for (int i = 0; i < MAX_CHARA; i++) {
-				if (charainfo[i].mode != NONE) MV1DrawModel(charainfo[i].model1);
+				if (charainfo[i].mode != NONE) {
+					MV1DrawModel(charainfo[i].model1);
+				}
 			}
-			// ステージと空
+
 			MV1DrawModel(stagedata);
 			MV1DrawModel(sky);
 
-			// 武器と鞘
 			for (int i = 0; i < PLAYER_COUNT; i++) {
 				if (playerWeaponModel[i] != -1) MV1DrawModel(playerWeaponModel[i]);
 				if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
 			}
 
-			// UI描画 (各プレイヤーの領域内に描画される)
-			game.DrawUI(pIdx, 900, 600);
+			game.DrawUI(pIdx, 900, 600, charainfo);
 		}
-		
+		SetDrawArea(0, 0, 900, 600);
 		game.Update(charainfo, charainfo);
-		
-
-		// 表画面と裏画面の切り替え
 		ScreenFlip();
-
 	}
+	
 	// DXライブラリの終了処理
 	DxLib_End();
 

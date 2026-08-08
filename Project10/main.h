@@ -78,6 +78,7 @@ struct SCharaInfo
 	int attachidx;
 	float playtime = 0, anim_totaltime;
 	VECTOR pos;
+	float rot;
 	VECTOR move;
 	SCharaHitInfo charahitinfo;
 	int				mode;				// ƒLƒƒƒ‰‚Ìó‘Ô

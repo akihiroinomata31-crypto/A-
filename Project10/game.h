@@ -15,7 +15,7 @@ public:
     std::vector<ReplayFrame> replayData;
     int spawnTimer = 0;
     //void Update();
-    void DrawUI(int pIdx, int sw, int sh);
+    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players);
     // プレイヤー1と2でそれぞれカウントするために配列にする
     int deathCount[2] = { 0, 0 };
     int gameState = 0;
@@ -30,7 +30,7 @@ public:
    
     // リプレイを記録する関数を追加
     void RecordFrame(VECTOR p1, VECTOR p2, int act);
-    void Update(SCharaInfo* enemyList);
+   // void Update(SCharaInfo* enemyList);
     void ActivateEnemy(SCharaInfo* enemyList, float x, float z);
     void UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players);
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
