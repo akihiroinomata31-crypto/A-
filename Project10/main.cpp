@@ -7,6 +7,9 @@
 #include "game.h"
 #include "player.h"
 
+
+
+
 namespace {
 
 	int LoadPlayerAssetModel(const char* fileName) {
@@ -30,8 +33,6 @@ namespace {
 	}
 
 } // namespace
-
-
 
 
 
@@ -72,11 +73,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	GameManager game;
 	VECTOR stagepos = VGet(0.0f, 2000.0f, 0.0f);
 
-	VECTOR cpos, ctgt;
-	// カメラポジション cpos:カメラ位置　ctgt:カメラ注視点
-	cpos = VGet(0.0f, 1000.0f, -800.0f);
-	ctgt = VGet(0.0f, 500.0f, 0.0f);
-
+	
 
 	// ステージコリジョン情報
 	MV1_COLL_RESULT_POLY_DIM HitDim;
@@ -141,8 +138,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	//モデル座標初期セット
 	VECTOR pos[2] = { VGet(1300.0f, 10.0f, 100.0f),VGet(1300.0f, 0.0f, -400.0f )};
 
-	VECTOR cposdistance = VSub(cpos, pos[0]);
-	VECTOR ctgtdistance = VSub(ctgt, pos[0]);
+	
 
 	//サウンドファイルの読込みストリーミング設定にする
 	SetCreateSoundDataType(DX_SOUNDDATATYPE_FILE);
@@ -156,6 +152,21 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	// DXライブラリの初期化
 	if (DxLib_Init() == -1) {
 		return -1;
+	}
+	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+		// 1. モデルを読み込む
+		charainfo[i].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
+
+		// 2. 読み込みエラーチェック
+		if (charainfo[i].model1 == -1) {
+			printfDx("ゴブリンのモデル読み込み失敗！(index:%d)\n", i);
+		}
+
+		// 3. 最初は表示しないようにする
+		MV1SetVisible(charainfo[i].model1, FALSE);
+
+		// 4. 最初は何もしていない状態にする
+		charainfo[i].mode = NONE;
 	}
 
 
@@ -185,23 +196,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 	
 
-
-	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-		// 1. モデルを読み込む
-		charainfo[i].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
-
-		// 2. 読み込みエラーチェック
-		if (charainfo[i].model1 == -1) {
-			printfDx("ゴブリンのモデル読み込み失敗！(index:%d)\n", i);
-		}
-
-		// 3. 最初は表示しないようにする
-		MV1SetVisible(charainfo[i].model1, FALSE);
-
-		// 4. 最初は何もしていない状態にする
-		charainfo[i].mode = NONE;
-	}
-
+	
+	
 	//ルートフレーム
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		rootflm = MV1SearchFrame(charainfo[i].model1, "root");
@@ -279,8 +275,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (anim_down == -1) return -1;
 	enemy_anim_walk = MV1LoadModel("..\\Data\\Goblin\\Anim_Walk.mv1");		// 被撃アニメ
 	if (anim_down == -1) return -1;
-	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// 被撃アニメ
-	if (anim_down == -1) return -1;
+	
+
+
+
+
+
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
@@ -292,7 +292,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	SetDrawScreen(DX_SCREEN_BACK);
 	//カメラの初期化
-	SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
+	//SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
 
 	// ＢＧＭ用のサウンドファイルを読み込む
 	sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
@@ -676,14 +676,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		}
 
-		cpos.x += charainfo[0].move.x;
-		cpos.y += charainfo[0].move.y;
-		cpos.z += charainfo[0].move.z;
-
-		ctgt.x += charainfo[0].move.x;
-		ctgt.y += charainfo[0].move.y;
-		ctgt.z += charainfo[0].move.z;
-		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
+		
 
 
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
@@ -780,24 +773,59 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			// 2. 現在のプレイヤーの座標を取得
 			VECTOR pPos = charainfo[pIdx].pos;
 
-			// 3. 【カメラ位置と注視点の調整】
+			// 3. 【カメラ位置と注視点の調整（斜め上見下ろし視点）】
 			VECTOR cPos, cTarget;
 
 			if (pIdx == 0) {
 				// 【プレイヤー1用（左画面）】
-				// 注視点をプレイヤーから少し右（中央寄り）にずらし、カメラ位置を左後ろに大きく離すことで、左画面の真ん中に収める
-				cTarget = VAdd(pPos, VGet(100.0f, 50.0f, 0.0f));
-				cPos = VAdd(cTarget, VGet(-150.0f, 250.0f, -500.0f));
+				// 注視点をプレイヤーの少し上にする
+				cTarget = VAdd(pPos, VGet(300.0f, 150.0f, 0.0f));
+
+				// 斜め上から見下ろす（X:少し横にずらす, Y:高さ, Z:後ろに離す）
+				cPos = VAdd(cTarget, VGet(-200.0f, 450.0f, -900.0f));
 			}
 			else {
 				// 【プレイヤー2用（右画面）】
-				// 注視点をプレイヤーから少し左（中央寄り）にずらし、カメラ位置を右後ろに大きく離すことで、右画面の真ん中に収める
-				cTarget = VAdd(pPos, VGet(-100.0f, 50.0f, 0.0f));
-				cPos = VAdd(cTarget, VGet(150.0f, 250.0f, -500.0f));
+				cTarget = VAdd(pPos, VGet(-300.0f, 150.0f, 0.0f));
+
+				// プレイヤー2も同様に反対側の斜め上から見下ろす
+				cPos = VAdd(cTarget, VGet(200.0f, 450.0f, -900.0f));
 			}
 
 			// 4. カメラを適用
 			SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
+
+			for (int i = 0; i < MAX_CHARA; i++) {
+				if (charainfo[i].mode == NONE) continue;
+
+				// 敵（TEST_ENEMY_INDEX以降）の場合、ここでアニメーションを進める
+				if (i >= TEST_ENEMY_INDEX && charainfo[i].mode != DOWNMODE) {
+					charainfo[i].playtime += 0.5f; // アニメーションのスピード
+
+					if (charainfo[i].playtime > charainfo[i].anim_totaltime) {
+						charainfo[i].playtime = 0.0f;
+
+						// ダメージ状態が終わった時の遷移
+						if (charainfo[i].mode == DAMAGE) {
+							if (charainfo[i].enemyHP <= 0) {
+								MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+								charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
+								charainfo[i].mode = DOWNMODE;
+							}
+							else {
+								MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+								charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
+								charainfo[i].mode = STAND;
+							}
+							charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+						}
+					}
+					// 時間をモデルに適用
+					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+				}
+
+				
+			}
 
 			// --- 以下、モデル等の描画処理 ---
 			for (int i = 0; i < MAX_CHARA; i++) {
@@ -815,6 +843,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 
 			game.DrawUI(pIdx, 900, 600, charainfo);
+
+			
 		}
 		SetDrawArea(0, 0, 900, 600);
 		game.Update(charainfo, charainfo);
@@ -823,6 +853,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	
 	// DXライブラリの終了処理
 	DxLib_End();
+
 
 	return 0;
 }

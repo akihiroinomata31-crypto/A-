@@ -44,30 +44,46 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         }
     }
 
-    // --- 3. AI更新処理（敵全体） ---
+    // --- 3. AI更新処理・アニメーション進行（敵全体） ---
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
         if (enemyList[i].mode != NONE && enemyList[i].mode != DOWNMODE) {
+            // AIと移動の更新
             UpdateEnemyAI(enemyList[i], players);
+
+            // ★追加：ここでアニメーションの再生時間を進める
+            enemyList[i].playtime += 0.5f; // スピードはお好みで調整してください
+
+            // アニメーションが最後のフレームを超えたらループさせる
+            if (enemyList[i].playtime >= enemyList[i].anim_totaltime) {
+                enemyList[i].playtime = 0.0f;
+            }
+
+            // ★追加：モデルにアニメーションの時間を反映させる
+            MV1SetAttachAnimTime(enemyList[i].model1, enemyList[i].attachidx, enemyList[i].playtime);
         }
     }
 }
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
 
-
-
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
         if (enemyList[i].mode == NONE) {
 
-            // 1. 引数で受け取った x, z をそのまま使って位置を決定
+            // 1. 位置やモードの設定
             enemyList[i].pos = VGet(x, 0.0f, z);
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 1;
-            enemyList[i].playtime = 0.1f;
-            // 2. モデルの位置を更新
+            enemyList[i].playtime = 0.0f;
+
+            // 2. モデルの位置と表示を更新
             MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
             MV1SetVisible(enemyList[i].model1, TRUE);
-            
-            return; // 1体見つけて生成したら終了
+
+            // 3. ★出現した瞬間にアニメーションを確実に再アタッチする
+            MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
+            // ※ enemy_anim_neutral は extern 等で GameManager から参照できるようにするか、
+            // または初期化時にアタッチした状態が維持されるようにします。
+
+            return;
         }
     }
 }
