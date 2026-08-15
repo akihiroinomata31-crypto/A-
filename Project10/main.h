@@ -6,7 +6,7 @@
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
 #define MAX_CHARA 500
-#define CHARA_ENUM_DEFAULT_SIZE		500.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
+#define CHARA_ENUM_DEFAULT_SIZE		200.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
 #define CHARA_MAX_HITCOLL			2048		// 処理するコリジョンポリゴンの最大数
 
 
@@ -24,8 +24,6 @@
 // 他のインクルードなどはそのまま
 
 // ここに extern をつけて宣言を追加
-extern int enemy_anim_attack;
-extern int enemy_anim_neutral;
 class GameManager;
 struct SCharaInfo;
 enum Direction
@@ -70,7 +68,9 @@ typedef struct
 
 
 struct SCharaInfo
-{
+{// 構造体の中にコンストラクタを追加する
+	SCharaInfo() : angle(0.0f), anim_time(0.0f), HP(0), isHit(false), model1(-1) {}
+		
 	int model1;
 	int timeLimit = 1000; // ゲーム制限時間など（必要であれば適宜設定）
 	int spawnTimer = 0;   // スポーンカウント用
@@ -90,6 +90,7 @@ struct SCharaInfo
 	float anim_time;
 
 	float anim_total;
+
 };
 
 // キャラクターの当たり判定の情
@@ -108,3 +109,5 @@ extern void CheckAttackHit(
 	int SEdamageHandle,
 	int anim_damage
 );
+
+

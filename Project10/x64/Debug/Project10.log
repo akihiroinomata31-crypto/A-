@@ -1,2 +1,2 @@
 ﻿  main.cpp
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\main.cpp(289): error C4700: 初期化されていないローカル変数 'enemy_anim_neutral' が使用されます
+  Project10.vcxproj -> C:\Users\akihi\OneDrive\Desktop\Project10\x64\Debug\Project10.exe
