@@ -25,7 +25,7 @@ public:
         }
     }
     //int p1Score = 0;
-
+    int enemy_anim_neutral = -1;
     void AddScore(int playerIndex, int score);
    
     // ƒŠƒvƒŒƒC‚ğ‹L˜^‚·‚éŠÖ”‚ğ’Ç‰Á
@@ -36,4 +36,3 @@ public:
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
 };
 extern int enemy_anim_attack;
-extern int enemy_anim_neutral;

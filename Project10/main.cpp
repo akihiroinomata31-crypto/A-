@@ -70,7 +70,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
 
 	GameManager game;
-	VECTOR stagepos = VGet(0.0f, 2000.0f, 0.0f);
+	VECTOR stagepos = VGet(0.0f, 900.0f, 0.0f);
 
 	
 
@@ -118,10 +118,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		charainfo[i].isHit = false;
 	}
 
-	charainfo[PLAYER1_INDEX].pos = VGet(1300.0f, 10.0f, 100.0f);
+	charainfo[PLAYER1_INDEX].pos = VGet(1300.0f, 0.0f, 100.0f);
 	charainfo[PLAYER2_INDEX].pos = VGet(1300.0f, 0.0f, -400.0f);
-	charainfo[TEST_ENEMY_INDEX].pos = VGet(750.0f, 0.0f, -150.0f); // 敵は真ん中あたり
-	charainfo[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 0.0f, -150.0f); // 敵は真ん中あたり
+	charainfo[TEST_ENEMY_INDEX].pos = VGet(1300.0f, 0.0f, -150.0f); // 敵は真ん中あたり
+	charainfo[TEST_ENEMY_GOLEM].pos = VGet(1300.0f, 0.0f, -150.0f); // 敵は真ん中あたり
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].mode = STAND;
 		charainfo[i].HP = 6;
@@ -135,7 +135,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
 
 	//モデル座標初期セット
-	VECTOR pos[2] = { VGet(1300.0f, 10.0f, 100.0f),VGet(1300.0f, 0.0f, -400.0f )};
+	//VECTOR pos[2] = { VGet(1300.0f, 0.0f, 100.0f),VGet(1300.0f, 0.0f, 200.0f) };
 
 	
 
@@ -292,6 +292,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// 被撃アニメ
 	if (enemy_anim_neutral == -1) return -1;
+	game.enemy_anim_neutral = enemy_anim_neutral;
 
 	
 
@@ -383,14 +384,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				charainfo[i].playtime = 0.0f;
 			}
 		}
-		// ==========================================
-			// 敵（ゴブリン）のAI・移動・アニメーション処理
-			// ==========================================
+
+// ==========================================
+// 敵（ゴブリン）のAI・移動・アニメーション処理
+// ==========================================
 		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
 			if (charainfo[i].mode == NONE) continue;
 
-			// もしダウンしている場合
-			else if (charainfo[i].mode == DAMAGE) {
+			// もしダメージ（被弾）中の場合
+			if (charainfo[i].mode == DAMAGE) {
 				// 被弾モーションを最後まで再生したら STAND に戻す
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].mode = STAND;
@@ -405,6 +407,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 					}
 				}
+
+				// アニメーション時間を進める
+				charainfo[i].playtime += 0.2f;
+				if (charainfo[i].attachidx != -1) {
+					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+				}
+
+				// ★ダメージ中のときは、下の通常の移動・攻撃AIに進ませないようにここでスキップ！
+				continue;
 			}
 
 			// 1. プレイヤーとの距離を測り、近い方をターゲットにする
@@ -480,12 +491,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 
 			// アニメーション時間の進行
-			charainfo[i].playtime += 0.5f;
+			charainfo[i].playtime += 0.2f;
+
+			// ★STAND（待機・移動中）のときはアニメーションをループさせる
+			if (charainfo[i].mode == STAND) {
+				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+					charainfo[i].playtime = 0.0f;
+				}
+			}
+
 			if (charainfo[i].attachidx != -1) {
 				MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
 			}
 		}
-
 
 		// キー操作
 		for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -573,32 +591,30 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[0].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[0].move));
 		WallNum = 0;
 		FloorNum = 0;
-		// 検出されたポリゴンの数だけ繰り返し
-		for (int i = 0; i < HitDim.HitNum; i++) {
-			// ＸＺ平面に垂直かどうかはポリゴンの法線のＹ成分が０に限りなく近いかどうかで判断する
-			if (HitDim.Dim[i].Normal.y < 0.000001f && HitDim.Dim[i].Normal.y > -0.000001f) {
+		for (int i = 0; i < HitDim.HitNum; i++)
+		{
+			// 法線のY成分が小さい → 壁
+			if (fabs(HitDim.Dim[i].Normal.y) < 0.5f)
+			{
 				printf("壁扱い\n");
-				// 壁ポリゴンと判断された場合でも、キャラクターのＹ座標＋１．０ｆより高いポリゴンのみ当たり判定を行う
+
 				if (HitDim.Dim[i].Position[0].y > charainfo[0].pos.y + 1.0f ||
 					HitDim.Dim[i].Position[1].y > charainfo[0].pos.y + 1.0f ||
-					HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f) {
-					// ポリゴンの数が列挙できる限界数に達していなかったらポリゴンを配列に追加
-					if (WallNum < CHARA_MAX_HITCOLL) {
-						// ポリゴンの構造体のアドレスを壁ポリゴンポインタ配列に保存する
+					HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f)
+				{
+					if (WallNum < CHARA_MAX_HITCOLL)
+					{
 						Wall[WallNum] = &HitDim.Dim[i];
-
-						// 壁ポリゴンの数を加算する
 						WallNum++;
 					}
 				}
 			}
-			else {
-				// ポリゴンの数が列挙できる限界数に達していなかったらポリゴンを配列に追加
-				if (FloorNum < CHARA_MAX_HITCOLL) {
-					// ポリゴンの構造体のアドレスを床ポリゴンポインタ配列に保存する
+			else
+			{
+				// 床
+				if (FloorNum < CHARA_MAX_HITCOLL)
+				{
 					Floor[FloorNum] = &HitDim.Dim[i];
-
-					// 床ポリゴンの数を加算する
 					FloorNum++;
 				}
 			}
@@ -852,6 +868,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 			
 
+
 			for (int i = 0; i < MAX_CHARA; i++) {
 				if (charainfo[i].mode != NONE && charainfo[i].model1 != -1) {
 					MV1DrawModel(charainfo[i].model1);
@@ -881,7 +898,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	return 0;
 }
 
-
 void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage) {
 	// 攻撃中かつ、ターゲットがダウン中・ダメージ硬直中・すでにHPが0以下の場合は判定しない
 	if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
@@ -898,21 +914,21 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 		{
 			attacker->isHit = true;
 
-			// 被弾アニメーションへ遷移
-			MV1DetachAnim(target->model1, target->attachidx);
-			target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
-			target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
-			target->playtime = 0.0f;
-			target->mode = DAMAGE;
-
 			// SE再生
 			PlaySoundMem(SEdamageHandle, DX_PLAYTYPE_BACK);
 
 			if (target == &charainfo[0] || target == &charainfo[1]) {
+
 				// ターゲットがプレイヤーの場合
 				if (target->HP > 0) {
 					target->HP--;
 				}
+
+				MV1DetachAnim(target->model1, target->attachidx);
+				target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
+				target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
+				target->playtime = 0.0f;
+				target->mode = DAMAGE;
 			}
 			else {
 				// ターゲットが敵の場合
@@ -921,17 +937,22 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 
 					// 敵が倒れたかチェック
 					if (target->enemyHP <= 0) {
-						// 確実にダウン状態に切り替える
 						target->mode = DOWNMODE;
 
 						// 攻撃者がプレイヤー1だったら
 						if (attacker == &charainfo[0]) {
-							game.AddScore(0, 100); // P1に100点加算
+							game.AddScore(0, 100);
 						}
-						// 攻撃者がプレイヤー2だったら
 						else if (attacker == &charainfo[1]) {
-							game.AddScore(1, 100); // P2に100点加算
+							game.AddScore(1, 100);
 						}
+					}
+					else {
+						MV1DetachAnim(target->model1, target->attachidx);
+						target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
+						target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
+						target->playtime = 0.0f;
+						target->mode = DAMAGE;
 					}
 				}
 			}
