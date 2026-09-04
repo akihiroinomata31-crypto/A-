@@ -50,15 +50,16 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	SCharaInfo charainfo[MAX_CHARA];
 	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
 	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
+	int heavyAttackEffectHandle[PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT];
 	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
 	int prevJKey = 0;
 	int isBGMPlaying = 1;
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
 		// 1P: キーボード(WASD) + 1Pゲームパッド。
-		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_2 },
+		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_2 },
 		// 2P: キーボード(矢印) + 2Pゲームパッド。
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1, PAD_INPUT_1, PAD_INPUT_2 }
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, -1, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_2 }
 	};
 
 
@@ -99,6 +100,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int BGMLoopEndPosition = -1;
 
 	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEファイル名
+	char HeavyAttackEffect_FilePath[] = "重攻撃.png";
 	int SEattackHandle, SEjumpHandle, SEdamageHandle;						// BGMサウンドハンドル	
 
 
@@ -154,6 +156,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	// DXライブラリの初期化
 	if (DxLib_Init() == -1) {
 		return -1;
+	}
+
+	for (int i = 0; i < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT; i++) {
+		heavyAttackEffectHandle[i] = -1;
 	}
 
 
@@ -297,6 +303,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	// 読み込みに失敗したらエラー
 	if (SEjumpHandle == -1) {
 		return false;
+	}
+
+	// 重攻撃エフェクトのスプライトシートを分割して読み込む。
+	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", HeavyAttackEffect_FilePath);
+	if (LoadDivGraph(String, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_ROW_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_HEIGHT, heavyAttackEffectHandle) == -1) {
+		printfDx("重攻撃エフェクトの読み込み失敗！\n");
+		return -1;
 	}
 
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
@@ -666,6 +679,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
 		MV1DrawModel(sky);
 
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			DrawPlayerHeavyAttackEffect(charainfo[i], playerStates[i], heavyAttackEffectHandle);
+		}
+
 		game.Update(charainfo);
 
 		game.DrawUI();
@@ -675,6 +692,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	}
 	// DXライブラリの終了処理
+	for (int i = 0; i < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT; i++) {
+		if (heavyAttackEffectHandle[i] != -1) {
+			DeleteGraph(heavyAttackEffectHandle[i]);
+		}
+	}
+
 	DxLib_End();
 
 	return 0;

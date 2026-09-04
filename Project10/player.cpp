@@ -23,6 +23,32 @@ bool IsPadOrKeyDown(int padState, int padButton, int keyCode) {
 	return IsPadButtonDown(padState, padButton) || IsKeyDown(keyCode);
 }
 
+void StartHeavyAttackEffect(PlayerRuntimeState& state) {
+	// 重攻撃開始時にエフェクトの先頭フレームへ戻す。
+	state.heavyAttackEffectFrame = 0;
+	state.heavyAttackEffectWait = 0;
+	state.isHeavyAttackEffectPlaying = true;
+}
+
+void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
+	// 重攻撃エフェクトのスプライトシートを1フレームずつ進める。
+	if (!state.isHeavyAttackEffectPlaying) {
+		return;
+	}
+
+	state.heavyAttackEffectWait++;
+	if (state.heavyAttackEffectWait < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_INTERVAL) {
+		return;
+	}
+
+	state.heavyAttackEffectWait = 0;
+	state.heavyAttackEffectFrame++;
+	if (state.heavyAttackEffectFrame >= PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT) {
+		state.heavyAttackEffectFrame = 0;
+		state.isHeavyAttackEffectPlaying = false;
+	}
+}
+
 void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& input, float& inputX, float& inputZ) {
 	// 方向キー、十字キー、左スティックをまとめて移動入力に変換する。
 	bool moveDown = IsPadButtonDown(state.key, PAD_INPUT_DOWN) || IsKeyDown(input.downKey);
@@ -74,9 +100,14 @@ void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
 	}
 }
 
-void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle) {
-	state.attackIndex = 0;
+void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, bool isHeavyAttack) {
+	// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃より重い見た目にする。
+	state.attackIndex = isHeavyAttack ? PLAYER_ATTACK_ANIM_COUNT - 1 : 0;
 	state.isAttackBuffered = false;
+	state.isHeavyAttack = isHeavyAttack;
+	if (isHeavyAttack) {
+		StartHeavyAttackEffect(state);
+	}
 	player.mode = ATTACK;
 	player.isHit = false;
 	SetCharacterAnimation(player, animAttack[state.attackIndex]);
@@ -128,6 +159,7 @@ void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 }
 
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
+	UpdateHeavyAttackEffect(state);
 	if (player.mode != JUMPOUT) {
 		player.playtime += 0.3f;
 	}
@@ -141,6 +173,7 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 			if ((player.mode == JUMPOUT) || (player.mode == ATTACKOUT)) {
 				if (player.mode == ATTACKOUT) {
 					state.attackIndex = 0;
+					state.isHeavyAttack = false;
 					player.isHit = false;
 				}
 				SetCharacterAnimation(player, animNeutral);
@@ -151,6 +184,23 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 	}
 
 	MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
+}
+
+void DrawPlayerHeavyAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state, const int effectHandles[]) {
+	// 重攻撃中だけ、プレイヤー位置にエフェクトを表示する。
+	if (!state.isHeavyAttackEffectPlaying) {
+		return;
+	}
+
+	const int frame = state.heavyAttackEffectFrame;
+	if (frame < 0 || frame >= PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT || effectHandles[frame] == -1) {
+		return;
+	}
+
+	const VECTOR effectPos = VAdd(player.pos, VGet(0.0f, player.charahitinfo.Height * 0.45f, 0.0f));
+	SetDrawBlendMode(DX_BLENDMODE_ADD, 220);
+	DrawBillboard3D(effectPos, 0.5f, 0.5f, PLAYER_HEAVY_ATTACK_EFFECT_SIZE, 0.0f, effectHandles[frame], TRUE);
+	SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 }
 
 void UpdatePlayerInput(
@@ -167,6 +217,7 @@ void UpdatePlayerInput(
 	// プレイヤーを操作できる状態か確認する。
 	state.moveInput = false;
 	bool attackPressed = false;
+	bool heavyAttackPressed = false;
 	bool jumpPressed = false;
 
 	if (CanControlPlayerMode(player.mode)) {
@@ -175,26 +226,33 @@ void UpdatePlayerInput(
 			// パッド未接続時は入力なしとして扱う。
 			state.key = 0;
 		}
-		// 攻撃/ジャンプは押した瞬間だけ反応させる。
+		// 攻撃、重攻撃、ジャンプは押した瞬間だけ反応させる。
 		const int currentAttackButton = (IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ||
 			IsPadButtonDown(state.key, PAD_INPUT_10)) ? 1 : 0;
+		const int currentHeavyAttackButton = IsPadOrKeyDown(state.key, input.heavyAttackPadButton, input.heavyAttackKey) ? 1 : 0;
 		const int currentJumpButton = IsPadOrKeyDown(state.key, input.jumpPadButton, input.jumpKey) ? 1 : 0;
 		attackPressed = (currentAttackButton == 1 && state.prevAttackButton == 0);
+		heavyAttackPressed = (currentHeavyAttackButton == 1 && state.prevHeavyAttackButton == 0);
 		jumpPressed = (currentJumpButton == 1 && state.prevJumpButton == 0);
 		state.prevAttackButton = currentAttackButton;
+		state.prevHeavyAttackButton = currentHeavyAttackButton;
 		state.prevJumpButton = currentJumpButton;
 	}
 	else {
 		state.key = 0;
 		state.prevAttackButton = 0;
+		state.prevHeavyAttackButton = 0;
 		state.prevJumpButton = 0;
 	}
 
 	if (player.mode == STAND || player.mode == RUN) {
 		ResetMove(player);
 
-		if (attackPressed) {
-			StartPlayerAttack(player, state, animAttack, seAttackHandle);
+		if (heavyAttackPressed) {
+			StartPlayerAttack(player, state, animAttack, seAttackHandle, true);
+		}
+		else if (attackPressed) {
+			StartPlayerAttack(player, state, animAttack, seAttackHandle, false);
 		}
 		else {
 			// キーボード、十字キー、左スティック入力を移動量に変換する。
@@ -219,7 +277,7 @@ void UpdatePlayerInput(
 	}
 
 	// 攻撃中にもう一度押したら次の攻撃を予約する。
-	if (player.mode == ATTACK && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
+	if (player.mode == ATTACK && !state.isHeavyAttack && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 		state.isAttackBuffered = true;
 	}
 
@@ -275,8 +333,14 @@ void UpdatePlayerAttackState(
 	}
 
 	if (player.playtime >= attackEndTime[state.attackIndex]) {
+		if (state.isHeavyAttack) {
+			// 重攻撃は単発で終了させる。
+			state.isAttackBuffered = false;
+			state.isHeavyAttack = false;
+			player.mode = ATTACKOUT;
+		}
 		// 予約入力があれば次の攻撃アニメへつなげる。
-		if (state.isAttackBuffered && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
+		else if (state.isAttackBuffered && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 			ApplyAttackStepMove(player, state, input);
 			state.attackIndex++;
 			state.isAttackBuffered = false;
