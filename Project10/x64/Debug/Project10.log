@@ -1,2 +1,4 @@
-﻿  game.cpp
+﻿  main.cpp
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\main.cpp(682,9): warning C4101: 'MaxY_poly': ローカル変数は 1 度も使われていません。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\main.cpp(681,9): warning C4101: 'MaxY': ローカル変数は 1 度も使われていません。
   Project10.vcxproj -> C:\Users\akihi\OneDrive\Desktop\Project10\x64\Debug\Project10.exe

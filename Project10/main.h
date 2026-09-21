@@ -70,7 +70,7 @@ typedef struct
 struct SCharaInfo
 {// 構造体の中にコンストラクタを追加する
 	SCharaInfo() : angle(0.0f), anim_time(0.0f), HP(0), isHit(false), model1(-1) {}
-		
+	int invincibleTimer; // ★追加：無敵時間カウンター（フレーム数）
 	int model1;
 	int timeLimit = 1000; // ゲーム制限時間など（必要であれば適宜設定）
 	int spawnTimer = 0;   // スポーンカウント用
@@ -86,7 +86,7 @@ struct SCharaInfo
 	int HP;
 	float angle;
 	bool isHit;
-
+	int deaths;
 	float anim_time;
 
 	float anim_total;
@@ -99,6 +99,9 @@ struct SCharaInfo
 // 当たり判定の中心座標
 extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
 
+extern int redGoblinBaseModel, red_goblin_anim_neutral, red_goblin_anim_walk , red_goblin_anim_attack ;
+
+
 extern void CheckAttackHit(
 	GameManager& game,
 	SCharaInfo* charainfo,
@@ -110,4 +113,4 @@ extern void CheckAttackHit(
 	int anim_damage
 );
 
-
+extern void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game);
