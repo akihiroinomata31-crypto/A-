@@ -15,7 +15,7 @@ public:
     std::vector<ReplayFrame> replayData;
     int spawnTimer = 0;
     //void Update();
-    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex);
+    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle);
     void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game);
     // プレイヤー1と2でそれぞれカウントするために配列にする
     int deathCount[2] = { 0, 0 };
@@ -31,16 +31,18 @@ public:
     int anim_attack;
     //int p1Score = 0;
     int enemy_anim_neutral = -1;
-    int red_goblin_anim_neutral;
-    int red_goblin_anim_attack;
+   
     void AddScore(int playerIndex, int score);
    
     // リプレイを記録する関数を追加
     void RecordFrame(VECTOR p1, VECTOR p2, int act);
    // void Update(SCharaInfo* enemyList);
   void ActivateEnemy(SCharaInfo* enemyList, float x, float z);
-  void ActivateRedGoblin(SCharaInfo* enemyList, float x, float z, int redGoblinBaseModel, int red_goblin_anim_neutral);
+  void ActivateRedGoblin(SCharaInfo* enemyList, float x, float z);
     void UpdateEnemyAI(SCharaInfo& enemy, SCharaInfo* players);
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
 };
 extern int enemy_anim_attack;
+extern int redGoblinBaseModel;
+extern int red_goblin_anim_neutral;
+extern int red_goblin_anim_attack;

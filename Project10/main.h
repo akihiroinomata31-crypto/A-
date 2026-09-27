@@ -99,8 +99,6 @@ struct SCharaInfo
 // “–‚½‚è”»’è‚Ì’†SÀ•W
 extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
 
-extern int redGoblinBaseModel, red_goblin_anim_neutral, red_goblin_anim_walk , red_goblin_anim_attack ;
-
 
 extern void CheckAttackHit(
 	GameManager& game,
@@ -113,4 +111,4 @@ extern void CheckAttackHit(
 	int anim_damage
 );
 
-extern void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game);
+extern void DrawCrownIcon(int pIdx, int xOffset, int startY, int p1Score, int p2Score, int crownGraphHandle);

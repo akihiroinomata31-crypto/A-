@@ -45,17 +45,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	MATRIX wpmatrix[PLAYER_COUNT], sayamatrix[PLAYER_COUNT];
 	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral{};
 
-	int redGoblinBaseModel = -1;
+	//int redGoblinBaseModel = -1;
 
-
-	int red_goblin_anim_neutral = -1;
+	 // ★これがあるか確認！
+//	int red_goblin_anim_neutral;      // ★これがあるか確認！
+	int red_goblin_anim_attack;       // ★これがあるか確認！
+	
 	int red_goblin_anim_walk = -1;
-	int red_goblin_anim_attack = -1;
+	//int redGoblinBaseModel;
 	int anim_attack[PLAYER_ATTACK_ANIM_COUNT];
 	int		stagedata;
 	int sky;
 	float skyRot = 0;
-	static SCharaInfo charainfo[MAX_CHARA];
+	static SCharaInfo charainfo[MAX_CHARA];//キャラクターのメモリ管理を配列で行ってる
 	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
 	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
 	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
@@ -71,11 +73,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	};
 
 
+
 	int enemyCount = 0;          // 現在の敵の数
 //	int spawnTimer = 0;          // 出現までのカウント用
 	const int SPAWN_INTERVAL = 300; // 出現間隔
 
 	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
+
 
 	GameManager game;
 	VECTOR stagepos = VGet(0.0f, 0.0f,0.0f);
@@ -99,6 +103,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	VECTOR PolyCharaHitField[3];
 
 
+
+	
 
 	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMファイル名
 	char String[256];						// メモリ展開する際に使う文字列
@@ -162,6 +168,43 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		
 		return -1;
 	}
+
+
+	int  redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
+
+	//red_goblin_anim_neutral = redGoblinBaseModel;
+	if (redGoblinBaseModel == -1) {
+		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
+	}
+	int red_goblin_anim_neutral = 0;
+	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+		if (redGoblinBaseModel != -1) {
+			// モデルを複製
+			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
+		}
+		else {
+			charainfo[i].model1 = -1;
+		}
+
+		if (charainfo[i].model1 == -1) {
+			printfDx("ゴブリンのモデル生成失敗！(index:%d)\n", i);
+			continue;
+		}
+
+		// 最初は非表示
+		MV1SetVisible(charainfo[i].model1, FALSE);
+		charainfo[i].mode = NONE;
+
+		// ★追加：複製したゴブリンに最初からニュートラルアニメーションをアタッチしておく
+		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, red_goblin_anim_neutral);
+		if (charainfo[i].attachidx != -1) {
+			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+		}
+
+		charainfo[i].playtime = 0.0f;
+	}
+
+
 
 	int baseGoblinModel = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
 
@@ -259,7 +302,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			printfDx("Player%d frame not found: sayabone\n", i + 1);
 		}
 	}
+	
 
+	
 
 	// ステージ情報の読み込み
 	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage_4545.mv1");
@@ -270,7 +315,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	{
 		MV1SetMeshBackCulling(stagedata, i, FALSE);
 	}
-	sky = MV1LoadModel("..\\Data\\Stage\\Stage00_sky.mv1");
+	sky = MV1LoadModel("..\\Data\\Stage\\Sage_1214.mv1");
 	if (sky == -1) return -1;
 	MV1SetPosition(sky, VGet(0, -1000, 0));
 
@@ -281,8 +326,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	// モデルに含まれるメッシュの数を取得する
 	MeshNum = MV1GetMeshNum(stagedata);
-	SetTransColor(255, 255, 255);
-	int crownGraphHandle = LoadGraph("..\\Data\\UI\\crown.png");
+	SetTransColor(0, 0, 0);
+	int crownGraphHandle = LoadGraph("..\\Data\\UI\\win.png");
 
 	anim_neutral = LoadPlayerAssetModel("Anim_Neutral.mv1");
 	if (anim_neutral == -1) return -1;
@@ -678,6 +723,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				}
 			}
 		}
+
 		float MaxY;
 		float MaxY_poly;
 
@@ -695,6 +741,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			charainfo[PLAYER2_INDEX].move.x = 0.0f;
 			charainfo[PLAYER2_INDEX].move.z = 0.0f;
 		}
+
+
+
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			// (ここに移動や床判定の処理...)
 
@@ -731,7 +780,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				charainfo[i].playtime = 0.0f;
 			}
 		}
-		// ==========================================
+
+	
 			// 各プレイヤーの床ポリゴンとの当たり判定
 			// ==========================================
 		for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -890,8 +940,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-
-
 		// 画面の消去
 		ClearDrawScreen();
 
@@ -904,7 +952,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 		
 
-
+		//ここから下が２重ループになってて重くなってる原因！
 		for (int pIdx = 0; pIdx < PLAYER_COUNT; pIdx++) {
 
 			// 1. 左右の画面領域（ビューポート）を決定
@@ -954,8 +1002,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
 			}
 
-			game.DrawUI(pIdx, 900, 600, charainfo, hpBarTex);
-			DrawCrownOnLeader(pIdx, charainfo, crownGraphHandle, game);
+			game.DrawUI(pIdx, 900, 600, charainfo, hpBarTex, crownGraphHandle);
+			//DrawCrownIcon(pIdx, startX, 20, game.p1Score, game.p2Score, crownGraphHandle);
 			
 		}
 		SetDrawArea(0, 0, 900, 600);
@@ -1035,32 +1083,3 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 	}
 }
 
-void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game) {
-	// 1位のプレイヤーを判定（例としてスコアを比較、あるいはP1/P2のスコア変数を使用）
-	int leaderIdx = 0;
-	// ※もしP2のスコアのほうが高ければ 1 にする判定をここに記述
-	// if (p2Score > p1Score) { leaderIdx = 1; }
-
-	// 1位のプレイヤーの3D座標を取得し、頭の上の高さに大きくオフセットする（例: +120.0fなどモデルの大きさに合わせる）
-	VECTOR charaPos = charainfo[leaderIdx].pos;
-	charaPos.y += 120.0f; // ★高さが足りない場合はここを大きく調整してください
-
-	// 3D座標をウィンドウ全体の2D画面座標に変換
-	VECTOR screenPos = ConvWorldPosToScreenPos(charaPos);
-
-	// カメラの前にいる場合のみ
-	if (screenPos.z > 0.0f && screenPos.z < 1.0f) {
-
-		float drawX = screenPos.x;
-		float drawY = screenPos.y;
-
-		// 左右の画面分割（ビューポート）に合わせた補正
-		// プレイヤー2（右画面：450〜900px）の場合、右画面用のローカル座標に調整する必要があるか確認
-		if (pIdx == 1) {
-			// もし右画面の描画領域にオフセットが必要な場合はここで調整
-		}
-
-		// 王冠を描画（サイズを少し大きくして見やすくする 例: 1.0f など）
-		DrawRotaGraph((int)drawX, (int)drawY, 0.8f, 0.0f, crownGraphHandle, TRUE);
-	}
-}

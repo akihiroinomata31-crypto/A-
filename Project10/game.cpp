@@ -6,8 +6,8 @@ int enemy_anim_attack;
 int enemy_anim_neutral;
 int red_goblin_anim_neutral;
 int red_goblin_anim_attack;
-
- 
+int  redGoblinSpawnTimer;
+ int redGoblinBaseModel;
  void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
      if (timeLimit > 0) {
          timeLimit--;
@@ -23,19 +23,11 @@ int red_goblin_anim_attack;
              gameState = 3;
          }
      }
-     static int redGoblinSpawnTimer = 0;
-     redGoblinSpawnTimer++;
+    
+   
 
-     // 例：ゲーム開始から一定フレーム（または制限時間が特定の時間）になったら出現
-     if (redGoblinSpawnTimer >= 600) { // 10秒に1回など
-         redGoblinSpawnTimer = 0;
-
-         float rx = (float)(GetRand(1000) - 500);
-         float rz = (float)(GetRand(1000) - 500);
-
-         // ※引数に使うモデルのハンドルは main.cpp 側から渡すか、グローバル変数として共有してください
-         // ActivateRedGoblin(enemyList, rx, rz, redGoblinBaseModel, red_goblin_anim_neutral);
-     }
+   
+    
      int seconds = timeLimit / 150;
 
      // ゲーム開始からの経過フレームを計測する静的変数
@@ -53,12 +45,24 @@ int red_goblin_anim_attack;
          // 25秒未満は5体、25秒以降は10体を同時にスポーンさせる
          int spawnCount = (elapsedSeconds < 25) ? 3 : 5;
          for (int i = 0; i < spawnCount; i++) {
-             float baseX = (float)(GetRand(14000) - 7000); // -1000 ～ +1000 の範囲
-             float baseZ = (float)(GetRand(14000) - 7000);
+             float baseX = (float)(GetRand(1000) - 500); // -1000 ～ +1000 の範囲
+             float baseZ = (float)(GetRand(1000) - 500);
              ActivateEnemy(enemyList, baseX, baseZ);
          }
      }
+     // 2秒ごと（60FPS × 2秒 = 120フレーム）に判定
+     if (spawnTimer >= 120) {
+         spawnTimer = 0;
 
+         // 25秒未満は5体、25秒以降は10体を同時にスポーンさせる
+         int spawnCount = (elapsedSeconds < 25) ? 2 : 1;
+         for (int i = 0; i < spawnCount; i++) {
+             float baseX = (float)(GetRand(1000) - 500); // -1000 ～ +1000 の範囲
+             float baseZ = (float)(GetRand(1000) - 500);
+             ActivateRedGoblin(enemyList, baseX, baseZ);
+         }
+     }
+    
      // 制限時間に応じた特殊ゴーレムの出現
      if (seconds <= 75 && gameState == 0) {
          if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
@@ -82,8 +86,7 @@ int red_goblin_anim_attack;
  }
 
 
- // game.cpp の適当な場所に追加
- void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z, int redGoblinBaseModel, int red_goblin_anim_neutral) {
+ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
      for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
          if (enemyList[i].mode == NONE) {
              // モデルがまだ割り当てられていない場合は複製してセットする
@@ -93,23 +96,28 @@ int red_goblin_anim_attack;
 
              if (enemyList[i].model1 == -1) continue;
 
-             // 初期位置の設定（ステージの床高さを取得して合わせる）
+             // まず仮の位置を設定
              enemyList[i].pos = VGet(x, 0.0f, z);
 
              extern int stagedata;
-             VECTOR cal_pos1 = VGet(x, 2000.0f, z);
-             VECTOR cal_pos2 = VGet(x, -1000.0f, z);
+             VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
+             VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
+
+             // 正しい型と変数名に修正
              MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
 
              float baseFloorY = 0.0f;
              if (LineRes.HitFlag == 1) {
                  baseFloorY = LineRes.HitPosition.y;
              }
-             enemyList[i].pos.y = baseFloorY + 0.0f; // 必要に応じて高さ調整
 
-             // パラメータの設定（通常のゴブリンよりHPを高くするなど）
+             // ★レッドゴブリン専用の高さ調整（通常の600.0fで位置が分からない場合はここを調整）
+             float heightOffset = 600.0f;
+             enemyList[i].pos.y = baseFloorY + heightOffset;
+
+             // パラメータの設定（赤ゴブリンはHPを5にするなど）
              enemyList[i].mode = STAND;
-             enemyList[i].enemyHP = 5; // 例：赤ゴブリンはHP 5
+             enemyList[i].enemyHP = 5;
              enemyList[i].playtime = 0.0f;
              enemyList[i].isHit = false;
 
@@ -119,11 +127,13 @@ int red_goblin_anim_attack;
              if (enemyList[i].attachidx != -1) {
                  MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
              }
-             // 赤ゴブリン専用のニュートラルアニメーションをアタッチ
+
+             // 赤ゴブリン専用のアニメーションをアタッチ
              enemyList[i].attachidx = MV1AttachAnim(enemyList[i].model1, 0, red_goblin_anim_neutral);
              if (enemyList[i].attachidx != -1) {
                  enemyList[i].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[i].model1, enemyList[i].attachidx);
              }
+
              break;
          }
      }
@@ -185,10 +195,10 @@ void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
     frame.action = act;
     replayData.push_back(frame);
 }
-
-void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex) {
+void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle) {
     // 画面分割に対応するためのオフセット（P1なら0、P2なら画面半分右側にずれる）
     int xOffset = (pIdx == 0) ? 0 : sw / 2;
+
     int seconds = timeLimit / 150;
     SetFontSize(20);
 
@@ -196,7 +206,6 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     // 1. 制限時間表示（P1側の処理のときだけ、画面中央上に描画する）
     // ==========================================
     if (pIdx == 0) {
-        // 制限時間の色判定
         unsigned int timerColor;
         if (seconds <= 10 && (timeLimit / 10) % 2 == 0) {
             timerColor = GetColor(255, 0, 0); // 点滅（赤）
@@ -214,17 +223,16 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
             timerColor = GetColor(255, 255, 0);
         }
 
-        // 描画エリアを画面全体に一時リセット（これで中央の文字が分割線で切られなくなる）
         SetDrawArea(0, 0, sw, sh);
 
         SetFontSize(28);
         if (seconds > 0) {
-            DrawFormatString(sw / 2 - 48, 22, GetColor(0, 0, 0), "LIMIT : %d", seconds); // 黒い影
-            DrawFormatString(sw / 2 - 50, 20, timerColor, "LIMIT : %d", seconds);       // 本体の文字
+            DrawFormatString(sw / 2 - 48, 22, GetColor(0, 0, 0), "LIMIT : %d", seconds);
+            DrawFormatString(sw / 2 - 50, 20, timerColor, "LIMIT : %d", seconds);
         }
         else {
-            DrawString(sw / 2 - 38, 22, "FINISH!", GetColor(0, 0, 0));                 // 黒い影
-            DrawString(sw / 2 - 40, 20, "FINISH!", GetColor(255, 0, 0));                 // 本体の文字
+            DrawString(sw / 2 - 38, 22, "FINISH!", GetColor(0, 0, 0));
+            DrawString(sw / 2 - 40, 20, "FINISH!", GetColor(255, 0, 0));
         }
         SetFontSize(20);
     }
@@ -269,15 +277,12 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
 
     int innerMargin = 2;
 
-    // 枠画像を下に描画
     DrawExtendGraph(drawX, drawY, drawX + frameDrawW, drawY + frameDrawH, hpBarTex, TRUE);
 
-    // 赤ゲージ（背景）
     DrawBox(drawX + innerMargin, drawY + innerMargin,
         drawX + frameDrawW - innerMargin, drawY + frameDrawH - innerMargin,
         GetColor(200, 0, 0), TRUE);
 
-    // 緑バー（現在HP）
     int innerMaxWidth = frameDrawW - (innerMargin * 2);
     int currentGreenWidth = (int)(innerMaxWidth * hpRate);
 
@@ -301,9 +306,22 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     int currentDeaths = (pIdx == 0) ? deathCount[0] : deathCount[1];
 
     int infoY = drawY + 32;
-    // スコアは豪華な金色（ゴールド）で表示
     DrawFormatString(xOffset + 20, infoY, GetColor(255, 215, 0), "Score: %d", currentScore);
     DrawFormatString(xOffset + 140, infoY, GetColor(255, 100, 200), "DEATHS: %d", currentDeaths);
+
+    if (p1Score >= 1000 || p2Score >= 1000) {
+        int leaderIdx = (p2Score > p1Score) ? 1 : 0;
+
+        // 現在描画しているプレイヤーが1位のときだけ、UI上の固定位置に描画
+        if (pIdx == leaderIdx) {
+            int crownX = xOffset + 220; // 画面内の固定X座標（HPバーやスコアの横あたり）
+            int crownY = drawY + 12;    // HPバーの高さに合わせる
+
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 255);
+            DrawRotaGraph(crownX, crownY, 0.3f, 0.0f, crownGraphHandle, TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
+    }
 }
 void GameManager::AddScore(int playerIndex, int score) {
     if (playerIndex == 0) {
