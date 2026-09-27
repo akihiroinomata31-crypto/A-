@@ -1,6 +1,9 @@
 #include "player.h"
 
+#include "game.h"
+
 #include <DxLib.h>
+#include <EffekseerForDXLib.h>
 #include <math.h>
 
 namespace {
@@ -23,11 +26,47 @@ bool IsPadOrKeyDown(int padState, int padButton, int keyCode) {
 	return IsPadButtonDown(padState, padButton) || IsKeyDown(keyCode);
 }
 
+
+void StartNormalAttackEffect(PlayerRuntimeState& state) {
+	state.normalAttackEffectFrame = 0;
+	state.normalAttackEffectWait = 0;
+	state.isNormalAttackEffectPlaying = true;
+}
+
+void StopNormalAttackEffect(PlayerRuntimeState& state) {
+	state.normalAttackEffectFrame = 0;
+	state.normalAttackEffectWait = 0;
+	state.isNormalAttackEffectPlaying = false;
+}
+
+void UpdateNormalAttackEffect(PlayerRuntimeState& state) {
+	if (!state.isNormalAttackEffectPlaying) {
+		return;
+	}
+
+	state.normalAttackEffectWait++;
+	if (state.normalAttackEffectWait < PLAYER_NORMAL_ATTACK_EFFECT_FRAME_INTERVAL) {
+		return;
+	}
+
+	state.normalAttackEffectWait = 0;
+	state.normalAttackEffectFrame++;
+	if (state.normalAttackEffectFrame >= PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT) {
+		StopNormalAttackEffect(state);
+	}
+}
+
 void StartHeavyAttackEffect(PlayerRuntimeState& state) {
 	// 重攻撃開始時にエフェクトの先頭フレームへ戻す。
 	state.heavyAttackEffectFrame = 0;
 	state.heavyAttackEffectWait = 0;
 	state.isHeavyAttackEffectPlaying = true;
+}
+
+void StopHeavyAttackEffect(PlayerRuntimeState& state) {
+	state.heavyAttackEffectFrame = 0;
+	state.heavyAttackEffectWait = 0;
+	state.isHeavyAttackEffectPlaying = false;
 }
 
 void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
@@ -44,8 +83,65 @@ void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
 	state.heavyAttackEffectWait = 0;
 	state.heavyAttackEffectFrame++;
 	if (state.heavyAttackEffectFrame >= PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT) {
-		state.heavyAttackEffectFrame = 0;
-		state.isHeavyAttackEffectPlaying = false;
+		StopHeavyAttackEffect(state);
+	}
+}
+
+void StartSpecialAttackEffect(
+	const SCharaInfo& player,
+	PlayerRuntimeState& state,
+	int effectResourceHandle
+) {
+	// 必殺技ごとに判定時間、多重ヒット防止、Effekseer の再生位置を初期化する。
+	state.specialAttackEffectFrame = 0;
+	state.specialAttackEffectWait = 0;
+	state.isSpecialAttackEffectPlaying = true;
+	state.isSpecialHitDone = false;
+	state.specialAttackPlayingHandle = PlayEffekseer3DEffect(effectResourceHandle);
+	if (state.specialAttackPlayingHandle != -1) {
+		SetPosPlayingEffekseer3DEffect(
+			state.specialAttackPlayingHandle,
+			player.pos.x,
+			player.pos.y + 8.0f,
+			player.pos.z
+		);
+	}
+}
+
+void StopSpecialAttackEffect(PlayerRuntimeState& state) {
+	if (state.specialAttackPlayingHandle != -1) {
+		StopEffekseer3DEffect(state.specialAttackPlayingHandle);
+		state.specialAttackPlayingHandle = -1;
+	}
+	state.specialAttackEffectFrame = 0;
+	state.specialAttackEffectWait = 0;
+	state.isSpecialAttackEffectPlaying = false;
+}
+
+void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
+	if (!state.isSpecialAttackEffectPlaying) {
+		return;
+	}
+
+	// プレイヤー座標を毎フレーム反映し、1P/2P の各エフェクトを本人に追従させる。
+	if (state.specialAttackPlayingHandle != -1) {
+		SetPosPlayingEffekseer3DEffect(
+			state.specialAttackPlayingHandle,
+			player.pos.x,
+			player.pos.y + 8.0f,
+			player.pos.z
+		);
+	}
+
+	state.specialAttackEffectWait++;
+	if (state.specialAttackEffectWait < PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL) {
+		return;
+	}
+
+	state.specialAttackEffectWait = 0;
+	state.specialAttackEffectFrame++;
+	if (state.specialAttackEffectFrame >= PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT) {
+		StopSpecialAttackEffect(state);
 	}
 }
 
@@ -101,13 +197,36 @@ void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
 }
 
 void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, bool isHeavyAttack) {
-	// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃より重い見た目にする。
+	// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃と重攻撃を区別する。
 	state.attackIndex = isHeavyAttack ? PLAYER_ATTACK_ANIM_COUNT - 1 : 0;
 	state.isAttackBuffered = false;
 	state.isHeavyAttack = isHeavyAttack;
+	state.isSpecialAttack = false;
+	state.isSpecialHitDone = false;
+	StopSpecialAttackEffect(state);
 	if (isHeavyAttack) {
+		StopNormalAttackEffect(state);
 		StartHeavyAttackEffect(state);
 	}
+	else {
+		StartNormalAttackEffect(state);
+	}
+	player.mode = ATTACK;
+	player.isHit = false;
+	SetCharacterAnimation(player, animAttack[state.attackIndex]);
+	PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
+}
+
+void StartPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, int effectResourceHandle) {
+	// 専用モデルアニメーションができるまでは3段目の攻撃動作を流用する。
+	state.attackIndex = PLAYER_ATTACK_ANIM_COUNT - 1;
+	state.isAttackBuffered = false;
+	state.isHeavyAttack = false;
+	state.isSpecialAttack = true;
+	StopNormalAttackEffect(state);
+	StopHeavyAttackEffect(state);
+	StartSpecialAttackEffect(player, state, effectResourceHandle);
+	ResetMove(player);
 	player.mode = ATTACK;
 	player.isHit = false;
 	SetCharacterAnimation(player, animAttack[state.attackIndex]);
@@ -159,7 +278,9 @@ void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 }
 
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
+	UpdateNormalAttackEffect(state);
 	UpdateHeavyAttackEffect(state);
+	UpdateSpecialAttackEffect(player, state);
 	if (player.mode != JUMPOUT) {
 		player.playtime += 0.3f;
 	}
@@ -186,6 +307,33 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 	MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
 }
 
+void DrawPlayerNormalAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state, const int effectHandles[]) {
+	if (!state.isNormalAttackEffectPlaying || state.attackIndex >= PLAYER_ATTACK_ANIM_COUNT - 1) {
+		return;
+	}
+
+	const int frame = state.normalAttackEffectFrame;
+	if (frame < 0 || frame >= PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT || effectHandles[frame] == -1) {
+		return;
+	}
+
+	VECTOR forward = VGet(0.0f, 0.0f, 0.0f);
+	switch (player.direction) {
+	case Direction::DOWN:  forward.z = -1.0f; break;
+	case Direction::UP:    forward.z = 1.0f; break;
+	case Direction::LEFT:  forward.x = -1.0f; break;
+	case Direction::RIGHT: forward.x = 1.0f; break;
+	default: break;
+	}
+
+	VECTOR effectPos = VAdd(player.pos, VScale(forward, 85.0f));
+	effectPos.y += player.charahitinfo.Height * 0.55f;
+	const float angle = state.attackIndex == 1 ? DX_PI_F : 0.0f;
+	SetDrawBlendMode(DX_BLENDMODE_ADD, 230);
+	DrawBillboard3D(effectPos, 0.5f, 0.5f, PLAYER_NORMAL_ATTACK_EFFECT_SIZE, angle, effectHandles[frame], TRUE);
+	SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+}
+
 void DrawPlayerHeavyAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state, const int effectHandles[]) {
 	// 重攻撃中だけ、プレイヤー位置にエフェクトを表示する。
 	if (!state.isHeavyAttackEffectPlaying) {
@@ -203,6 +351,55 @@ void DrawPlayerHeavyAttackEffect(const SCharaInfo& player, const PlayerRuntimeSt
 	SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 }
 
+void CheckPlayerSpecialAttackHit(
+	GameManager& game,
+	SCharaInfo& attacker,
+	PlayerRuntimeState& state,
+	SCharaInfo& target,
+	int seDamageHandle,
+	int animDamage
+) {
+	// 水波が見えるフレームだけ、プレイヤー中心の円形判定を有効にする。
+	if (!state.isSpecialAttack || !state.isSpecialAttackEffectPlaying || state.isSpecialHitDone) {
+		return;
+	}
+	if (state.specialAttackEffectFrame < PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME ||
+		state.specialAttackEffectFrame > PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME) {
+		return;
+	}
+	if (target.mode == DOWNMODE || target.mode == DAMAGE) {
+		return;
+	}
+
+	// 波紋の広がりに合わせ、開始フレームから最大半径まで判定を拡大する。
+	const int radiusFrame = state.specialAttackEffectFrame < PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME
+		? state.specialAttackEffectFrame
+		: PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME;
+	const float radiusRate = static_cast<float>(radiusFrame - PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME + 1) /
+		static_cast<float>(PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME - PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME + 1);
+	const float attackRadius = PLAYER_SPECIAL_ATTACK_MAX_RADIUS * radiusRate;
+	const float targetRadius = target.charahitinfo.Width * 0.5f;
+	const float hitDistance = attackRadius + targetRadius;
+	const float distanceX = target.pos.x - attacker.pos.x;
+	const float distanceZ = target.pos.z - attacker.pos.z;
+	if (distanceX * distanceX + distanceZ * distanceZ > hitDistance * hitDistance) {
+		return;
+	}
+
+	// isSpecialHitDone により、同じ必殺技が毎フレーム連続ヒットするのを防ぐ。
+	state.isSpecialHitDone = true;
+	SetCharacterAnimation(target, animDamage);
+	target.mode = DAMAGE;
+	PlaySoundMem(seDamageHandle, DX_PLAYTYPE_BACK);
+
+	target.enemyHP -= PLAYER_SPECIAL_ATTACK_DAMAGE;
+	if (target.enemyHP <= 0) {
+		target.enemyHP = 0;
+		game.AddScore(100);
+	}
+	printfDx("必殺技ヒット！残りHP:%d\n", target.enemyHP);
+}
+
 void UpdatePlayerInput(
 	SCharaInfo& player,
 	PlayerRuntimeState& state,
@@ -212,12 +409,14 @@ void UpdatePlayerInput(
 	int animRun,
 	int animJumpIn,
 	int seAttackHandle,
-	int seJumpHandle
+	int seJumpHandle,
+	int specialAttackEffectResourceHandle
 ) {
 	// プレイヤーを操作できる状態か確認する。
 	state.moveInput = false;
 	bool attackPressed = false;
 	bool heavyAttackPressed = false;
+	bool specialAttackPressed = false;
 	bool jumpPressed = false;
 
 	if (CanControlPlayerMode(player.mode)) {
@@ -230,25 +429,32 @@ void UpdatePlayerInput(
 		const int currentAttackButton = (IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ||
 			IsPadButtonDown(state.key, PAD_INPUT_10)) ? 1 : 0;
 		const int currentHeavyAttackButton = IsPadOrKeyDown(state.key, input.heavyAttackPadButton, input.heavyAttackKey) ? 1 : 0;
+		const int currentSpecialAttackButton = IsPadOrKeyDown(state.key, input.specialAttackPadButton, input.specialAttackKey) ? 1 : 0;
 		const int currentJumpButton = IsPadOrKeyDown(state.key, input.jumpPadButton, input.jumpKey) ? 1 : 0;
 		attackPressed = (currentAttackButton == 1 && state.prevAttackButton == 0);
 		heavyAttackPressed = (currentHeavyAttackButton == 1 && state.prevHeavyAttackButton == 0);
+		specialAttackPressed = (currentSpecialAttackButton == 1 && state.prevSpecialAttackButton == 0);
 		jumpPressed = (currentJumpButton == 1 && state.prevJumpButton == 0);
 		state.prevAttackButton = currentAttackButton;
 		state.prevHeavyAttackButton = currentHeavyAttackButton;
+		state.prevSpecialAttackButton = currentSpecialAttackButton;
 		state.prevJumpButton = currentJumpButton;
 	}
 	else {
 		state.key = 0;
 		state.prevAttackButton = 0;
 		state.prevHeavyAttackButton = 0;
+		state.prevSpecialAttackButton = 0;
 		state.prevJumpButton = 0;
 	}
 
 	if (player.mode == STAND || player.mode == RUN) {
 		ResetMove(player);
 
-		if (heavyAttackPressed) {
+		if (specialAttackPressed) {
+			StartPlayerSpecialAttack(player, state, animAttack, seAttackHandle, specialAttackEffectResourceHandle);
+		}
+		else if (heavyAttackPressed) {
 			StartPlayerAttack(player, state, animAttack, seAttackHandle, true);
 		}
 		else if (attackPressed) {
@@ -277,7 +483,7 @@ void UpdatePlayerInput(
 	}
 
 	// 攻撃中にもう一度押したら次の攻撃を予約する。
-	if (player.mode == ATTACK && !state.isHeavyAttack && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
+	if (player.mode == ATTACK && !state.isHeavyAttack && !state.isSpecialAttack && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 		state.isAttackBuffered = true;
 	}
 
@@ -309,6 +515,17 @@ void UpdatePlayerAttackState(
 ) {
 	// 攻撃アニメーション中の移動と連撃遷移を処理する。
 	if (player.mode != ATTACK) {
+		return;
+	}
+
+	// 必殺技中は移動を止め、エフェクトの終了と同時に攻撃後状態へ移る。
+	if (state.isSpecialAttack) {
+		ResetMove(player);
+		if (!state.isSpecialAttackEffectPlaying) {
+			state.isAttackBuffered = false;
+			state.isSpecialAttack = false;
+			player.mode = ATTACKOUT;
+		}
 		return;
 	}
 
@@ -345,6 +562,12 @@ void UpdatePlayerAttackState(
 			state.attackIndex++;
 			state.isAttackBuffered = false;
 			player.isHit = false;
+			if (state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
+				StartNormalAttackEffect(state);
+			}
+			else {
+				StopNormalAttackEffect(state);
+			}
 			SetCharacterAnimation(player, animAttack[state.attackIndex]);
 			PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
 		}

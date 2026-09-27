@@ -1,5 +1,6 @@
 // DXライブラリーのインクルード
 #include <DxLib.h>
+#include <EffekseerForDXLib.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -50,6 +51,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	SCharaInfo charainfo[MAX_CHARA];
 	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
 	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
+	int normalAttackEffectHandle[PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT];
 	int heavyAttackEffectHandle[PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT];
 	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
 	int prevJKey = 0;
@@ -57,9 +59,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
 		// 1P: キーボード(WASD) + 1Pゲームパッド。
-		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_2 },
+		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_3, PAD_INPUT_2 },
 		// 2P: キーボード(矢印) + 2Pゲームパッド。
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, -1, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_2 }
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, KEY_INPUT_RCONTROL, -1, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_3, PAD_INPUT_2 }
 	};
 
 
@@ -100,8 +102,11 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int BGMLoopEndPosition = -1;
 
 	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEファイル名
+	char NormalAttackEffect_FilePath[] = "NormalAttack.png";
 	char HeavyAttackEffect_FilePath[] = "重攻撃.png";
-	int SEattackHandle, SEjumpHandle, SEdamageHandle;						// BGMサウンドハンドル	
+	char SpecialAttackEffect_FilePath[] = "SpecialAttack\\ToonWater.efkefc";
+	int SEattackHandle, SEjumpHandle, SEdamageHandle;
+	int specialAttackEffectResourceHandle = -1;
 
 
 //キャラ情報
@@ -153,11 +158,25 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	// ウインドウサイズの変更
 	SetGraphMode(900, 600, 32);
 
+	// Effekseer を利用するため、DxLib を DirectX 11 で初期化する。
+	SetUseDirect3DVersion(DX_DIRECT3D_11);
+
 	// DXライブラリの初期化
 	if (DxLib_Init() == -1) {
 		return -1;
 	}
 
+	// 同時に表示できる最大パーティクル数を指定して Effekseer を初期化する。
+	if (Effekseer_Init(8000) == -1) {
+		DxLib_End();
+		return -1;
+	}
+	SetChangeScreenModeGraphicsSystemResetFlag(FALSE);
+	Effekseer_SetGraphicsDeviceLostCallbackFunctions();
+
+	for (int i = 0; i < PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT; i++) {
+		normalAttackEffectHandle[i] = -1;
+	}
 	for (int i = 0; i < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT; i++) {
 		heavyAttackEffectHandle[i] = -1;
 	}
@@ -305,6 +324,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		return false;
 	}
 
+	// 通常攻撃エフェクトのスプライトシートを分割して読み込む。
+	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", NormalAttackEffect_FilePath);
+	if (LoadDivGraph(String, PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT, PLAYER_NORMAL_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_NORMAL_ATTACK_EFFECT_ROW_COUNT, PLAYER_NORMAL_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_NORMAL_ATTACK_EFFECT_FRAME_HEIGHT, normalAttackEffectHandle) == -1) {
+		printfDx("Normal attack effect load failed.\n");
+		return -1;
+	}
+
 	// 重攻撃エフェクトのスプライトシートを分割して読み込む。
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", HeavyAttackEffect_FilePath);
 	if (LoadDivGraph(String, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_ROW_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_HEIGHT, heavyAttackEffectHandle) == -1) {
@@ -312,6 +338,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		return -1;
 	}
 
+	// 必殺技は Effekseer の3Dエフェクトをそのまま読み込み、全180フレームを再生する。
+	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", SpecialAttackEffect_FilePath);
+	specialAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
+	if (specialAttackEffectResourceHandle == -1) {
+		printfDx("必殺技エフェクトの読み込み失敗！\n");
+		return -1;
+	}
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
@@ -352,7 +385,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				anim_run,
 				anim_jumpin,
 				SEattackHandle,
-				SEjumpHandle
+				SEjumpHandle,
+				specialAttackEffectResourceHandle
 			);
 			UpdatePlayerAttackState(
 				charainfo[i],
@@ -635,8 +669,20 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				wpPosStart[i] = VTransform(wpPosStart[i], wpmatrix[i]);
 				wpPosEnd[i] = VTransform(wpPosEnd[i], wpmatrix[i]);
 
-				CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+				// 必殺技中は剣の判定を止め、光線判定との二重ヒットを防ぐ。
+				if (!playerStates[i].isSpecialAttack) {
+					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+				}
 			}
+
+			CheckPlayerSpecialAttackHit(
+				game,
+				charainfo[i],
+				playerStates[i],
+				charainfo[TEST_ENEMY_INDEX],
+				SEdamageHandle,
+				anim_damage
+			);
 		}
 
 		MV1SetAttachAnimTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx, charainfo[TEST_ENEMY_INDEX].playtime);
@@ -655,12 +701,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		cpos = VAdd(ctgt, VGet(0.0f, 300.0f, -1200.0f));
 		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
 
+		// DxLib の最終カメラ設定を Effekseer に同期してから、エフェクトを1フレーム進める。
+		Effekseer_Sync3DSetting();
+		UpdateEffekseer3D();
 
 		// 画面の消去
 		ClearDrawScreen();
 
 		// 四角形を表示 最後の引数をfalseにすると塗りつぶし無し
-		DrawBox(0, 0, 900, 600, GetColor(255, 255, 255), true);
+		DrawBox(0, 0, 900, 600, GetColor(0, 0, 0), true);
 		//モデル描画
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			MV1DrawModel(charainfo[i].model1);
@@ -680,8 +729,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1DrawModel(sky);
 
 		for (int i = 0; i < PLAYER_COUNT; i++) {
+			DrawPlayerNormalAttackEffect(charainfo[i], playerStates[i], normalAttackEffectHandle);
 			DrawPlayerHeavyAttackEffect(charainfo[i], playerStates[i], heavyAttackEffectHandle);
 		}
+
+		// 1P/2P が再生している Effekseer の必殺技をまとめて描画する。
+		DrawEffekseer3D();
 
 		game.Update(charainfo);
 
@@ -692,11 +745,20 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	}
 	// DXライブラリの終了処理
+	for (int i = 0; i < PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT; i++) {
+		if (normalAttackEffectHandle[i] != -1) {
+			DeleteGraph(normalAttackEffectHandle[i]);
+		}
+	}
 	for (int i = 0; i < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT; i++) {
 		if (heavyAttackEffectHandle[i] != -1) {
 			DeleteGraph(heavyAttackEffectHandle[i]);
 		}
 	}
+	if (specialAttackEffectResourceHandle != -1) {
+		DeleteEffekseerEffect(specialAttackEffectResourceHandle);
+	}
+	Effkseer_End();
 
 	DxLib_End();
 
