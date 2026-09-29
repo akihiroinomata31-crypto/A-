@@ -35,29 +35,24 @@ int  redGoblinSpawnTimer;
      totalFrames++;
      int elapsedSeconds = totalFrames / 60; // 60FPS想定（1秒 = 60フレーム）
 
-     // ゴブリンの自動出現（スポーン）タイマー
      spawnTimer++;
 
      // 2秒ごと（60FPS × 2秒 = 120フレーム）に判定
      if (spawnTimer >= 120) {
-         spawnTimer = 0;
+         spawnTimer = 0; // ←ここで1回だけリセット！
 
-         // 25秒未満は5体、25秒以降は10体を同時にスポーンさせる
+         // --- 普通のゴブリンのスポーン ---
          int spawnCount = (elapsedSeconds < 25) ? 3 : 5;
          for (int i = 0; i < spawnCount; i++) {
-             float baseX = (float)(GetRand(1000) - 500); // -1000 ～ +1000 の範囲
+             float baseX = (float)(GetRand(1000) - 500);
              float baseZ = (float)(GetRand(1000) - 500);
              ActivateEnemy(enemyList, baseX, baseZ);
          }
-     }
-     // 2秒ごと（60FPS × 2秒 = 120フレーム）に判定
-     if (spawnTimer >= 120) {
-         spawnTimer = 0;
 
-         // 25秒未満は5体、25秒以降は10体を同時にスポーンさせる
-         int spawnCount = (elapsedSeconds < 25) ? 2 : 1;
-         for (int i = 0; i < spawnCount; i++) {
-             float baseX = (float)(GetRand(1000) - 500); // -1000 ～ +1000 の範囲
+         // --- 赤ゴブリンのスポーン ---
+         int redSpawnCount = (elapsedSeconds < 25) ? 2 : 1;
+         for (int i = 0; i < redSpawnCount; i++) {
+             float baseX = (float)(GetRand(1000) - 500);
              float baseZ = (float)(GetRand(1000) - 500);
              ActivateRedGoblin(enemyList, baseX, baseZ);
          }
@@ -87,7 +82,7 @@ int  redGoblinSpawnTimer;
 
 
  void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
-     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+     for (int i = TEST_ENEMY_RED; i < MAX_CHARAS; i++) {
          if (enemyList[i].mode == NONE) {
              // モデルがまだ割り当てられていない場合は複製してセットする
              if (enemyList[i].model1 == -1 && redGoblinBaseModel != -1) {

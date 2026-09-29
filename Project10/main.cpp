@@ -170,39 +170,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 
-	int  redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
-
-	//red_goblin_anim_neutral = redGoblinBaseModel;
-	if (redGoblinBaseModel == -1) {
-		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
-	}
-	int red_goblin_anim_neutral = 0;
-	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-		if (redGoblinBaseModel != -1) {
-			// モデルを複製
-			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
-		}
-		else {
-			charainfo[i].model1 = -1;
-		}
-
-		if (charainfo[i].model1 == -1) {
-			printfDx("ゴブリンのモデル生成失敗！(index:%d)\n", i);
-			continue;
-		}
-
-		// 最初は非表示
-		MV1SetVisible(charainfo[i].model1, FALSE);
-		charainfo[i].mode = NONE;
-
-		// ★追加：複製したゴブリンに最初からニュートラルアニメーションをアタッチしておく
-		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, red_goblin_anim_neutral);
-		if (charainfo[i].attachidx != -1) {
-			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
-		}
-
-		charainfo[i].playtime = 0.0f;
-	}
 
 
 
@@ -241,6 +208,41 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 	
+
+	int  redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
+
+	//red_goblin_anim_neutral = redGoblinBaseModel;
+	if (redGoblinBaseModel == -1) {
+		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
+	}
+	int red_goblin_anim_neutral = 0;
+	for (int i = TEST_ENEMY_RED; i < MAX_CHARAS; i++) {
+		if (redGoblinBaseModel != -1) {
+			// モデルを複製
+			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
+		}
+		else {
+			charainfo[i].model1 = -1;
+		}
+
+		if (charainfo[i].model1 == -1) {
+			printfDx("ゴブリンのモデル生成失敗！(index:%d)\n", i);
+			continue;
+		}
+
+		// 最初は非表示
+		MV1SetVisible(charainfo[i].model1, FALSE);
+		charainfo[i].mode = NONE;
+
+		// ★追加：複製したゴブリンに最初からニュートラルアニメーションをアタッチしておく
+		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, red_goblin_anim_neutral);
+		if (charainfo[i].attachidx != -1) {
+			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+		}
+
+		charainfo[i].playtime = 0.0f;
+	}
+
 	//モデル読み込み
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].model1 = LoadPlayerAssetModel("PC.mv1");
