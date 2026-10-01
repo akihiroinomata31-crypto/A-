@@ -8,6 +8,8 @@ int red_goblin_anim_neutral;
 int red_goblin_anim_attack;
 int  redGoblinSpawnTimer;
  int redGoblinBaseModel;
+
+
  void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
      if (timeLimit > 0) {
          timeLimit--;
@@ -37,26 +39,48 @@ int  redGoblinSpawnTimer;
 
      spawnTimer++;
 
-     // 2秒ごと（60FPS × 2秒 = 120フレーム）に判定
+    
      if (spawnTimer >= 120) {
          spawnTimer = 0; // ←ここで1回だけリセット！
 
-         // --- 普通のゴブリンのスポーン ---
-         int spawnCount = (elapsedSeconds < 25) ? 3 : 5;
-         for (int i = 0; i < spawnCount; i++) {
-             float baseX = (float)(GetRand(1000) - 500);
-             float baseZ = (float)(GetRand(1000) - 500);
-             ActivateEnemy(enemyList, baseX, baseZ);
+         // ==========================================
+         // ★【追加】現在生きている敵の総数を数えて、25体以上なら湧かせない
+         // ==========================================
+         int activeEnemyCount = 0;
+         for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+             if (enemyList[i].mode != NONE) {
+                 activeEnemyCount++;
+             }
          }
 
-         // --- 赤ゴブリンのスポーン ---
-         int redSpawnCount = (elapsedSeconds < 25) ? 2 : 1;
-         for (int i = 0; i < redSpawnCount; i++) {
-             float baseX = (float)(GetRand(1000) - 500);
-             float baseZ = (float)(GetRand(1000) - 500);
-             ActivateRedGoblin(enemyList, baseX, baseZ);
+         // すでに25体以上いたら、今回のスポーン処理をまるごとスキップ！
+         if (activeEnemyCount < 60) {
+             // --- 普通のゴブリンのスポーン ---
+             int spawnCount = (elapsedSeconds < 60) ? 10 : 15;
+             for (int i = 0; i < spawnCount; i++) {
+                 float centeX = (float)(GetRand(3000) - 1500);
+                 float centeZ = (float)(GetRand(3000) - 1500);
+
+                 // 3体を少しずつ離した位置にずらしながらスポーンさせる
+                 for (int j = 0; j < 3; j++) { // ※中のループ変数が外と同じ 'i' になっていたので 'j' に直すと安全です！
+                     // 1体ごとにバラバラの方向へ少しずつ座標をずらす（オフセット）
+                     float offsetX = (float)(GetRand(4000) - 2000);
+                     float offsetZ = (float)(GetRand(4000) - 2000);
+
+                     float spawnX = centeX + offsetX;
+                     float spawnZ = centeZ + offsetZ;
+
+                     ActivateEnemy(enemyList, spawnX, spawnZ);
+                 }
+             }
+         }
+         else {
          }
      }
+         // ==========================================
+     
+
+    
     
      // 制限時間に応じた特殊ゴーレムの出現
      if (seconds <= 75 && gameState == 0) {
@@ -119,6 +143,8 @@ int  redGoblinSpawnTimer;
              MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
              MV1SetVisible(enemyList[i].model1, TRUE);
 
+           
+
              if (enemyList[i].attachidx != -1) {
                  MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
              }
@@ -165,7 +191,7 @@ int  redGoblinSpawnTimer;
 
 
              enemyList[i].mode = STAND;
-             enemyList[i].enemyHP = 2;
+             enemyList[i].enemyHP = 5;
              enemyList[i].playtime = 0.0f;
              enemyList[i].isHit = false;
 
@@ -313,6 +339,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
             int crownY = drawY + 12;    // HPバーの高さに合わせる
 
             SetDrawBlendMode(DX_BLENDMODE_ADD, 255);
+
             DrawRotaGraph(crownX, crownY, 0.3f, 0.0f, crownGraphHandle, TRUE);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }

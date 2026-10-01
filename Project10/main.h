@@ -50,6 +50,7 @@ enum CharaMode
 	ATTACKOUT,
 	DAMAGE,
 	DOWNMODE,
+	ANIM_RUN,
 	NONE,
 };
 /* ------------------------------------------------------------------------
@@ -91,14 +92,16 @@ struct SCharaInfo
 	float anim_time;
 
 	float anim_total;
-
+	int weaponModel;  // 武器のモデルハンドル
+	int weaponFrame;
+	int currentAnimType;
 };
 
 // キャラクターの当たり判定の情
 
 // 当たり判定の幅、高さ
 // 当たり判定の中心座標
-extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
+extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_run, enemy_anim_neutral;
 
 
 extern void CheckAttackHit(

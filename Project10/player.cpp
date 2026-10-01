@@ -1,4 +1,4 @@
-#include "player.h"
+ï»¿#include "player.h"
 
 #include <DxLib.h>
 #include <math.h>
@@ -15,6 +15,8 @@ namespace {
 
 
 
+
+
 	constexpr int PAD_ANALOG_DEAD_ZONE = 400;
 
 	bool IsPadButtonDown(int padState, int padButton) {
@@ -26,7 +28,7 @@ namespace {
 	}
 
 	void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& input, float& inputX, float& inputZ) {
-		// •ûŒüƒL[A\šƒL[A¶ƒXƒeƒBƒbƒN‚ğ‚Ü‚Æ‚ß‚ÄˆÚ“®“ü—Í‚É•ÏŠ·‚·‚éB
+		// æ–¹å‘ã‚­ãƒ¼ã€åå­—ã‚­ãƒ¼ã€å·¦ã‚¹ãƒ†ã‚£ãƒƒã‚¯ã‚’ã¾ã¨ã‚ã¦ç§»å‹•å…¥åŠ›ã«å¤‰æ›ã™ã‚‹ã€‚
 		bool moveDown = IsPadButtonDown(state.key, PAD_INPUT_DOWN) || IsKeyDown(input.downKey);
 		bool moveUp = IsPadButtonDown(state.key, PAD_INPUT_UP) || IsKeyDown(input.upKey);
 		bool moveLeft = IsPadButtonDown(state.key, PAD_INPUT_LEFT) || IsKeyDown(input.leftKey);
@@ -67,7 +69,7 @@ namespace {
 	}
 
 	void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
-		// ˆÚ“®•ûŒü‚É‡‚í‚¹‚ÄƒLƒƒƒ‰ƒNƒ^[‚ÌŒü‚«‚ğ•Ï‚¦‚éB
+		// ç§»å‹•æ–¹å‘ã«åˆã‚ã›ã¦ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼ã®å‘ãã‚’å¤‰ãˆã‚‹ã€‚
 		if (fabsf(inputX) > fabsf(inputZ)) {
 			player.direction = inputX < 0.0f ? Direction::LEFT : Direction::RIGHT;
 		}
@@ -114,6 +116,7 @@ namespace {
 		}
 	}
 
+
 } // namespace
 
 void ResetMove(SCharaInfo& chara) {
@@ -123,12 +126,29 @@ void ResetMove(SCharaInfo& chara) {
 }
 
 void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
-	MV1DetachAnim(chara.model1, chara.attachidx);
+	// ğŸ›¡ï¸ å®‰å…¨ã‚¬ãƒ¼ãƒ‰ï¼šãƒ¢ãƒ‡ãƒ«ãŒå­˜åœ¨ã—ãªã„å ´åˆã¯ä½•ã‚‚ã—ãªã„ï¼ˆã‚¯ãƒ©ãƒƒã‚·ãƒ¥é˜²æ­¢ï¼‰
+	if (chara.model1 == -1) {
+		return;
+	}
+
+	// ğŸ›¡ï¸ ã™ã§ã«æœ‰åŠ¹ãªã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ãŒã‚¢ã‚¿ãƒƒãƒã•ã‚Œã¦ã„ã‚‹å ´åˆã®ã¿ãƒ‡ã‚¿ãƒƒãƒã™ã‚‹
+	if (chara.attachidx != -1) {
+		MV1DetachAnim(chara.model1, chara.attachidx);
+		chara.attachidx = -1;
+	}
+
+	// æ–°ã—ã„ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’ã‚¢ã‚¿ãƒƒãƒ
 	chara.attachidx = MV1AttachAnim(chara.model1, 0, animHandle);
-	chara.anim_totaltime = MV1GetAttachAnimTotalTime(chara.model1, chara.attachidx);
+
+	if (chara.attachidx != -1) {
+		chara.anim_totaltime = MV1GetAttachAnimTotalTime(chara.model1, chara.attachidx);
+	}
+	else {
+		chara.anim_totaltime = 0.0f;
+	}
+
 	chara.playtime = playtime;
 }
-
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
 	if (player.mode != JUMPOUT) {
 		player.playtime += 0.3f;
@@ -166,7 +186,7 @@ void UpdatePlayerInput(
 	int seAttackHandle,
 	int seJumpHandle
 ) {
-	// ƒvƒŒƒCƒ„[‚ğ‘€ì‚Å‚«‚éó‘Ô‚©Šm”F‚·‚éB
+	// ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‚’æ“ä½œã§ãã‚‹çŠ¶æ…‹ã‹ç¢ºèªã™ã‚‹ã€‚
 	state.moveInput = false;
 	bool attackPressed = false;
 	bool jumpPressed = false;
@@ -174,10 +194,10 @@ void UpdatePlayerInput(
 	if (CanControlPlayerMode(player.mode)) {
 		state.key = GetJoypadInputState(input.padType);
 		if (state.key < 0) {
-			// ƒpƒbƒh–¢Ú‘±‚Í“ü—Í‚È‚µ‚Æ‚µ‚Äˆµ‚¤B
+			// ãƒ‘ãƒƒãƒ‰æœªæ¥ç¶šæ™‚ã¯å…¥åŠ›ãªã—ã¨ã—ã¦æ‰±ã†ã€‚
 			state.key = 0;
 		}
-		// UŒ‚/ƒWƒƒƒ“ƒv‚Í‰Ÿ‚µ‚½uŠÔ‚¾‚¯”½‰‚³‚¹‚éB
+		// æ”»æ’ƒ/ã‚¸ãƒ£ãƒ³ãƒ—ã¯æŠ¼ã—ãŸç¬é–“ã ã‘åå¿œã•ã›ã‚‹ã€‚
 		const int currentAttackButton = (IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ||
 			IsPadButtonDown(state.key, PAD_INPUT_10)) ? 1 : 0;
 		const int currentJumpButton = IsPadOrKeyDown(state.key, input.jumpPadButton, input.jumpKey) ? 1 : 0;
@@ -199,7 +219,7 @@ void UpdatePlayerInput(
 			StartPlayerAttack(player, state, animAttack, seAttackHandle);
 		}
 		else {
-			// ƒL[ƒ{[ƒhA\šƒL[A¶ƒXƒeƒBƒbƒN“ü—Í‚ğˆÚ“®—Ê‚É•ÏŠ·‚·‚éB
+			// ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã€åå­—ã‚­ãƒ¼ã€å·¦ã‚¹ãƒ†ã‚£ãƒƒã‚¯å…¥åŠ›ã‚’ç§»å‹•é‡ã«å¤‰æ›ã™ã‚‹ã€‚
 			float inputX = 0.0f;
 			float inputZ = 0.0f;
 			GetMoveInput(state, input, inputX, inputZ);
@@ -220,14 +240,14 @@ void UpdatePlayerInput(
 		}
 	}
 
-	// UŒ‚’†‚É‚à‚¤ˆê“x‰Ÿ‚µ‚½‚çŸ‚ÌUŒ‚‚ğ—\–ñ‚·‚éB
+	// æ”»æ’ƒä¸­ã«ã‚‚ã†ä¸€åº¦æŠ¼ã—ãŸã‚‰æ¬¡ã®æ”»æ’ƒã‚’äºˆç´„ã™ã‚‹ã€‚
 	if (player.mode == ATTACK && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 		state.isAttackBuffered = true;
 	}
 
 	MV1SetRotationXYZ(player.model1, VGet(0.0f, DX_PI_F * 0.5f * player.direction, 0.0f));
 
-	// “ü—Í‚Ì—L–³‚Å‘Ò‹@/‘–‚èƒAƒjƒ‚ğØ‚è‘Ö‚¦‚éB
+	// å…¥åŠ›ã®æœ‰ç„¡ã§å¾…æ©Ÿ/èµ°ã‚Šã‚¢ãƒ‹ãƒ¡ã‚’åˆ‡ã‚Šæ›¿ãˆã‚‹ã€‚
 	if (!state.moveInput) {
 		if (player.mode == RUN) {
 			ResetMove(player);
@@ -242,7 +262,7 @@ void UpdatePlayerInput(
 		}
 	}
 }
-
+     
 void UpdatePlayerAttackState(
 	SCharaInfo& player,
 	PlayerRuntimeState& state,
@@ -251,7 +271,7 @@ void UpdatePlayerAttackState(
 	const float attackEndTime[],
 	int seAttackHandle
 ) {
-	// UŒ‚ƒAƒjƒ[ƒVƒ‡ƒ“’†‚ÌˆÚ“®‚Æ˜AŒ‚‘JˆÚ‚ğˆ—‚·‚éB
+	// æ”»æ’ƒã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ä¸­ã®ç§»å‹•ã¨é€£æ’ƒé·ç§»ã‚’å‡¦ç†ã™ã‚‹ã€‚
 	if (player.mode != ATTACK) {
 		return;
 	}
@@ -277,7 +297,7 @@ void UpdatePlayerAttackState(
 	}
 
 	if (player.playtime >= attackEndTime[state.attackIndex]) {
-		// —\–ñ“ü—Í‚ª‚ ‚ê‚ÎŸ‚ÌUŒ‚ƒAƒjƒ‚Ö‚Â‚È‚°‚éB
+		// äºˆç´„å…¥åŠ›ãŒã‚ã‚Œã°æ¬¡ã®æ”»æ’ƒã‚¢ãƒ‹ãƒ¡ã¸ã¤ãªã’ã‚‹ã€‚
 		if (state.isAttackBuffered && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 			ApplyAttackStepMove(player, state, input);
 			state.attackIndex++;
@@ -292,3 +312,5 @@ void UpdatePlayerAttackState(
 		}
 	}
 }
+
+

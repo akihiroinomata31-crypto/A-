@@ -43,7 +43,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int running = 0;
 	int rootflm;
 	MATRIX wpmatrix[PLAYER_COUNT], sayamatrix[PLAYER_COUNT];
-	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral{};
+	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_run, enemy_anim_neutral{};
 
 	//int redGoblinBaseModel = -1;
 
@@ -59,6 +59,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	float skyRot = 0;
 	static SCharaInfo charainfo[MAX_CHARA];//キャラクターのメモリ管理を配列で行ってる
 	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
+	int WeaponModel[TEST_ENEMY_RED], WeaponFrame[TEST_ENEMY_RED];
 	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
 	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
 	int prevJKey = 0;
@@ -216,7 +217,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
 	}
 	int red_goblin_anim_neutral = 0;
-	for (int i = TEST_ENEMY_RED; i < MAX_CHARAS; i++) {
+	for (int i = TEST_ENEMY_RED; i < MAX_CHARAS
+		; i++) {
 		if (redGoblinBaseModel != -1) {
 			// モデルを複製
 			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
@@ -266,7 +268,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		charainfo[TEST_ENEMY_GOLEM].mode = NONE;
 		MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f)); // 必要ならサイズ調整
 	}
-	
 
 	
 	
@@ -286,28 +287,50 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 
+	/*
+	// MAX_CHARAS ではなく MAX_CHARA に修正し、範囲を厳密にする
+	for (int i = TEST_ENEMY_RED; i < MAX_CHARAS; i++) {
+
+		// 1. キャラクターのモデルが存在しない（-1）場合はスキップ
+		if (charainfo[i].model1 == -1) {
+			continue;
+		}
+
+		// 2. 武器モデルの読み込み
+		WeaponModel[i] = MV1LoadModel("..\\Data\\Weapon\\Sabel\\Sabel.mv1");
+		if (WeaponModel[i] == -1) {
+			printfDx("サーベルのモデル読み込み失敗 (index:%d)\n", i);
+			continue;
+		}
+
+		// 3. 武器をアタッチするフレームの検索
+		WeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "hansocketR");
+		if (WeaponFrame[i] == -1) {
+			printfDx("赤ゴブリン %d のフレームが見つかりません\n", i);
+		}
+	}
+	*/
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		//武器モデル
 		playerWeaponModel[i] = LoadPlayerAssetModel("Sabel.mv1");
 		if (playerWeaponModel[i] == -1) return -1;
 		//武器フレーム
 		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "wp");
+		
 		if (playerWeaponFrame[i] == -1) {
 			printfDx("Player%d frame not found: wp\n", i + 1);
 		}
 		//鞘モデル
-		playerSayaModel[i] = LoadPlayerAssetModel("Saya.mv1");
+		playerSayaModel[i] = LoadPlayerAssetModel("Sabel.mv1");
 		if (playerSayaModel[i] == -1) return -1;
 		//鞘フレーム
 		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
 		if (playerSayaFrame[i] == -1) {
 			printfDx("Player%d frame not found: sayabone\n", i + 1);
 		}
+		
 	}
 	
-
-	
-
 	// ステージ情報の読み込み
 	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage_4545.mv1");
 	if (stagedata == -1) return -1;
@@ -353,8 +376,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (anim_down == -1) return -1;
 	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// 被撃アニメ
 	if (enemy_anim_attack == -1) return -1;
-	enemy_anim_walk = MV1LoadModel("..\\Data\\Goblin\\Anim_Walk.mv1");		// 被撃アニメ
-	if (enemy_anim_walk == -1) return -1;
+	enemy_anim_run = MV1LoadModel("..\\Data\\Goblin\\Anim_Run.mv1");		// 被撃アニメ
+	if (enemy_anim_run == -1) return -1;
 
 	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// 被撃アニメ
 	if (enemy_anim_neutral == -1) return -1;
@@ -466,7 +489,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		// ==========================================
 		// 敵（ゴブリン）のAI・移動・アニメーション処理
 		// ==========================================
-		
+
 		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
 			if (charainfo[i].mode == NONE) continue;
 
@@ -509,19 +532,66 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			dir.y = 0;
 			float dist = VSize(dir);
 
+			// ==========================================
+			// ★【最適化】プレイヤーが一定距離（例: 500.0f）より遠くにいるときは、
+			//   移動・押し出し・攻撃などの重い計算を一切せず、アニメーションと描画だけに留める！
+			// ==========================================
+			float activeRange = 500.0f; // この距離以内に入るとAIが起動する
+			if (dist > activeRange && charainfo[i].mode != ATTACK) {
+				charainfo[i].playtime += 0.2f;
+				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+					charainfo[i].playtime = 0.0f;
+				}
+				if (charainfo[i].attachidx != -1) {
+					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+				}
+				continue; // 🔴ここでこの敵の重い計算処理を強制終了（スキップ）！
+			}
+			// ==========================================
+
 			// ★後ろ向きになる場合はここに DX_PI_F を足して向きを合わせます
 			float angle = atan2f(dir.x, dir.z) + DX_PI_F;
 			MV1SetRotationXYZ(charainfo[i].model1, VGet(0.0f, angle, 0.0f));
-
-			if (charainfo[i].mode == STAND) {
+if (charainfo[i].mode == STAND) {
+				// 1. 150pxより遠いときは、プレイヤーに向かって移動 ＆ 走りアニメーション
 				if (dist > 150.0f) {
 					VECTOR moveDir = VNorm(dir);
 					moveDir.y = 0.0f;
 					charainfo[i].pos = VAdd(charainfo[i].pos, VScale(moveDir, 1.5f));
+
+					// まだ走りアニメーション（仮にアニメーション番号などの管理）でなければ切り替える
+					// ※もし currentAnimType を使っていない場合はこの if 文ごと外してもOKです
+					if (charainfo[i].currentAnimType != 2) { // 2を走り状態と仮定
+						charainfo[i].currentAnimType = 2;
+						charainfo[i].playtime = 0.0f;
+
+						if (charainfo[i].attachidx != -1) {
+							MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						}
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_run); // 走りのアニメーション
+						if (charainfo[i].attachidx != -1) {
+							charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+						}
+					}
+				}
+				else {
+					// 2. 150px以内で止まっているときは、待機（ニュートラル）アニメーションに戻す
+					if (charainfo[i].currentAnimType != 1) { // 1を待機状態と仮定
+						charainfo[i].currentAnimType = 1;
+						charainfo[i].playtime = 0.0f;
+
+						if (charainfo[i].attachidx != -1) {
+							MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						}
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral); // ニュートラル
+						if (charainfo[i].attachidx != -1) {
+							charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+						}
+					}
 				}
 
 				// ==========================================
-				// ★追加：他のゴブリンと密集しすぎたら押し返す処理
+				// ★他のゴブリンと密集しすぎたら押し返す処理
 				// ==========================================
 				for (int j = TEST_ENEMY_INDEX; j < MAX_CHARA; j++) {
 					if (i == j) continue;
@@ -531,17 +601,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					diff.y = 0.0f;
 					float enemyDist = VSize(diff);
 
-					// 判定距離を少し広げる（例: 70.0f）
 					float minDistance = 170.0f;
 					if (enemyDist < minDistance && enemyDist > 0.0001f) {
 						VECTOR pushDir = VNorm(diff);
-						// 押し出す力も少し強めにする（例: 1.5f）
 						charainfo[i].pos = VAdd(charainfo[i].pos, VScale(pushDir, 1.5f));
 					}
 				}
 				// ==========================================
-
-
 
 				MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 
@@ -975,14 +1041,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				cTarget = VAdd(pPos, VGet(300.0f, 150.0f, 0.0f));
 
 				// 斜め上から見下ろす（X:少し横にずらす, Y:高さ, Z:後ろに離す）
-				cPos = VAdd(cTarget, VGet(-200.0f, 450.0f, -900.0f));
+				cPos = VAdd(cTarget, VGet(-200.0f, 200.0f, -600.0f));
 			}
 			else {
 				// 【プレイヤー2用（右画面）】
 				cTarget = VAdd(pPos, VGet(-300.0f, 150.0f, 0.0f));
 
 				// プレイヤー2も同様に反対側の斜め上から見下ろす
-				cPos = VAdd(cTarget, VGet(200.0f, 450.0f, -900.0f));
+				cPos = VAdd(cTarget, VGet(200.0f, 200.0f, -600.0f));
 			}
 
 			// 4. カメラを適用

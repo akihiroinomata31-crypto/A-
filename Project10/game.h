@@ -46,3 +46,4 @@ extern int enemy_anim_attack;
 extern int redGoblinBaseModel;
 extern int red_goblin_anim_neutral;
 extern int red_goblin_anim_attack;
+extern int weaponBaseModel;
