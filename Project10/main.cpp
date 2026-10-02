@@ -174,16 +174,20 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 
+	// ==========================================
+		// 1. 通常ゴブリンのベースモデル読み込みと初期化
+		// ==========================================
 	int baseGoblinModel = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
-
 	enemy_anim_neutral = baseGoblinModel;
+
 	if (baseGoblinModel == -1) {
 		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
+		
 	}
 
-	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+	// ★修正：TEST_ENEMY_INDEX から TEST_ENEMY_RED の手前までだけを通常ゴブリンにする！
+	for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
 		if (baseGoblinModel != -1) {
-			// モデルを複製
 			charainfo[i].model1 = MV1DuplicateModel(baseGoblinModel);
 		}
 		else {
@@ -199,28 +203,31 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1SetVisible(charainfo[i].model1, FALSE);
 		charainfo[i].mode = NONE;
 
-		// ★追加：複製したゴブリンに最初からニュートラルアニメーションをアタッチしておく
 		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
 		if (charainfo[i].attachidx != -1) {
 			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 		}
 
-		charainfo[i].playtime = 0.0f;
+		charainfo[i].playtime = 0.3f;
 	}
 
-	
 
-	int  redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
+	// ==========================================
+	// 2. 赤ゴブリンのベースモデル読み込みと初期化
+	// ==========================================
+	// ★修正：型名(int)を外して、グローバル変数の redGoblinBaseModel に代入する
+	redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
 
-	//red_goblin_anim_neutral = redGoblinBaseModel;
 	if (redGoblinBaseModel == -1) {
-		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
+		printfDx("赤ゴブリンのベースモデル読み込み失敗！\n");
 	}
-	int red_goblin_anim_neutral = 0;
-	for (int i = TEST_ENEMY_RED; i < MAX_CHARAS
-		; i++) {
+
+	// ★修正：型名(int)を外してグローバル変数に代入
+	red_goblin_anim_neutral = redGoblinBaseModel;
+
+	// ★修正：TEST_ENEMY_RED から MAX_CHARA までを赤ゴブリン専用スロットにする
+	for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
 		if (redGoblinBaseModel != -1) {
-			// モデルを複製
 			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
 		}
 		else {
@@ -228,7 +235,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		if (charainfo[i].model1 == -1) {
-			printfDx("ゴブリンのモデル生成失敗！(index:%d)\n", i);
+			printfDx("赤ゴブリンのモデル生成失敗！(index:%d)\n", i);
 			continue;
 		}
 
@@ -236,13 +243,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1SetVisible(charainfo[i].model1, FALSE);
 		charainfo[i].mode = NONE;
 
-		// ★追加：複製したゴブリンに最初からニュートラルアニメーションをアタッチしておく
 		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, red_goblin_anim_neutral);
 		if (charainfo[i].attachidx != -1) {
 			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 		}
 
-		charainfo[i].playtime = 0.0f;
+		charainfo[i].playtime = 0.3f;
 	}
 
 	//モデル読み込み

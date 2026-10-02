@@ -10,7 +10,8 @@ constexpr int PLAYER1_INDEX = 0;
 constexpr int PLAYER2_INDEX = 1;
 constexpr int TEST_ENEMY_INDEX = 2;
 constexpr int TEST_ENEMY_GOLEM = 3;
-constexpr int TEST_ENEMY_RED = 4;
+constexpr int TEST_ENEMY_RED = 500;
+constexpr int MAX_CHARA = 600;
 constexpr float PLAYER_MODEL_SCALE = 1.1f;
 const int MAX_HP = 6;
 // 1êlï™ÇÃì¸óÕê›íËÅB
