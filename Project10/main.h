@@ -89,7 +89,7 @@ struct SCharaInfo
 	bool isHit;
 	int deaths;
 	float anim_time;
-
+	int popups;
 	float anim_total;
 	int weaponModel;  // •Ší‚Ìƒ‚ƒfƒ‹ƒnƒ“ƒhƒ‹
 	int weaponFrame;

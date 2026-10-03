@@ -1,38 +1,46 @@
 ﻿#include "game.h"
 #include "main.h"
 #include "player.h"
+#include <math.h>
+int stagedata = -1;
+int enemy_anim_attack = -1;
+int redGoblinBaseModel = -1;
+int red_goblin_anim_neutral = -1;
+int red_goblin_anim_attack = -1;
+int weaponBaseModel = -1;
 
-int stagedata;
-int enemy_anim_attack;
-int enemy_anim_neutral;
-int red_goblin_anim_neutral;
-int red_goblin_anim_attack;
-int redGoblinSpawnTimer;
-int redGoblinBaseModel;
+void GameManager::Init() {
+    mainTimer = 99 * 60;
+    goblinSpawnTimer = 0;
+    redSpawnTimer = 0;
+    p1Score = 0;
+    p2Score = 0;
+    gameState = 0;
+    deathCount[0] = 0;
+    deathCount[1] = 0;
+
+    for (int i = 0; i < 20; i++) {
+        popups[i].active = false;
+    }
+}
 
 void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
-    if (timeLimit > 0) {
-        timeLimit--;
+    // ==========================================
+    // 1. メイン制限時間タイマー（他から完全に独立）
+    // ==========================================
+    if (mainTimer > 0) {
+        mainTimer--;
     }
     else if (gameState == 0) {
-        if (p1Score > p2Score) {
-            gameState = 1;
-        }
-        else if (p2Score > p1Score) {
-            gameState = 2;
-        }
-        else {
-            gameState = 3;
-        }
+        if (p1Score > p2Score)      gameState = 1;
+        else if (p2Score > p1Score) gameState = 2;
+        else                        gameState = 3;
     }
 
-    int seconds = timeLimit / 150;
 
-    static int totalFrames = 0;
-    totalFrames++;
-    int elapsedSeconds = totalFrames / 60;
-
-    // 生存中の敵の数をカウント
+    // ==========================================
+    // 2. 敵スポーン処理（mainTimer とは無関係に動作）
+    // ==========================================
     int activeEnemyCount = 0;
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
         if (enemyList[i].mode != NONE) {
@@ -40,44 +48,37 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         }
     }
 
-    // タイマーを加算
-    spawnTimer++;
-    redGoblinSpawnTimer++;
+    // 同時生存数の上限（無双向けに35体程度をキープ）
+    const int MAX_FIELD_ENEMIES = 200;
 
-    // 生存上限（25体制限）
-    if (activeEnemyCount < 100) {
+    if (activeEnemyCount < MAX_FIELD_ENEMIES) {
 
-        // ---【通常ゴブリン：2秒ごと（120フレーム）】---
-        if (spawnTimer >= 120) {
-            spawnTimer = 0;
+        // --- 通常ゴブリン：約0.3秒（20フレーム）ごとに小分けスポーン ---
+        goblinSpawnTimer++;
+        if (goblinSpawnTimer >= 280) {
+            goblinSpawnTimer = 0;
 
-            int spawnCount = (elapsedSeconds < 100) ? 2 : 3;
-            for (int i = 0; i < spawnCount; i++) {
-                float centeX = (float)(GetRand(3000) - 1500);
-                float centeZ = (float)(GetRand(3000) - 1500);
-
-                for (int j = 0; j < 3; j++) {
-                    float offsetX = (float)(GetRand(400) - 200);
-                    float offsetZ = (float)(GetRand(400) - 200);
-
-                    ActivateEnemy(enemyList, centeX + offsetX, centeZ + offsetZ);
-                }
+            for (int k = 0; k < 9; k++) {
+                float spawnX = (float)(GetRand(4000) - 2000);
+                float spawnZ = (float)(GetRand(4000) - 2000);
+                ActivateEnemy(enemyList, spawnX, spawnZ);
             }
         }
 
-        if (redGoblinSpawnTimer >= 300) {
-            redGoblinSpawnTimer = 0;
-            printfDx("Red Goblin Spawn Triggered! BaseHandle: %d\n", redGoblinBaseModel);
+        // --- 赤ゴブリン：約3秒（180フレーム）ごとに1体 ---
+        redSpawnTimer++;
+        if (redSpawnTimer >= 500) {
+            redSpawnTimer = 0;
 
             float spawnX = (float)(GetRand(3000) - 1500);
             float spawnZ = (float)(GetRand(3000) - 1500);
-
             ActivateRedGoblin(enemyList, spawnX, spawnZ);
         }
     }
 
-    // 制限時間に応じた特殊ゴーレムの出現
-    if (seconds <= 75 && gameState == 0) {
+    // 特殊ゴーレムの出現条件（残り約50秒以下）
+    int seconds = mainTimer / 60;
+    if (seconds <= 50 && gameState == 0) {
         if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
             enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 30.0f, -150.0f);
             enemyList[TEST_ENEMY_GOLEM].mode = STAND;
@@ -96,31 +97,20 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
             }
         }
     }
-   
 }
 
 void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
-    bool spawned = false;
-
     for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
         if (enemyList[i].mode == NONE) {
-
-            // モデルのチェック
             if (enemyList[i].model1 == -1 && redGoblinBaseModel != -1) {
                 enemyList[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
             }
-
-            if (enemyList[i].model1 == -1) {
-                printfDx("[Red] Model Duplicate Failed! (index:%d)\n", i);
-                continue;
-            }
+            if (enemyList[i].model1 == -1) continue;
 
             enemyList[i].pos = VGet(x, 0.0f, z);
 
-            extern int stagedata;
             VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
             VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
-
             MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
 
             float baseFloorY = 0.0f;
@@ -128,9 +118,7 @@ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
                 baseFloorY = LineRes.HitPosition.y;
             }
 
-            float heightOffset = 600.0f;
-            enemyList[i].pos.y = baseFloorY + heightOffset;
-
+            enemyList[i].pos.y = baseFloorY + 600.0f;
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 5;
             enemyList[i].playtime = 0.0f;
@@ -142,39 +130,22 @@ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
             if (enemyList[i].attachidx != -1) {
                 MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
             }
-
-            // アニメーション設定
-            extern int red_goblin_anim_neutral;
             enemyList[i].attachidx = MV1AttachAnim(enemyList[i].model1, 0, red_goblin_anim_neutral);
             if (enemyList[i].attachidx != -1) {
                 enemyList[i].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[i].model1, enemyList[i].attachidx);
             }
-
-            printfDx("[Red] Successfully Activated! index:%d, Pos:(%.1f, %.1f, %.1f)\n",
-                i, enemyList[i].pos.x, enemyList[i].pos.y, enemyList[i].pos.z);
-
-            spawned = true;
             break;
         }
     }
-
-    if (!spawned) {
-        printfDx("[Red] No Empty Slot! (TEST_ENEMY_RED=%d, MAX_CHARA=%d)\n", TEST_ENEMY_RED, MAX_CHARA);
-    }
 }
 
-// ==========================================
-// 通常ゴブリン生成：TEST_ENEMY_INDEX 〜 TEST_ENEMY_RED 手前のみを使用
-// ==========================================
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
-   for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
+    for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
         if (enemyList[i].mode == NONE) {
             enemyList[i].pos = VGet(x, 0.0f, z);
 
-            extern int stagedata;
             VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
             VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
-
             MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
 
             float baseFloorY = 0.0f;
@@ -182,9 +153,7 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
                 baseFloorY = LineRes.HitPosition.y;
             }
 
-            float heightOffset = 600.0f;
-            enemyList[i].pos.y = baseFloorY + heightOffset;
-
+            enemyList[i].pos.y = baseFloorY + 600.0f;
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 2;
             enemyList[i].playtime = 0.0f;
@@ -215,54 +184,14 @@ void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
 
 void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle) {
     int xOffset = (pIdx == 0) ? 0 : sw / 2;
-    int seconds = timeLimit / 150;
     SetFontSize(20);
-
-    if (pIdx == 0) {
-        unsigned int timerColor;
-        if (seconds <= 10 && (timeLimit / 10) % 2 == 0) {
-            timerColor = GetColor(255, 0, 0);
-        }
-        else if (seconds <= 25) {
-            timerColor = GetColor(255, 0, 0);
-        }
-        else if (seconds <= 45) {
-            timerColor = GetColor(255, 0, 0);
-        }
-        else if (seconds <= 75) {
-            timerColor = GetColor(0, 200, 200);
-        }
-        else {
-            timerColor = GetColor(255, 255, 0);
-        }
-
-        SetDrawArea(0, 0, sw, sh);
-
-        SetFontSize(28);
-        if (seconds > 0) {
-            DrawFormatString(sw / 2 - 48, 22, GetColor(0, 0, 0), "LIMIT : %d", seconds);
-            DrawFormatString(sw / 2 - 50, 20, timerColor, "LIMIT : %d", seconds);
-        }
-        else {
-            DrawString(sw / 2 - 38, 22, "FINISH!", GetColor(0, 0, 0));
-            DrawString(sw / 2 - 40, 20, "FINISH!", GetColor(255, 0, 0));
-        }
-        SetFontSize(20);
-    }
 
     if (gameState != 0) {
         SetFontSize(60);
         int color = GetColor(255, 255, 0);
-
-        if (gameState == 1) {
-            DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
-        }
-        else if (gameState == 2) {
-            DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
-        }
-        else {
-            DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
-        }
+        if (gameState == 1)      DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
+        else if (gameState == 2) DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
+        else                     DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
         SetFontSize(20);
     }
 
@@ -280,9 +209,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     if (hpRate > 1.0f) hpRate = 1.0f;
 
     int innerMargin = 2;
-
     DrawExtendGraph(drawX, drawY, drawX + frameDrawW, drawY + frameDrawH, hpBarTex, TRUE);
-
     DrawBox(drawX + innerMargin, drawY + innerMargin,
         drawX + frameDrawW - innerMargin, drawY + frameDrawH - innerMargin,
         GetColor(200, 0, 0), TRUE);
@@ -291,12 +218,8 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     int currentGreenWidth = (int)(innerMaxWidth * hpRate);
 
     if (currentGreenWidth > 0) {
-        if (hpRate <= 0.3f) {
-            SetDrawBright(255, 100, 100);
-        }
-        else {
-            SetDrawBright(100, 255, 100);
-        }
+        if (hpRate <= 0.3f) SetDrawBright(255, 100, 100);
+        else                SetDrawBright(100, 255, 100);
 
         DrawBox(drawX + innerMargin, drawY + innerMargin,
             drawX + innerMargin + currentGreenWidth, drawY + frameDrawH - innerMargin,
@@ -314,23 +237,106 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
 
     if (p1Score >= 1000 || p2Score >= 1000) {
         int leaderIdx = (p2Score > p1Score) ? 1 : 0;
-
         if (pIdx == leaderIdx) {
             int crownX = xOffset + 220;
             int crownY = drawY + 12;
-
             SetDrawBlendMode(DX_BLENDMODE_ADD, 255);
             DrawRotaGraph(crownX, crownY, 0.3f, 0.0f, crownGraphHandle, TRUE);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
     }
+
+    for (int i = 0; i < 20; i++) {
+        if (popups[i].active && popups[i].playerIdx == pIdx) {
+            int popupBaseX = xOffset + 20 + 180 + 70;
+            int popupBaseY = startY + 30 + 2 - (int)popups[i].offsetY;
+
+            int alpha = 255;
+            if (popups[i].timer < 20) {
+                alpha = (popups[i].timer * 255) / 20;
+            }
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+            SetFontSize(24);
+
+            if (popups[i].score > 0) {
+                DrawFormatString(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+%d", popups[i].score);
+            }
+            else {
+                DrawFormatString(popupBaseX, popupBaseY, GetColor(255, 0, 0), "%d", popups[i].score);
+            }
+
+            SetFontSize(20);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+            popups[i].offsetY += 0.5f;
+            popups[i].timer--;
+            if (popups[i].timer <= 0) {
+                popups[i].active = false;
+            }
+        }
+    }
+}
+
+// ==========================================
+// タイマー専用描画（文字のみ・中央配置）
+// ==========================================
+void GameManager::DrawTimer(int sw, int sh) {
+    // 60fps固定なら 60 で割る
+    int seconds = mainTimer / 120;
+    if (seconds > 200) seconds = 200;
+    if (seconds < 0)  seconds = 0;
+
+    unsigned int timerColor;
+    if (seconds <= 10 && (mainTimer / 15) % 2 == 0) {
+        timerColor = GetColor(255, 50, 50); // 10秒以下で点滅
+    }
+    else if (seconds <= 30) {
+        timerColor = GetColor(255, 80, 80);
+    }
+    else {
+        timerColor = GetColor(255, 255, 0);
+    }
+
+    SetFontSize(24);
+
+    char timerStr[32];
+    if (seconds > 0) {
+        sprintf_s(timerStr, "%02d", seconds);
+    }
+    else {
+        sprintf_s(timerStr, "FINISH!");
+    }
+
+    int textWidth = GetDrawStringWidth(timerStr, (int)strlen(timerStr));
+    int drawX = sw / 2 - textWidth / 2;
+    int drawY = 15;
+
+    // 下地ボックスなし、文字のみ描画
+    DrawString(drawX, drawY, timerStr, timerColor);
+
+    SetFontSize(50);
 }
 
 void GameManager::AddScore(int playerIndex, int score) {
     if (playerIndex == 0) {
         p1Score += score;
+        if (p1Score < 0) p1Score = 0;
     }
     else {
         p2Score += score;
+        if (p2Score < 0) p2Score = 0;
+    }
+}
+
+void GameManager::AddScorePopup(int playerIdx, int score) {
+    for (int i = 0; i < 20; i++) {
+        if (!popups[i].active) {
+            popups[i].score = score;
+            popups[i].playerIdx = playerIdx;
+            popups[i].offsetY = 0.0f;
+            popups[i].timer = 60;
+            popups[i].active = true;
+            break;
+        }
     }
 }

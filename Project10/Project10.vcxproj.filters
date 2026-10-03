@@ -7,6 +7,7 @@
     <ClCompile Include="Mapps.cpp" />
     <ClCompile Include="player.cpp" />
     <ClCompile Include="winer.cpp" />
+    <ClCompile Include="senk.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
@@ -14,5 +15,6 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
     <ClInclude Include="player.h" />
+    <ClInclude Include="senk.h" />
   </ItemGroup>
 </Project>
