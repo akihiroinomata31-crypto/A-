@@ -94,6 +94,7 @@ struct SCharaInfo
 	int weaponModel;  // 武器のモデルハンドル
 	int weaponFrame;
 	int currentAnimType;
+	float dir;
 };
 
 // キャラクターの当たり判定の情

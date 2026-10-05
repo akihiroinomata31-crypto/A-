@@ -7,22 +7,17 @@
 #include "game.h"
 #include "player.h"
 
-
-
-
 namespace {
 
 	int LoadPlayerAssetModel(const char* fileName) {
 		char path[256];
 
-		// 先に新しく置いた Player フォルダを読む。
 		sprintf_s(path, sizeof(path), "..\\Player\\%s", fileName);
 		int handle = MV1LoadModel(path);
 		if (handle != -1) {
 			return handle;
 		}
 
-		// 見つからない場合は、既存の Data\\Player フォルダから読む。
 		sprintf_s(path, sizeof(path), "..\\Data\\Player\\%s", fileName);
 		handle = MV1LoadModel(path);
 		if (handle == -1) {
@@ -34,126 +29,75 @@ namespace {
 
 } // namespace
 
-
-
-
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
-
 	int running = 0;
 	int rootflm;
 	MATRIX wpmatrix[PLAYER_COUNT], sayamatrix[PLAYER_COUNT];
-	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_run, enemy_anim_neutral{};
+	int	anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down;
+	int enemy_anim_attack, enemy_anim_run, enemy_anim_neutral;
 
-	//int redGoblinBaseModel = -1;
-
-	 // ★これがあるか確認！
-//	int red_goblin_anim_neutral;      // ★これがあるか確認！
-	int red_goblin_anim_attack;       // ★これがあるか確認！
-	
+	int redGoblinBaseModel = -1;
+	int red_goblin_anim_neutral = -1;
+	int red_goblin_anim_attack = -1;
 	int red_goblin_anim_walk = -1;
-	//int redGoblinBaseModel;
+
 	int anim_attack[PLAYER_ATTACK_ANIM_COUNT];
-	int		stagedata;
+	int stagedata;
 	int sky;
 	float skyRot = 0;
-	static SCharaInfo charainfo[MAX_CHARA];//キャラクターのメモリ管理を配列で行ってる
+	static SCharaInfo charainfo[MAX_CHARA];
 	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
-	int WeaponModel[TEST_ENEMY_RED], 
-		WeaponFrame[TEST_ENEMY_RED];
 	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
 	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
 	int prevJKey = 0;
 	int isBGMPlaying = 1;
+
+	// ==========================================
+	// 閃光弾エイム用変数
+	// ==========================================
+	bool isAiming[PLAYER_COUNT] = { false, false };
+	bool prevAiming[PLAYER_COUNT] = { false, false };
+	float aimAngle[PLAYER_COUNT] = { 0.0f, 0.0f };
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
-	
+
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
-		// 1P: キーボード(WASD) + 1Pゲームパッド。
 		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_2 },
-		// 2P: キーボード(矢印) + 2Pゲームパッド。
 		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, -1, PAD_INPUT_1, PAD_INPUT_2 }
 	};
 
-
-
-	int enemyCount = 0;          // 現在の敵の数
-//	int spawnTimer = 0;          // 出現までのカウント用
-	const int SPAWN_INTERVAL = 300; // 出現間隔
-
+	const int SPAWN_INTERVAL = 300;
 	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
 
-
 	GameManager game;
-	VECTOR stagepos = VGet(0.0f, 0.0f,1200.0f);
-
-
+	VECTOR stagepos = VGet(0.0f, 0.0f, 1200.0f);
 
 	// ステージコリジョン情報
 	MV1_COLL_RESULT_POLY_DIM HitDim;
 	int WallNum;
-	int FloorNum;										// 床ポリゴンと判断されたポリゴンの数
+	int FloorNum;
 	MV1_COLL_RESULT_POLY* Wall[CHARA_MAX_HITCOLL];
 	MV1_COLL_RESULT_POLY* Floor[CHARA_MAX_HITCOLL];
 	int HitFlag = 0;
-	int timeLimit = 1000; // ゲーム制限時間など（必要であれば適宜設定）
+	int timeLimit = 1000;
 	static int spawnTimer = 0;
-	spawnTimer++; // 毎フレーム加算
+	spawnTimer++;
 	MV1_COLL_RESULT_POLY* Poly;
 	HITRESULT_LINE LineRes;
 
-	// キャラがヒットした床のポリゴン表示の座標
 	VECTOR PolyCharaHitField[3];
-	int grenadeBaseModel = -1; // 読み込んだSenkou.mv1のハンドル
+	int grenadeBaseModel = -1;
 
-	// 空から落ちてくるアイテム
-	struct FieldFlashItem {
-		VECTOR pos;
-		float groundY;
-		float bobbingAngle;
-		bool isFalling;
-		bool active;
-	};
-	FieldFlashItem flashItems[3];
-	for (int i = 0; i < 3; i++) flashItems[i].active = false;
-	int itemDropTimer = 0;
-
-	// 投げられて飛ぶ閃光弾
-	struct ThrownGrenade {
-		VECTOR startPos; // 投げた位置（距離判定用）
-		VECTOR pos;
-		VECTOR vel;
-		int modelHandle;
-		int timer;
-		int ownerIdx;
-		bool isGlowing;  // 一定距離飛んで発光開始したか
-		float glowTimer; // 点滅用
-		bool active;
-	};
-	ThrownGrenade thrownGrenades[4];
-	for (int i = 0; i < 4; i++) {
-		thrownGrenades[i].active = false;
-		thrownGrenades[i].modelHandle = -1;
-	}
-
-	int flashStock[PLAYER_COUNT] = { 0, 0 };      // 各プレイヤーの所持弾数
-	int playerStunTimer[PLAYER_COUNT] = { 0, 0 }; // スタン残り時間（0なら通常
-
-
-	
-
-	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMファイル名
-	char String[256];						// メモリ展開する際に使う文字列
-	int BGMSoundHandle;						// BGMサウンドハンドル
+	char BGM0_FilePath[] = "BGM_stg0.ogg";
+	char String[256];
+	int BGMSoundHandle;
 	int BGMLoopStartPosition = -1;
 	int BGMLoopEndPosition = -1;
 	int hpBarTex = -1;
-	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEファイル名
-	int SEattackHandle, SEjumpHandle, SEdamageHandle;						// BGMサウンドハンドル	
+	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";
+	int SEattackHandle, SEjumpHandle, SEdamageHandle;
 
-
-//キャラ情報
-
-	// 0番を1P、1番を2P、2番をテスト用敵として使う。
+	// キャラ初期化
 	for (int i = 0; i < MAX_CHARA; i++) {
 		charainfo[i].model1 = -1;
 		charainfo[i].attachidx = -1;
@@ -166,58 +110,40 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		charainfo[i].enemyHP = 0;
 		charainfo[i].isHit = false;
 	}
-	// 初期化の場所（GameInit関数など）
+
 	charainfo[0].deaths = 0;
 	charainfo[1].deaths = 0;
 	charainfo[PLAYER1_INDEX].pos = VGet(1300.0f, 800.0f, 100.0f);
 	charainfo[PLAYER2_INDEX].pos = VGet(1300.0f, 800.0f, -400.0f);
-	
+
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].mode = STAND;
-
 		charainfo[i].HP = 6;
 		charainfo[i].charahitinfo.Height = PC_HEIGHT * PLAYER_MODEL_SCALE;
 		charainfo[i].charahitinfo.Width = PC_WIDTH * PLAYER_MODEL_SCALE;
-		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos; // 座標確定後に代入
+		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 	}
 
 	charainfo[TEST_ENEMY_INDEX].mode = STAND;
 	charainfo[TEST_ENEMY_INDEX].enemyHP = 2;
 	charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
 
-	
-	
-
-	//サウンドファイルの読込みストリーミング設定にする
 	SetCreateSoundDataType(DX_SOUNDDATATYPE_FILE);
-
-	// ウインドウモードの切り替え
 	ChangeWindowMode(TRUE);
-
-	// ウインドウサイズの変更
 	SetGraphMode(900, 600, 32);
-	// DXライブラリの初期化
+
 	if (DxLib_Init() == -1) {
-		
 		return -1;
 	}
 
-
-
-
-
-	// ==========================================
-		// 1. 通常ゴブリンのベースモデル読み込みと初期化
-		// ==========================================
+	// 1. 通常ゴブリン読み込み
 	int baseGoblinModel = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
 	enemy_anim_neutral = baseGoblinModel;
 
 	if (baseGoblinModel == -1) {
 		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
-		
 	}
 
-	// ★修正：TEST_ENEMY_INDEX から TEST_ENEMY_RED の手前までだけを通常ゴブリンにする！
 	for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
 		if (baseGoblinModel != -1) {
 			charainfo[i].model1 = MV1DuplicateModel(baseGoblinModel);
@@ -226,12 +152,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			charainfo[i].model1 = -1;
 		}
 
-		if (charainfo[i].model1 == -1) {
-			printfDx("ゴブリンのモデル生成失敗！(index:%d)\n", i);
-			continue;
-		}
+		if (charainfo[i].model1 == -1) continue;
 
-		// 最初は非表示
 		MV1SetVisible(charainfo[i].model1, FALSE);
 		charainfo[i].mode = NONE;
 
@@ -239,25 +161,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		if (charainfo[i].attachidx != -1) {
 			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 		}
-
 		charainfo[i].playtime = 0.3f;
 	}
 
-
-	// ==========================================
-	// 2. 赤ゴブリンのベースモデル読み込みと初期化
-	// ==========================================
-	// ★修正：型名(int)を外して、グローバル変数の redGoblinBaseModel に代入する
+	// 2. 赤ゴブリン読み込み
 	redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
+	red_goblin_anim_neutral = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Neutral.mv1");
+	red_goblin_anim_walk = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Walk.mv1");
+	red_goblin_anim_attack = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Attack1.mv1");
 
-	if (redGoblinBaseModel == -1) {
-		printfDx("赤ゴブリンのベースモデル読み込み失敗！\n");
-	}
-
-	// ★修正：型名(int)を外してグローバル変数に代入
-	red_goblin_anim_neutral = redGoblinBaseModel;
-
-	// ★修正：TEST_ENEMY_RED から MAX_CHARA までを赤ゴブリン専用スロットにする
 	for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
 		if (redGoblinBaseModel != -1) {
 			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
@@ -266,12 +178,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			charainfo[i].model1 = -1;
 		}
 
-		if (charainfo[i].model1 == -1) {
-			printfDx("赤ゴブリンのモデル生成失敗！(index:%d)\n", i);
-			continue;
-		}
+		if (charainfo[i].model1 == -1) continue;
 
-		// 最初は非表示
 		MV1SetVisible(charainfo[i].model1, FALSE);
 		charainfo[i].mode = NONE;
 
@@ -279,44 +187,29 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		if (charainfo[i].attachidx != -1) {
 			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 		}
-
 		charainfo[i].playtime = 0.3f;
 	}
 
-	//モデル読み込み
+	// プレイヤーモデル読み込み
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].model1 = LoadPlayerAssetModel("PC.mv1");
-		if (charainfo[i].model1 == -1) {
-			printfDx("プレイヤー%dのモデル読み込み失敗！\n", i + 1);
-			return -1;
-		}
+		if (charainfo[i].model1 == -1) return -1;
 		MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 		MV1SetScale(charainfo[i].model1, VGet(PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE));
 	}
-	// 2P は仮で少し青くして、同じモデルでも見分けやすくする。
 	MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
 
 	charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Golem.mv1");
-	if (charainfo[TEST_ENEMY_GOLEM].model1 == -1) {
-		printfDx("ゴーレムのモデル読み込み失敗！\n");
-	}
-	else {
-		// 最初は非表示にしておく
+	if (charainfo[TEST_ENEMY_GOLEM].model1 != -1) {
 		MV1SetVisible(charainfo[TEST_ENEMY_GOLEM].model1, FALSE);
 		charainfo[TEST_ENEMY_GOLEM].mode = NONE;
-		MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f)); // 必要ならサイズ調整
+		MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f));
 	}
 
-	
-	
-	//ルートフレーム
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		rootflm = MV1SearchFrame(charainfo[i].model1, "root");
 		if (rootflm != -1) {
 			MV1SetFrameUserLocalMatrix(charainfo[i].model1, rootflm, MGetIdent());
-		}
-		else {
-			printfDx("Player%d frame not found: root\n", i + 1);
 		}
 	}
 	rootflm = MV1SearchFrame(charainfo[TEST_ENEMY_INDEX].model1, "root");
@@ -324,134 +217,105 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1SetFrameUserLocalMatrix(charainfo[TEST_ENEMY_INDEX].model1, rootflm, MGetIdent());
 	}
 
-
-	/*
-	// MAX_CHARAS ではなく MAX_CHARA に修正し、範囲を厳密にする
-	for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
-
-		// 1. キャラクターのモデルが存在しない（-1）場合はスキップ
-		if (charainfo[i].model1 == -1) {
-			continue;
-		}
-
-		// 2. 武器モデルの読み込み
-		WeaponModel[i] = MV1LoadModel("..\\Data\\Weapon\\Sabel\\Sabel.mv1");
-		if (WeaponModel[i] == -1) {
-			printfDx("サーベルのモデル読み込み失敗 (index:%d)\n", i);
-			continue;
-		}
-
-		// 3. 武器をアタッチするフレームの検索
-		WeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "hansocketR");
-		if (WeaponFrame[i] == -1) {
-			printfDx("赤ゴブリン %d のフレームが見つかりません\n", i);dw
-		}
-	}
-	*/
 	for (int i = 0; i < PLAYER_COUNT; i++) {
-		//武器モデル
 		playerWeaponModel[i] = LoadPlayerAssetModel("Sabel.mv1");
 		if (playerWeaponModel[i] == -1) return -1;
-		//武器フレーム
 		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "wp");
-		
-		if (playerWeaponFrame[i] == -1) {
-			printfDx("Player%d frame not found: wp\n", i + 1);
-		}
-		//鞘モデル
+
 		playerSayaModel[i] = LoadPlayerAssetModel("Sabel.mv1");
 		if (playerSayaModel[i] == -1) return -1;
-		//鞘フレーム
 		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
-		if (playerSayaFrame[i] == -1) {
-			printfDx("Player%d frame not found: sayabone\n", i + 1);
-		}
-		
 	}
-	
-	// ステージ情報の読み込み
+
+	// ステージ背面カリング有効化（描画負荷削減）
 	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage_4545.mv1");
 	if (stagedata == -1) return -1;
 	MV1SetPosition(stagedata, stagepos);
 	int meshNum = MV1GetMeshNum(stagedata);
-	for (int i = 0; i < meshNum; i++)
-	{
-		MV1SetMeshBackCulling(stagedata, i, FALSE);
+	for (int i = 0; i < meshNum; i++) {
+		MV1SetMeshBackCulling(stagedata, i, TRUE);
 	}
 	sky = MV1LoadModel("..\\Data\\Stage\\Sage_1214.mv1");
 	if (sky == -1) return -1;
 	MV1SetPosition(sky, VGet(0, -1000, 0));
 
-	// モデル全体のコリジョン情報のセットアップ
 	MV1SetupCollInfo(stagedata, -1);
-
-	int MeshNum;
-
-	// モデルに含まれるメッシュの数を取得する
-	MeshNum = MV1GetMeshNum(stagedata);
 	SetTransColor(0, 0, 0);
 
 	// ==========================================
-	// 閃光弾モデル（Senkou.mv1）の読み込み
+	// 閃光弾モデルと構造体
 	// ==========================================
-	
 	if (grenadeBaseModel == -1) {
 		grenadeBaseModel = MV1LoadModel("..\\Data\\Weapon\\Senkou.mv1");
 	}
-	
-
 	if (grenadeBaseModel != -1) {
-		MV1SetVisible(grenadeBaseModel, FALSE); // 複製元なので普段は非表示
+		MV1SetVisible(grenadeBaseModel, FALSE);
 	}
-	else {
-		printfDx("閃光弾モデル(Senkou.mv1)の読み込みに失敗しました！\n");
+
+	struct ThrownFlashbang {
+		int model;
+		VECTOR pos;
+		VECTOR move;
+		int timer;
+		bool active;
+		int ownerIndex; // 投げたプレイヤー（0:1P, 1:2P）
+	};
+
+	const int MAX_THROWN_FLASH = 2;
+	ThrownFlashbang thrownFlashes[MAX_THROWN_FLASH];
+	for (int f = 0; f < MAX_THROWN_FLASH; f++) {
+		thrownFlashes[f].active = false;
+		thrownFlashes[f].ownerIndex = -1;
+		thrownFlashes[f].model = (grenadeBaseModel != -1) ? MV1DuplicateModel(grenadeBaseModel) : -1;
+		if (thrownFlashes[f].model != -1) {
+			MV1SetVisible(thrownFlashes[f].model, FALSE);
+			MV1SetScale(thrownFlashes[f].model, VGet(1.0f, 1.0f, 1.0f));
+		}
 	}
+
+	int flashStock[PLAYER_COUNT] = { 1, 1 };
+	int playerWhiteoutTimer[PLAYER_COUNT] = { 0, 0 };
+
+	struct FlashDropItem {
+		int model;
+		VECTOR pos;
+		float basePosY;
+		float bobAngle;
+		bool active;
+	};
+
+	FlashDropItem dropFlashItem;
+	dropFlashItem.active = false;
+	dropFlashItem.basePosY = 800.0f;
+	dropFlashItem.bobAngle = 0.0f;
+	dropFlashItem.model = (grenadeBaseModel != -1) ? MV1DuplicateModel(grenadeBaseModel) : -1;
+	if (dropFlashItem.model != -1) {
+		MV1SetVisible(dropFlashItem.model, FALSE);
+		MV1SetScale(dropFlashItem.model, VGet(1.3f, 1.3f, 1.3f));
+	}
+
+	int flashSpawnTimer = 0;
+	const int FLASH_SPAWN_INTERVAL = 60 * 18;
 
 	int crownGraphHandle = LoadGraph("..\\Data\\UI\\win.png");
 
 	anim_neutral = LoadPlayerAssetModel("Anim_Neutral.mv1");
-	if (anim_neutral == -1) return -1;
 	anim_run = LoadPlayerAssetModel("Anim_Run.mv1");
-	if (anim_run == -1) return -1;
 	anim_jumpin = LoadPlayerAssetModel("Anim_Jump_In.mv1");
-	if (anim_jumpin == -1) return -1;
 	anim_jumploop = LoadPlayerAssetModel("Anim_Jump_Loop.mv1");
-	if (anim_jumploop == -1) return -1;
 	anim_jumpout = LoadPlayerAssetModel("Anim_Jump_Out.mv1");
-	if (anim_jumpout == -1) return -1;
 	anim_attack[0] = LoadPlayerAssetModel("Anim_Attack1.mv1");
-	if (anim_attack[0] == -1) return -1;
 	anim_attack[1] = LoadPlayerAssetModel("Anim_Attack2.mv1");
-	if (anim_attack[1] == -1) return -1;
 	anim_attack[2] = LoadPlayerAssetModel("Anim_Attack3.mv1");
-	if (anim_attack[2] == -1) return -1;
 	anim_damage = LoadPlayerAssetModel("Anim_Damage.mv1");
-	if (anim_damage == -1) return -1;
 	anim_down = LoadPlayerAssetModel("Anim_Down_Loop.mv1");
-	if (anim_down == -1) return -1;
-	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// 被撃アニメ
-	if (enemy_anim_attack == -1) return -1;
-	enemy_anim_run = MV1LoadModel("..\\Data\\Goblin\\Anim_Run.mv1");		// 被撃アニメ
-	if (enemy_anim_run == -1) return -1;
-
-	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// 被撃アニメ
-	if (enemy_anim_neutral == -1) return -1;
+	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");
+	enemy_anim_run = MV1LoadModel("..\\Data\\Goblin\\Anim_Run.mv1");
+	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");
 	game.enemy_anim_neutral = enemy_anim_neutral;
-	
+
 	SetTransColor(255, 255, 255);
-	hpBarTex = LoadGraph("..\\Data\\UI\\Hpbar023.png"); // ※実際のファイルパスに合わせて調整してください
-
-	if (hpBarTex == -1) {
-		// 読み込みに失敗した場合のエラー処理（必要に応じて）
-		printfDx("HPバーの画像読み込み失敗！\n");
-	}
-
-
-	 redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
-	 red_goblin_anim_neutral = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Neutral.mv1");
-	 red_goblin_anim_walk = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Walk.mv1");
-	 red_goblin_anim_attack = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Attack1.mv1");
-
+	hpBarTex = LoadGraph("..\\Data\\UI\\Hpbar023.png");
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
@@ -460,80 +324,49 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, enemy_anim_neutral);
 	charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
 
-
 	SetDrawScreen(DX_SCREEN_BACK);
-	//カメラの初期化
-	//SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
 
-	// ＢＧＭ用のサウンドファイルを読み込む
+	// カメラの初期画角設定
+	SetupCamera_Perspective(60.0f * DX_PI_F / 180.0f);
+
+	// サウンド
 	sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
 	BGMSoundHandle = LoadSoundMem(String);
-	// 読み込みに失敗したらエラー
-	if (BGMSoundHandle == -1) {
-		return false;
+	if (BGMSoundHandle != -1) {
+		PlaySoundMem(BGMSoundHandle, BGMLoopStartPosition >= 0 ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK);
 	}
-	// 有効なループポイントがある場合はループ再生する
-	PlaySoundMem(BGMSoundHandle,
-		BGMLoopStartPosition >= 0 ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK);
 
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Weapon\\Sword\\%s", SEattack_FilePath);
-
 	SEattackHandle = LoadSoundMem(String);
-	// 読み込みに失敗したらエラー
-	if (SEattackHandle == -1) {
-		return false;
-	}
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEdamage_FilePath);
 	SEdamageHandle = LoadSoundMem(String);
-	// 読み込みに失敗したらエラー
-	if (SEdamageHandle == -1) {
-		return false;
-	}
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEjump_FilePath);
 	SEjumpHandle = LoadSoundMem(String);
-	// 読み込みに失敗したらエラー
-	if (SEjumpHandle == -1) {
-		return false;
-	}
 
+	// ==========================================
+	// メインループ
+	// ==========================================
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
-
-
 
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
-
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// 1P/2P の再生時間と待機復帰を共通処理する。
 			UpdatePlayerAnimationProgress(charainfo[i], playerStates[i], anim_neutral);
 		}
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// HPが0以下で、まだDOWNMODEになっていない場合
 			if (charainfo[i].HP <= 0 && charainfo[i].mode != DOWNMODE) {
 				game.AddScore(i, -500);
-				// 状態をDOWNMODEへ
 				charainfo[i].mode = DOWNMODE;
-
-				// 死亡アニメーション処理など
 				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
 				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
 				charainfo[i].playtime = 0.0f;
-
-				// ★ここでカウントする
 				game.AddDeath(i);
 			}
 		}
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// 死亡状態(DOWNMODE)で、ジャンプボタン（1P:SPACE, 2P:RETURN）が押されたら
 			if (charainfo[i].mode == DOWNMODE && CheckHitKey(playerInputs[i].jumpKey) == 1) {
-
-				// 1. HPを回復
 				charainfo[i].HP = 6;
-
-				// 2. モードを STAND に戻す
 				charainfo[i].mode = STAND;
-
-				// 3. アニメーションを通常に戻す
 				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
 				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
 				charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
@@ -542,25 +375,194 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		// ==========================================
-		// 敵（ゴブリン）のAI・移動・アニメーション処理
+		// 閃光弾：エイム操作 ＆ リリース投擲
 		// ==========================================
+		for (int p = 0; p < PLAYER_COUNT; p++) {
+			bool currentAimInput = false;
+			if (p == 0) {
+				currentAimInput = (CheckHitKey(KEY_INPUT_E) == 1) || (playerStates[p].key & PAD_INPUT_5);
+			}
+			else {
+				currentAimInput = (CheckHitKey(KEY_INPUT_RSHIFT) == 1) || (playerStates[p].key & PAD_INPUT_5);
+			}
 
+			if (flashStock[p] > 0 && charainfo[p].mode != DAMAGE && charainfo[p].mode != DOWNMODE) {
+				if (currentAimInput && !prevAiming[p]) {
+					isAiming[p] = true;
+					aimAngle[p] = charainfo[p].dir;
+				}
+				else if (currentAimInput && isAiming[p]) {
+					if (p == 0) {
+						if (CheckHitKey(KEY_INPUT_A)) aimAngle[p] -= 0.05f;
+						if (CheckHitKey(KEY_INPUT_D)) aimAngle[p] += 0.05f;
+					}
+					else {
+						if (CheckHitKey(KEY_INPUT_LEFT))  aimAngle[p] -= 0.05f;
+						if (CheckHitKey(KEY_INPUT_RIGHT)) aimAngle[p] += 0.05f;
+					}
+
+					int inputX = 0, inputY = 0;
+					GetJoypadAnalogInput(&inputX, &inputY, (p == 0) ? DX_INPUT_PAD1 : DX_INPUT_PAD2);
+					if (abs(inputX) > 300) {
+						aimAngle[p] += (inputX / 1000.0f) * 0.05f;
+					}
+
+					charainfo[p].dir = aimAngle[p];
+					MV1SetRotationXYZ(charainfo[p].model1, VGet(0.0f, aimAngle[p] + DX_PI_F, 0.0f));
+					charainfo[p].move.x = 0.0f;
+					charainfo[p].move.z = 0.0f;
+				}
+				else if (!currentAimInput && prevAiming[p] && isAiming[p]) {
+					isAiming[p] = false;
+
+					for (int f = 0; f < MAX_THROWN_FLASH; f++) {
+						if (!thrownFlashes[f].active && thrownFlashes[f].model != -1) {
+							thrownFlashes[f].active = true;
+							thrownFlashes[f].timer = 75;
+							thrownFlashes[f].ownerIndex = p; // 投げた本人を記録
+							flashStock[p]--;
+
+							thrownFlashes[f].pos = VAdd(charainfo[p].pos, VGet(0.0f, 70.0f, 0.0f));
+
+							float speed = 15.0f;
+							thrownFlashes[f].move = VGet(sinf(aimAngle[p]) * speed, 8.5f, cosf(aimAngle[p]) * speed);
+
+							MV1SetVisible(thrownFlashes[f].model, TRUE);
+							break;
+						}
+					}
+				}
+			}
+			else {
+				isAiming[p] = false;
+			}
+
+			prevAiming[p] = currentAimInput;
+		}
+
+		// ==========================================
+		// アイテムの出現＆回収処理
+		// ==========================================
+		if (!dropFlashItem.active) {
+			flashSpawnTimer++;
+			if (flashSpawnTimer >= FLASH_SPAWN_INTERVAL) {
+				flashSpawnTimer = 0;
+				dropFlashItem.active = true;
+				dropFlashItem.pos = VGet(1300.0f + (float)(GetRand(600) - 300), dropFlashItem.basePosY + 40.0f, -150.0f + (float)(GetRand(600) - 300));
+				if (dropFlashItem.model != -1) {
+					MV1SetVisible(dropFlashItem.model, TRUE);
+				}
+			}
+		}
+		else {
+			dropFlashItem.bobAngle += 0.05f;
+			float currentY = dropFlashItem.basePosY + 40.0f + sinf(dropFlashItem.bobAngle) * 15.0f;
+
+			MV1SetPosition(dropFlashItem.model, VGet(dropFlashItem.pos.x, currentY, dropFlashItem.pos.z));
+			MV1SetRotationXYZ(dropFlashItem.model, VGet(0.0f, dropFlashItem.bobAngle, 0.0f));
+
+			const float PICKUP_RANGE_SQ = 130.0f * 130.0f;
+			for (int p = 0; p < PLAYER_COUNT; p++) {
+				if (charainfo[p].mode == DOWNMODE) continue;
+
+				float dx = charainfo[p].pos.x - dropFlashItem.pos.x;
+				float dy = charainfo[p].pos.y - currentY;
+				float dz = charainfo[p].pos.z - dropFlashItem.pos.z;
+
+				if (dx * dx + dy * dy + dz * dz < PICKUP_RANGE_SQ) {
+					flashStock[p]++;
+					dropFlashItem.active = false;
+					if (dropFlashItem.model != -1) {
+						MV1SetVisible(dropFlashItem.model, FALSE);
+					}
+					break;
+				}
+			}
+		}
+
+		// ==========================================
+		// 閃光弾の物理挙動 ＆ 炸裂処理（高速版）
+		// ==========================================
+		for (int f = 0; f < MAX_THROWN_FLASH; f++) {
+			if (!thrownFlashes[f].active) continue;
+
+			thrownFlashes[f].pos.x += thrownFlashes[f].move.x;
+			thrownFlashes[f].pos.y += thrownFlashes[f].move.y;
+			thrownFlashes[f].pos.z += thrownFlashes[f].move.z;
+			thrownFlashes[f].move.y -= 0.45f;
+
+			if (thrownFlashes[f].pos.y <= 800.0f) {
+				thrownFlashes[f].pos.y = 800.0f;
+				thrownFlashes[f].move.y = -thrownFlashes[f].move.y * 0.3f;
+				thrownFlashes[f].move.x *= 0.6f;
+				thrownFlashes[f].move.z *= 0.6f;
+			}
+
+			MV1SetPosition(thrownFlashes[f].model, thrownFlashes[f].pos);
+
+			thrownFlashes[f].timer--;
+			if (thrownFlashes[f].timer <= 0) {
+				thrownFlashes[f].active = false;
+				MV1SetVisible(thrownFlashes[f].model, FALSE);
+
+				const float FLASH_RANGE_SQ = 450.0f * 450.0f;
+
+				// ① 敵AIのスタン
+				for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+					if (charainfo[i].mode == NONE) continue;
+					float edx = charainfo[i].pos.x - thrownFlashes[f].pos.x;
+					float edz = charainfo[i].pos.z - thrownFlashes[f].pos.z;
+					if (edx * edx + edz * edz < FLASH_RANGE_SQ) {
+						charainfo[i].mode = DAMAGE;
+						charainfo[i].playtime = 0.0f;
+					}
+				}
+
+				// ② 相手プレイヤーの直視判定（投げた本人は食らわない）
+				for (int p = 0; p < PLAYER_COUNT; p++) {
+					if (charainfo[p].mode == DOWNMODE) continue;
+					if (p == thrownFlashes[f].ownerIndex) continue; // 投げた本人は無効化
+
+					float toX = thrownFlashes[f].pos.x - charainfo[p].pos.x;
+					float toZ = thrownFlashes[f].pos.z - charainfo[p].pos.z;
+					float pDistSq = toX * toX + toZ * toZ;
+
+					if (pDistSq < FLASH_RANGE_SQ) {
+						float fwdX = sinf(charainfo[p].dir);
+						float fwdZ = cosf(charainfo[p].dir);
+						float dot = fwdX * toX + fwdZ * toZ;
+
+						// dot > 0 で直視判定
+						if (dot > 0.0f) {
+							charainfo[p].mode = DAMAGE;
+							charainfo[p].playtime = 0.0f;
+							MV1DetachAnim(charainfo[p].model1, charainfo[p].attachidx);
+							charainfo[p].attachidx = MV1AttachAnim(charainfo[p].model1, 0, anim_damage);
+							charainfo[p].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[p].model1, charainfo[p].attachidx);
+							playerWhiteoutTimer[p] = 120;
+						}
+						else {
+							playerWhiteoutTimer[p] = 20;
+						}
+					}
+				}
+			}
+		}
+
+		// 敵AI処理
 		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
 			if (charainfo[i].mode == NONE) continue;
 
-			// ゴブリンの種類に応じたアニメーションハンドルの判定
 			bool isRed = (i >= TEST_ENEMY_RED);
 			int animNeutral = isRed ? red_goblin_anim_neutral : enemy_anim_neutral;
 			int animAttack = isRed ? red_goblin_anim_attack : enemy_anim_attack;
 
-			// もしダメージ（被弾）中の場合
 			if (charainfo[i].mode == DAMAGE) {
-				// 被弾モーションを最後まで再生したら STAND に戻す
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].mode = STAND;
 					charainfo[i].playtime = 0.0f;
 					charainfo[i].isHit = false;
-					charainfo[i].currentAnimType = 1; // 待機状態へ
+					charainfo[i].currentAnimType = 1;
 
 					if (charainfo[i].attachidx != -1) {
 						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
@@ -571,34 +573,29 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					}
 				}
 
-				// アニメーション時間を進める
 				charainfo[i].playtime += 0.2f;
 				if (charainfo[i].attachidx != -1) {
 					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
 				}
-
-				continue; // ダメージ中はスキップ
+				continue;
 			}
 
-			// 1. プレイヤーとの距離を測り、近い方をターゲットにする
-			int enemyTargetIndex = PLAYER1_INDEX;
-			float enemyDistP1 = VSize(VSub(charainfo[PLAYER1_INDEX].pos, charainfo[i].pos));
-			float enemyDistP2 = VSize(VSub(charainfo[PLAYER2_INDEX].pos, charainfo[i].pos));
-			if (enemyDistP2 < enemyDistP1) {
-				enemyTargetIndex = PLAYER2_INDEX;
-			}
+			float dx1 = charainfo[PLAYER1_INDEX].pos.x - charainfo[i].pos.x;
+			float dz1 = charainfo[PLAYER1_INDEX].pos.z - charainfo[i].pos.z;
+			float distSqP1 = dx1 * dx1 + dz1 * dz1;
+
+			float dx2 = charainfo[PLAYER2_INDEX].pos.x - charainfo[i].pos.x;
+			float dz2 = charainfo[PLAYER2_INDEX].pos.z - charainfo[i].pos.z;
+			float distSqP2 = dx2 * dx2 + dz2 * dz2;
+
+			int enemyTargetIndex = (distSqP2 < distSqP1) ? PLAYER2_INDEX : PLAYER1_INDEX;
+			float targetDistSq = (distSqP2 < distSqP1) ? distSqP2 : distSqP1;
 
 			VECTOR dir = VSub(charainfo[enemyTargetIndex].pos, charainfo[i].pos);
 			dir.y = 0;
-			float dist = VSize(dir);
 
-			// ==========================================
-			// ★【修正1：遠距離の敵の停止処理】
-			// プレイヤーから遠い敵は移動・追尾をせず、待機（Idle）にして走らせない
-			// ==========================================
-			float activeRange = 600.0f; // 索敵・起動範囲
-			if (dist > activeRange && charainfo[i].mode != ATTACK) {
-				// 走り状態のままになっていたら、待機モーションに切り替える
+			const float activeRangeSq = 300.0f * 300.0f;
+			if (targetDistSq > activeRangeSq && charainfo[i].mode != ATTACK) {
 				if (charainfo[i].currentAnimType != 1) {
 					charainfo[i].currentAnimType = 1;
 					charainfo[i].playtime = 0.0f;
@@ -611,7 +608,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					}
 				}
 
-				// 待機モーションを再生してスキップ
 				charainfo[i].playtime += 0.2f;
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].playtime = 0.0f;
@@ -621,24 +617,18 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				}
 				continue;
 			}
-			// ==========================================
 
-			// 向きを合わせる
 			float angle = atan2f(dir.x, dir.z) + DX_PI_F;
 			MV1SetRotationXYZ(charainfo[i].model1, VGet(0.0f, angle, 0.0f));
 
-			// ==========================================
-			// 状態ごとの処理（STAND：追尾・待機 ／ ATTACK：攻撃中）
-			// ==========================================
-			if (charainfo[i].mode == STAND) {
-				const float attackRange = 140.0f; // 攻撃へ入る射程
+			const float attackRangeSq = 140.0f * 140.0f;
 
-				if (dist <= attackRange) {
-					// ---【攻撃への遷移】---
+			if (charainfo[i].mode == STAND) {
+				if (targetDistSq <= attackRangeSq) {
 					charainfo[i].mode = ATTACK;
 					charainfo[i].playtime = 0.0f;
 					charainfo[i].isHit = false;
-					charainfo[i].currentAnimType = 3; // 攻撃
+					charainfo[i].currentAnimType = 3;
 
 					if (charainfo[i].attachidx != -1) {
 						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
@@ -649,12 +639,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					}
 				}
 				else {
-					// ---【接近移動 ＆ 走りモーション】---
-					VECTOR moveDir = VNorm(dir);
-					moveDir.y = 0.0f;
-					charainfo[i].pos = VAdd(charainfo[i].pos, VScale(moveDir, 1.8f));
+					float realDist = sqrtf(targetDistSq);
+					if (realDist > 0.001f) {
+						VECTOR moveDir = VGet(dir.x / realDist, 0.0f, dir.z / realDist);
+						charainfo[i].pos = VAdd(charainfo[i].pos, VScale(moveDir, 1.8f));
+					}
 
-					// 走りに切り替え（まだ走っていなければ一度だけアタッチ）
 					if (charainfo[i].currentAnimType != 2) {
 						charainfo[i].currentAnimType = 2;
 						charainfo[i].playtime = 0.0f;
@@ -662,34 +652,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 						if (charainfo[i].attachidx != -1) {
 							MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
 						}
-						// ※もし走り専用モデルがない場合は animNeutral や指定の番号を使用
 						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_run);
 						if (charainfo[i].attachidx != -1) {
 							charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
 						}
 					}
-
-					// 密集押し出し処理（移動中のみ押し合う）
-					for (int j = TEST_ENEMY_INDEX; j < MAX_CHARA; j++) {
-						if (i == j) continue;
-						if (charainfo[j].mode == NONE) continue;
-
-						VECTOR diff = VSub(charainfo[i].pos, charainfo[j].pos);
-						diff.y = 0.0f;
-						float enemyDist = VSize(diff);
-
-						float minDistance = 120.0f;
-						if (enemyDist < minDistance && enemyDist > 0.0001f) {
-							VECTOR pushDir = VNorm(diff);
-							charainfo[i].pos = VAdd(charainfo[i].pos, VScale(pushDir, 1.0f));
-						}
-					}
 				}
-
-				MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 			}
 			else if (charainfo[i].mode == ATTACK) {
-				// ---【攻撃判定】---
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime * 0.2f &&
 					charainfo[i].playtime <= charainfo[i].anim_totaltime * 0.6f)
 				{
@@ -703,19 +673,17 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 							{
 								charainfo[p].HP -= 1;
 								charainfo[i].isHit = true;
-								printfDx("プレイヤー%dがゴブリンの攻撃を受けた！ HP:%d\n", p + 1, charainfo[p].HP);
 								break;
 							}
 						}
 					}
 				}
 
-				// ---【攻撃アニメーション終了後のリセット】---
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].mode = STAND;
 					charainfo[i].playtime = 0.0f;
 					charainfo[i].isHit = false;
-					charainfo[i].currentAnimType = 1; // 待機へ
+					charainfo[i].currentAnimType = 1;
 
 					if (charainfo[i].attachidx != -1) {
 						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
@@ -727,10 +695,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				}
 			}
 
-			// ---【共通アニメーション再生処理】---
 			charainfo[i].playtime += 0.2f;
-
-			// STAND（走り・待機）のときはループさせる
 			if (charainfo[i].mode == STAND) {
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].playtime = 0.0f;
@@ -742,108 +707,51 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 		}
 
+		// 敵押し合い処理（2フレームに1回）
+		static int pushFrameCount = 0;
+		pushFrameCount++;
 
+		if (pushFrameCount % 2 == 0)
+		{
+			const float minDistance = 120.0f;
+			const float minDistanceSq = minDistance * minDistance;
 
-		// ==========================================
-		// 閃光弾アイテムの定期投下 ＆ 浮遊・回収処理
-		// ==========================================
-		itemDropTimer++;
-		if (itemDropTimer >= 360) { // 約6秒ごとに1個上空から降ってくる
-			itemDropTimer = 0;
-			for (int i = 0; i < 3; i++) {
-				if (!flashItems[i].active) {
-					flashItems[i].active = true;
-					flashItems[i].isFalling = true;
-					flashItems[i].bobbingAngle = 0.0f;
+			for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+				if (charainfo[i].mode != STAND || charainfo[i].currentAnimType != 2) continue;
 
-					float rx = (float)(GetRand(2400) - 1200);
-					float rz = (float)(GetRand(2400) - 1200);
+				for (int j = i + 1; j < MAX_CHARA; j++) {
+					if (charainfo[j].mode != STAND) continue;
 
-					// 地面の高さを取得
-					VECTOR c1 = VGet(rx, 2000.0f, rz);
-					VECTOR c2 = VGet(rx, -1000.0f, rz);
-					MV1_COLL_RESULT_POLY hit = MV1CollCheck_Line(stagedata, -1, c1, c2);
-					float gy = (hit.HitFlag == 1) ? hit.HitPosition.y : 0.0f;
+					float diffX = charainfo[i].pos.x - charainfo[j].pos.x;
+					float diffZ = charainfo[i].pos.z - charainfo[j].pos.z;
+					float distSq = diffX * diffX + diffZ * diffZ;
 
-					flashItems[i].groundY = gy + 35.0f; // 地面から少し浮かす
-					flashItems[i].pos = VGet(rx, gy + 800.0f, rz); // 上空800から落下
-					break;
+					if (distSq < minDistanceSq && distSq > 0.001f) {
+						float actualDist = sqrtf(distSq);
+						float pushDist = (minDistance - actualDist) * 0.5f;
+
+						float pushX = (diffX / actualDist) * pushDist;
+						float pushZ = (diffZ / actualDist) * pushDist;
+
+						charainfo[i].pos.x += pushX;
+						charainfo[i].pos.z += pushZ;
+						charainfo[j].pos.x -= pushX;
+						charainfo[j].pos.z -= pushZ;
+					}
 				}
+
+				MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 			}
 		}
 
-		// アイテムの落下・浮遊・回収判定
-		for (int i = 0; i < 3; i++) {
-			if (!flashItems[i].active) continue;
-
-			if (flashItems[i].isFalling) {
-				flashItems[i].pos.y -= 7.0f;
-				if (flashItems[i].pos.y <= flashItems[i].groundY) {
-					flashItems[i].pos.y = flashItems[i].groundY;
-					flashItems[i].isFalling = false;
-				}
-			}
-			else {
-				flashItems[i].bobbingAngle += 0.05f;
-				flashItems[i].pos.y = flashItems[i].groundY + sinf(flashItems[i].bobbingAngle) * 12.0f;
-			}
-
-			// プレイヤーが近づいたら回収（接触距離 90px）
-			for (int p = 0; p < PLAYER_COUNT; p++) {
-				if (charainfo[p].mode == DOWNMODE) continue;
-				float dist = VSize(VSub(charainfo[p].pos, flashItems[i].pos));
-				if (dist < 90.0f) {
-					flashStock[p]++;
-					flashItems[i].active = false;
-					game.AddScorePopup(p, 0); // 拾った合図
-					break;
-				}
-			}
-		}
-
-		// ==========================================
-			// 閃光弾アイテムの定期投下
-			// ==========================================
-		itemDropTimer++;
-		if (itemDropTimer >= 300) { // 約5秒ごとに投下
-			itemDropTimer = 0;
-
-			for (int i = 0; i < 3; i++) {
-				if (!flashItems[i].active) {
-					flashItems[i].active = true;
-					flashItems[i].isFalling = true;
-					flashItems[i].bobbingAngle = 0.0f;
-
-					// ★ステージ中央付近（見失わない範囲）に落とす！
-					float rx = (float)(GetRand(800) - 400);
-					float rz = (float)(GetRand(800) - 400);
-
-					// 地面判定
-					VECTOR c1 = VGet(rx, 2000.0f, rz);
-					VECTOR c2 = VGet(rx, -1000.0f, rz);
-					MV1_COLL_RESULT_POLY hit = MV1CollCheck_Line(stagedata, -1, c1, c2);
-
-					// もし床ポリゴンに当たらなかったら、プレイヤー1の足元の高さを使う（安全策）
-					float gy = (hit.HitFlag == 1) ? hit.HitPosition.y : charainfo[0].pos.y;
-
-					flashItems[i].groundY = gy + 40.0f; // 地面から40浮かす
-					flashItems[i].pos = VGet(rx, gy + 600.0f, rz); // 空中600からスーッと落下
-
-					printfDx("[Item Spawned!] X:%.1f Z:%.1f\n", rx, rz); // ★画面左上に出現ログを出す！
-					break;
-				}
-			}
-		}
-		// キー操作
+		// プレイヤー更新
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-
-			// ★スタン中は行動不能（移動・攻撃させない）
-			if (playerStunTimer[i] > 0) {
+			if (charainfo[i].mode == DAMAGE) {
 				charainfo[i].move.x = 0.0f;
 				charainfo[i].move.z = 0.0f;
-				continue; // 操作受付をスキップ
+				continue;
 			}
-			// 1P/2P の入力、移動、待機/走り切替、攻撃予約を共通処理する。
+
 			UpdatePlayerInput(
 				charainfo[i],
 				playerStates[i],
@@ -864,38 +772,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				SEattackHandle
 			);
 
-			// ★閃光弾投擲（1P: Eキー, 2P: テンキー0 または Returnキー）
-			bool throwKey = false;
-			if (i == 0 && CheckHitKey(KEY_INPUT_E) == 1) throwKey = true;
-			if (i == 1 && CheckHitKey(KEY_INPUT_NUMPAD0) == 1) throwKey = true;
-
-			if (throwKey && flashStock[i] > 0) {
-				// 空いている弾スロットを探して発射
-				for (int g = 0; g < 4; g++) {
-					if (!thrownGrenades[g].active) {
-						flashStock[i]--; // 1個消費
-						thrownGrenades[g].active = true;
-						thrownGrenades[g].ownerIdx = i;
-						thrownGrenades[g].timer = 150;
-						thrownGrenades[g].isGlowing = false;
-						thrownGrenades[g].glowTimer = 0.0f;
-
-						thrownGrenades[g].startPos = VAdd(charainfo[i].pos, VGet(0.0f, 100.0f, 0.0f));
-						thrownGrenades[g].pos = thrownGrenades[g].startPos;
-
-						// プレイヤーの向きへ山なり発射
-						VECTOR fwd = VGet(sinf(charainfo[i].angle), 0.0f, cosf(charainfo[i].angle));
-						thrownGrenades[g].vel = VAdd(VScale(fwd, 24.0f), VGet(0.0f, 9.0f, 0.0f));
-
-						if (grenadeBaseModel != -1) {
-							thrownGrenades[g].modelHandle = MV1DuplicateModel(grenadeBaseModel);
-							MV1SetScale(thrownGrenades[g].modelHandle, VGet(3.5f, 3.5f, 3.5f));
-							MV1SetVisible(thrownGrenades[g].modelHandle, TRUE);
-						}
-						break;
-					}
-				}
-			}
 			if (currentJKey == 1 && prevJKey == 0) {
 				if (isBGMPlaying) {
 					StopSoundMem(BGMSoundHandle);
@@ -916,80 +792,36 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 
 			if (charainfo[TEST_ENEMY_INDEX].mode == STAND) {
-				// 距離の近いプレイヤーを攻撃対象にする。
 				float dist = VSize(VSub(charainfo[enemyTargetIndex].pos, charainfo[TEST_ENEMY_INDEX].pos));
 				if (dist < 150.0f) {
 					charainfo[TEST_ENEMY_INDEX].mode = ATTACK;
 					SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_attack);
 				}
 			}
-
 			else if (charainfo[TEST_ENEMY_INDEX].mode == ATTACK) {
-
-				// 攻撃アニメーションの「振り下ろし」タイミング
 				if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.4f &&
 					charainfo[TEST_ENEMY_INDEX].playtime <= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.6f)
 				{
-					// 攻撃がまだ一度も当たっていない場合のみ判定
-					if (charainfo[TEST_ENEMY_INDEX].isHit == false)
-					{
-						for (int i = 0; i < PLAYER_COUNT; i++) {
-							// テスト敵の攻撃は、範囲内のどちらのプレイヤーにも当たる。
+					if (charainfo[TEST_ENEMY_INDEX].isHit == false) {
+						for (int p = 0; p < PLAYER_COUNT; p++) {
 							if (HitCheck_Capsule_Capsule(
 								charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
-								charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)), charainfo[i].charahitinfo.Width / 2))
+								charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
 							{
-
-								charainfo[i].HP -= 1; // ダメージ発生
-								charainfo[TEST_ENEMY_INDEX].isHit = true; // フラグを立てて連続ヒットを防止
-								printfDx("プレイヤー%d被弾！HP:%d\n", i + 1, charainfo[i].HP);
+								charainfo[p].HP -= 1;
+								charainfo[TEST_ENEMY_INDEX].isHit = true;
 								break;
 							}
 						}
 					}
 				}
 
-				// アニメーションが終わったらフラグをリセットして通常モードへ
 				if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
 					charainfo[TEST_ENEMY_INDEX].mode = STAND;
 					SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
 					charainfo[TEST_ENEMY_INDEX].isHit = false;
 				}
 			}
-			HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[0].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[0].move));
-			WallNum = 0;
-			FloorNum = 0;
-			for (int i = 0; i < HitDim.HitNum; i++)
-			{
-				// 法線のY成分が小さい → 壁
-				if (fabs(HitDim.Dim[i].Normal.y) < 0.5f)
-				{
-					printf("壁扱い\n");
-
-					if (HitDim.Dim[i].Position[0].y > charainfo[0].pos.y + 1.0f ||
-						HitDim.Dim[i].Position[1].y > charainfo[0].pos.y + 1.0f ||
-						HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f)
-					{
-						if (WallNum < CHARA_MAX_HITCOLL)
-						{
-							Wall[WallNum] = &HitDim.Dim[i];
-							WallNum++;
-						}
-					}
-				}
-				else
-				{
-					// 床
-					if (FloorNum < CHARA_MAX_HITCOLL)
-					{
-						Floor[FloorNum] = &HitDim.Dim[i];
-						FloorNum++;
-					}
-				}
-			}
-
-			float MaxY;
-			float MaxY_poly;
 
 			if (HitCheck_Capsule_Capsule(
 				VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER1_INDEX].move),
@@ -997,83 +829,58 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				charainfo[PLAYER1_INDEX].charahitinfo.Width / 2,
 				VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move),
 				VAdd(VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move), VGet(0, charainfo[PLAYER2_INDEX].charahitinfo.Height, 0)),
-				charainfo[PLAYER2_INDEX].charahitinfo.Width / 2)
-				== TRUE) {
-				// プレイヤー同士が重なりそうな場合は、横移動だけ止める。
+				charainfo[PLAYER2_INDEX].charahitinfo.Width / 2) == TRUE)
+			{
 				charainfo[PLAYER1_INDEX].move.x = 0.0f;
 				charainfo[PLAYER1_INDEX].move.z = 0.0f;
 				charainfo[PLAYER2_INDEX].move.x = 0.0f;
 				charainfo[PLAYER2_INDEX].move.z = 0.0f;
 			}
 
+			// 落下判定
+			float DEATH_LINE = -300.0f;
+			if (charainfo[i].pos.y < DEATH_LINE) {
+				charainfo[i].deaths++;
+				game.AddScore(i, -500);
 
-
-			for (int i = 0; i < PLAYER_COUNT; i++) {
-				// (ここに移動や床判定の処理...)
-
-				// ==========================================
-				// 場外落下（デス）判定
-				// ==========================================
-				float DEATH_LINE = -300.0f; // このY座標を下回ったら落下死（ステージに合わせて調整）
-
-				if (charainfo[i].pos.y < DEATH_LINE) {
-					// 1. 死亡回数（DEATHS）を増やす
-					charainfo[i].deaths++;
-					game.AddScore(i, -500);
-
-					// 2. 復活位置（スポーン地点）へワープさせる
-					if (i == 0) {
-						charainfo[i].pos = VGet(0.0f, 800.0f, 0.0f); // 1Pの復活位置
-					}
-					else {
-						charainfo[i].pos = VGet(100.0f, 800.0f, 0.0f); // 2Pの復活位置
-					}
-
-					// 3. 移動量や速度をリセット（落下した勢いを消す）
-					charainfo[i].move = VGet(0.0f, 0.0f, 0.0f);
-
-					// 4. HPを回復させる（ヘッダーに合わせて HP を大文字に）
-					charainfo[i].HP = 100; // 最大HPの変数がないため、全快する数値を直接指定
-
-					// 5. モードを通常状態（STAND）に戻す
-					charainfo[i].mode = STAND;
-					MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
-
-					// 待機モーション（anim_neutral を使用）に設定
-					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
-					charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
-					charainfo[i].playtime = 0.0f;
+				if (i == 0) {
+					charainfo[i].pos = VGet(1300.0f, 800.0f, 100.0f);
 				}
+				else {
+					charainfo[i].pos = VGet(1300.0f, 800.0f, -400.0f);
+				}
+
+				charainfo[i].move = VGet(0.0f, 0.0f, 0.0f);
+				charainfo[i].HP = 6;
+				charainfo[i].mode = STAND;
+				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
+				charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+				charainfo[i].playtime = 0.0f;
 			}
 		}
-	
-			// 各プレイヤーの床ポリゴンとの当たり判定
-			// ==========================================
+
+		// 床コリジョン判定
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			if (charainfo[i].mode == DOWNMODE) continue;
 
 			HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[i].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[i].move));
 			WallNum = 0;
 			FloorNum = 0;
-			for (int h = 0; h < HitDim.HitNum; h++)
-			{
-				if (fabs(HitDim.Dim[h].Normal.y) < 0.5f)
-				{
+			for (int h = 0; h < HitDim.HitNum; h++) {
+				if (fabs(HitDim.Dim[h].Normal.y) < 0.5f) {
 					if (HitDim.Dim[h].Position[0].y > charainfo[i].pos.y + 1.0f ||
 						HitDim.Dim[h].Position[1].y > charainfo[i].pos.y + 1.0f ||
 						HitDim.Dim[h].Position[2].y > charainfo[i].pos.y + 1.0f)
 					{
-						if (WallNum < CHARA_MAX_HITCOLL)
-						{
+						if (WallNum < CHARA_MAX_HITCOLL) {
 							Wall[WallNum] = &HitDim.Dim[h];
 							WallNum++;
 						}
 					}
 				}
-				else
-				{
-					if (FloorNum < CHARA_MAX_HITCOLL)
-					{
+				else {
+					if (FloorNum < CHARA_MAX_HITCOLL) {
 						Floor[FloorNum] = &HitDim.Dim[h];
 						FloorNum++;
 					}
@@ -1092,7 +899,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					LineRes = HitCheck_Line_Triangle(cal_pos1, cal_pos2, Poly->Position[0], Poly->Position[1], Poly->Position[2]);
 
 					if (LineRes.HitFlag == TRUE) {
-						if (i == 0) { // デバッグ用の描画は1Pのものを代表させる場合
+						if (i == 0) {
 							PolyCharaHitField[0] = Poly->Position[0];
 							PolyCharaHitField[1] = Poly->Position[1];
 							PolyCharaHitField[2] = Poly->Position[2];
@@ -1135,8 +942,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					}
 				}
 			}
-			else
-			{
+			else {
 				if (charainfo[i].mode != JUMPLOOP && charainfo[i].mode != FALL) {
 					MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
 					charainfo[i].mode = FALL;
@@ -1153,43 +959,29 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 			MV1CollResultPolyDimTerminate(HitDim);
 		}
-		// 移動処理
+
+		// 座標反映
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			charainfo[i].pos.x += charainfo[i].move.x;
 			charainfo[i].pos.y += charainfo[i].move.y;
 			charainfo[i].pos.z += charainfo[i].move.z;
-			// 移動後の座標を攻撃判定用の中心にも反映する。
 			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		}
 
-
-
-
-
-
-	
-
-
-		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			MV1SetPosition(charainfo[i].model1, charainfo[
-				i].pos);
-			//鞘の座標更新
+			MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 			if (playerSayaFrame[i] != -1 && playerSayaModel[i] != -1) {
 				sayamatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerSayaFrame[i]);
 				MV1SetMatrix(playerSayaModel[i], sayamatrix[i]);
 			}
-			//武器の座標更新
 			if (playerWeaponFrame[i] != -1 && playerWeaponModel[i] != -1) {
 				wpmatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerWeaponFrame[i]);
 				MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
-				//攻撃判定の更新
 				wpPosStart[i] = VGet(0.0f, 0.0f, 0.0f);
 				wpPosEnd[i] = VGet(0.0f, -90.0f, 0.0f);
 				wpPosStart[i] = VTransform(wpPosStart[i], wpmatrix[i]);
 				wpPosEnd[i] = VTransform(wpPosEnd[i], wpmatrix[i]);
 				for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
-					// 生成されていない敵（NONE）はスキップ
 					if (charainfo[e].mode == NONE) continue;
 					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[e], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
 				}
@@ -1204,45 +996,47 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
 		}
 
-
-		// 画面の消去
 		ClearDrawScreen();
 
-		// 四角形を表示 最後の引数をfalseにすると塗りつぶし無し
-		DrawBox(0, 0, 900, 600, GetColor(255, 255, 255), true);
-
 		// ==============================================================
-		// プレイヤーごとの画面分割（3Dモデル & 個別UI）
+		// 画面分割描画パス
 		// ==============================================================
 		for (int pIdx = 0; pIdx < PLAYER_COUNT; pIdx++) {
-
-			// 1. 左右の画面領域（ビューポート）を決定
 			int startX = (pIdx == 0) ? 0 : 450;
 			int endX = (pIdx == 0) ? 450 : 900;
 
 			SetDrawArea(startX, 0, endX, 600);
 
-			// 2. 現在のプレイヤーの座標を取得
 			VECTOR pPos = charainfo[pIdx].pos;
-
-			// 3. 【カメラ位置と注視点の調整（斜め上見下ろし視点）】
 			VECTOR cPos, cTarget;
 
-			if (pIdx == 0) {
-				// 【プレイヤー1用（左画面）】
-				cTarget = VAdd(pPos, VGet(300.0f, 150.0f, 0.0f));
-				cPos = VAdd(cTarget, VGet(-200.0f, 200.0f, -600.0f));
+			// エイム中と通常時のカメラ
+			if (isAiming[pIdx]) {
+				float dist = 280.0f;
+				float height = 180.0f;
+
+				cPos = VGet(
+					pPos.x - sinf(aimAngle[pIdx]) * dist,
+					pPos.y + height,
+					pPos.z - cosf(aimAngle[pIdx]) * dist
+				);
+
+				cTarget = VAdd(pPos, VGet(sinf(aimAngle[pIdx]) * 350.0f, 40.0f, cosf(aimAngle[pIdx]) * 350.0f));
 			}
 			else {
-				// 【プレイヤー2用（右画面）】
-				cTarget = VAdd(pPos, VGet(-300.0f, 150.0f, 0.0f));
-				cPos = VAdd(cTarget, VGet(200.0f, 200.0f, -600.0f));
+				if (pIdx == 0) {
+					cTarget = VAdd(pPos, VGet(300.0f, 150.0f, 0.0f));
+					cPos = VAdd(cTarget, VGet(-200.0f, 200.0f, -600.0f));
+				}
+				else {
+					cTarget = VAdd(pPos, VGet(-300.0f, 150.0f, 0.0f));
+					cPos = VAdd(cTarget, VGet(200.0f, 200.0f, -600.0f));
+				}
 			}
 
-			// 4. カメラを適用
 			SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
 
-			// キャラクター・ステージ描画
+			// 3Dモデル描画
 			for (int i = 0; i < MAX_CHARA; i++) {
 				if (charainfo[i].mode != NONE && charainfo[i].model1 != -1) {
 					MV1DrawModel(charainfo[i].model1);
@@ -1250,60 +1044,118 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 			MV1DrawModel(stagedata);
 			MV1DrawModel(sky);
-		
+
 			for (int i = 0; i < PLAYER_COUNT; i++) {
 				if (playerWeaponModel[i] != -1) MV1DrawModel(playerWeaponModel[i]);
 				if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
 			}
 
-			// 個別UI（HPバー、各プレイヤーのスコアなど）を描画
-			game.DrawUI(pIdx, 900, 600, charainfo, hpBarTex, crownGraphHandle);
-		}
-		game.Update(charainfo, charainfo);
-		// ==============================================================
-		// ★ここから画面全体の共通UI描画（最前面レイヤー）
-		// ==============================================================
-		// 1. クリップ範囲を全画面に戻す
-		SetDrawArea(0, 0, 900, 600);
-	
-		// 2. 中央の分割境界線を描画（お好みで太さや色を調整）
-		DrawLine(450, 0, 450, 600, GetColor(0, 0, 0), 2);
+			// 閃光弾
+			for (int f = 0; f < MAX_THROWN_FLASH; f++) {
+				if (thrownFlashes[f].active && thrownFlashes[f].model != -1) {
+					MV1DrawModel(thrownFlashes[f].model);
+				}
+			}
 
+			// 浮遊アイテム
+			if (dropFlashItem.active && dropFlashItem.model != -1) {
+				MV1DrawModel(dropFlashItem.model);
+			}
+
+			// 個別UI
+			game.DrawUI(pIdx, 900, 600, charainfo, hpBarTex, crownGraphHandle);
+
+			// ==========================================
+			// エイム中の丸い照準マーカー（レティクル）
+			// ==========================================
+			if (isAiming[pIdx]) {
+				int centerX = (startX + endX) / 2;
+				int centerY = 300;
+
+				DrawCircle(centerX, centerY, 18, GetColor(0, 255, 200), FALSE);
+				DrawCircle(centerX, centerY, 19, GetColor(0, 255, 200), FALSE);
+				DrawCircle(centerX, centerY, 3, GetColor(255, 255, 255), TRUE);
+
+				DrawLine(centerX - 26, centerY, centerX - 12, centerY, GetColor(0, 255, 200), 2);
+				DrawLine(centerX + 12, centerY, centerX + 26, centerY, GetColor(0, 255, 200), 2);
+				DrawLine(centerX, centerY - 26, centerX, centerY - 12, GetColor(0, 255, 200), 2);
+				DrawLine(centerX, centerY + 12, centerX, centerY + 26, GetColor(0, 255, 200), 2);
+			}
+
+			// ホワイトアウト描画
+			if (playerWhiteoutTimer[pIdx] > 0) {
+				playerWhiteoutTimer[pIdx]--;
+				int alpha = (playerWhiteoutTimer[pIdx] > 40) ? 255 : (playerWhiteoutTimer[pIdx] * 255 / 40);
+
+				SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+				DrawBox(startX, 0, endX, 600, GetColor(255, 255, 255), TRUE);
+				SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+			}
+		}
+
+		game.Update(charainfo, charainfo);
+
+		SetDrawArea(0, 0, 900, 600);
+		DrawLine(450, 0, 450, 600, GetColor(0, 0, 0), 2);
 		game.DrawTimer(900, 600);
 
-		// ゲーム更新処理 ＆ 画面反映
-		
 		ScreenFlip();
 	}
-	// DXライブラリの終了処理
-	DxLib_End();
 
+	// ==========================================
+	// 終了処理（メモリ解放）
+	// ==========================================
+	MV1TerminateCollInfo(stagedata, -1);
+
+	for (int i = 0; i < MAX_CHARA; i++) {
+		if (charainfo[i].model1 != -1) {
+			MV1DeleteModel(charainfo[i].model1);
+			charainfo[i].model1 = -1;
+		}
+	}
+	if (baseGoblinModel != -1) MV1DeleteModel(baseGoblinModel);
+	if (redGoblinBaseModel != -1) MV1DeleteModel(redGoblinBaseModel);
+	if (stagedata != -1) MV1DeleteModel(stagedata);
+	if (sky != -1) MV1DeleteModel(sky);
+
+	for (int i = 0; i < PLAYER_COUNT; i++) {
+		if (playerWeaponModel[i] != -1) MV1DeleteModel(playerWeaponModel[i]);
+		if (playerSayaModel[i] != -1) MV1DeleteModel(playerSayaModel[i]);
+	}
+
+	for (int f = 0; f < MAX_THROWN_FLASH; f++) {
+		if (thrownFlashes[f].model != -1) {
+			MV1DeleteModel(thrownFlashes[f].model);
+			thrownFlashes[f].model = -1;
+		}
+	}
+	if (dropFlashItem.model != -1) {
+		MV1DeleteModel(dropFlashItem.model);
+		dropFlashItem.model = -1;
+	}
+	if (grenadeBaseModel != -1) MV1DeleteModel(grenadeBaseModel);
+
+	DxLib_End();
 
 	return 0;
 }
 
 void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage) {
-	// 攻撃中かつ、ターゲットがダウン中・ダメージ硬直中・すでにHPが0以下の場合は判定しない
 	if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
 	{
 		if (attacker->isHit == true) {
 			return;
 		}
 
-		// 半径を 30.0f に拡大
 		if (HitCheck_Capsule_Capsule(start, end, 30.0f,
 			target->pos,
 			VAdd(target->pos, VGet(0, target->charahitinfo.Height, 0)),
 			target->charahitinfo.Width / 2 + 30.0f))
 		{
 			attacker->isHit = true;
-
-			// SE再生
 			PlaySoundMem(SEdamageHandle, DX_PLAYTYPE_BACK);
 
 			if (target == &charainfo[0] || target == &charainfo[1]) {
-
-				// ターゲットがプレイヤーの場合
 				if (target->HP > 0) {
 					target->HP--;
 				}
@@ -1315,16 +1167,13 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 				target->mode = DAMAGE;
 			}
 			else {
-				// ターゲットが敵の場合
 				if (target->enemyHP > 0) {
 					target->enemyHP--;
 
-					// 敵のHPが0以下になったら消滅させる
 					if (target->enemyHP <= 0) {
-						target->mode = NONE; // 状態を無効にする
-						MV1SetVisible(target->model1, FALSE); // 画面から消す
+						target->mode = NONE;
+						MV1SetVisible(target->model1, FALSE);
 
-						// 攻撃者がプレイヤー1だったらスコア加算
 						if (attacker == &charainfo[0]) {
 							game.AddScore(0, 100);
 							game.AddScorePopup(0, 100);
@@ -1335,7 +1184,6 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 						}
 					}
 					else {
-						// まだHPが残っている場合はダメージモーション
 						MV1DetachAnim(target->model1, target->attachidx);
 						target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
 						target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
@@ -1344,8 +1192,6 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 					}
 				}
 			}
-			printfDx("ヒット！残リHP:%d\n", (target == &charainfo[0] ? target->HP : target->enemyHP));
 		}
 	}
 }
-

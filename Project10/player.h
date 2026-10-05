@@ -11,9 +11,15 @@ constexpr int PLAYER2_INDEX = 1;
 constexpr int TEST_ENEMY_INDEX = 2;
 constexpr int TEST_ENEMY_GOLEM = 3;
 constexpr int TEST_ENEMY_RED = 500;
-constexpr int MAX_CHARA = 600;
+constexpr int MAX_CHARA = 550;
 constexpr float PLAYER_MODEL_SCALE = 1.1f;
+const float ITEM_HEIGHT_OFFSET = 90.0f;
+
+
 const int MAX_HP = 6;
+
+
+
 // 1人分の入力設定。
 // キーボードとゲームパッド入力を、同じ処理で扱うためにまとめる。
 struct PlayerInputConfig {

@@ -38,6 +38,11 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     }
 
 
+    
+    
+    
+    
+    
     // ==========================================
     // 2. 敵スポーン処理（mainTimer とは無関係に動作）
     // ==========================================
@@ -59,8 +64,8 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
             goblinSpawnTimer = 0;
 
             for (int k = 0; k < 9; k++) {
-                float spawnX = (float)(GetRand(4000) - 2000);
-                float spawnZ = (float)(GetRand(4000) - 2000);
+                float spawnX = (float)(GetRand(4500) - 2250);
+                float spawnZ = (float)(GetRand(4500) - 2250);
                 ActivateEnemy(enemyList, spawnX, spawnZ);
             }
         }
@@ -197,7 +202,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
 
     int startY = 20;
     unsigned int pColor = (pIdx == 0) ? GetColor(100, 200, 255) : GetColor(255, 150, 100);
-    DrawFormatString(xOffset + 20, startY, pColor, "--- PLAYER %d ---", pIdx + 1);
+    DrawFormatString(xOffset + 20, startY, pColor, " PLAYER %d ", pIdx + 1);
 
     int frameDrawW = 180;
     int frameDrawH = 24;
@@ -297,7 +302,7 @@ void GameManager::DrawTimer(int sw, int sh) {
         timerColor = GetColor(255, 255, 0);
     }
 
-    SetFontSize(24);
+    SetFontSize(30);
 
     char timerStr[32];
     if (seconds > 0) {
@@ -340,3 +345,5 @@ void GameManager::AddScorePopup(int playerIdx, int score) {
         }
     }
 }
+
+
