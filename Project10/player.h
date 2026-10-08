@@ -155,3 +155,7 @@ int FindWhirlwindPullPlayer(const SCharaInfo players[], const PlayerRuntimeState
 void UpdateWhirlwindPull(const SCharaInfo players[], const PlayerRuntimeState states[], SCharaInfo& target);
 // Switch locomotion once, preserving animation time while movement continues.
 void UpdateEnemyLocomotionAnimation(SCharaInfo& enemy, bool moving);
+
+int ReadPlayerPadState(int padType);
+
+void CancelPlayerCombat(PlayerRuntimeState& state);

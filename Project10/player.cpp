@@ -6,6 +6,21 @@
 #include <EffekseerForDXLib.h>
 #include <math.h>
 
+// Normalize Xbox face buttons to A=1, B=2, X=3, Y=4.
+int ReadPlayerPadState(int padType) {
+    int buttons = GetJoypadInputState(padType);
+    if (buttons < 0) buttons = 0;
+    XINPUT_STATE xbox = {};
+    if (GetJoypadXInputState(padType, &xbox) == 0) {
+        buttons &= ~(PAD_INPUT_1 | PAD_INPUT_2 | PAD_INPUT_3 | PAD_INPUT_4);
+        if (xbox.Buttons[XINPUT_BUTTON_A]) buttons |= PAD_INPUT_1;
+        if (xbox.Buttons[XINPUT_BUTTON_B]) buttons |= PAD_INPUT_2;
+        if (xbox.Buttons[XINPUT_BUTTON_X]) buttons |= PAD_INPUT_3;
+        if (xbox.Buttons[XINPUT_BUTTON_Y]) buttons |= PAD_INPUT_4;
+    }
+    return buttons;
+}
+
 namespace {
 
 bool IsKeyDown(int keyCode) {
@@ -274,10 +289,43 @@ void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 	chara.playtime = playtime;
 }
 
+void CancelPlayerCombat(PlayerRuntimeState& state) {
+    StopNormalAttackEffect(state);
+    StopHeavyAttackEffect(state);
+    StopSpecialAttackEffect(state);
+    state.isSpecialAttack = false;
+    state.isHeavyAttack = false;
+    state.isAttackBuffered = false;
+    state.attackIndex = 0;
+    state.movementAnimation = -1;
+}
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
-	UpdateNormalAttackEffect(player, state);
+	if (player.mode == DAMAGE || player.mode == DOWNMODE) {
+        CancelPlayerCombat(state);
+        ResetMove(player);
+        if (player.mode == DOWNMODE) {
+            player.playtime = fminf(player.playtime + (PLAYER_USE_NEW_MODEL ? 0.5f : 0.3f), player.anim_totaltime);
+            if (player.attachidx >= 0) MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
+            return;
+        }
+    }
+    UpdateNormalAttackEffect(player, state);
 	UpdateHeavyAttackEffect(state);
 	UpdateSpecialAttackEffect(player, state);
+    // Restore control and animation together when the special effect ends.
+    if (state.isSpecialAttack && !state.isSpecialAttackEffectPlaying) {
+        state.isSpecialAttack = false;
+        state.isHeavyAttack = false;
+        state.isAttackBuffered = false;
+        state.attackIndex = 0;
+        state.movementAnimation = -1;
+        player.isHit = false;
+        if (player.mode == ATTACK || player.mode == ATTACKOUT) {
+            ResetMove(player);
+            SetCharacterAnimation(player, animNeutral);
+            player.mode = STAND;
+        }
+    }
 	if (player.mode != JUMPOUT) {
 		player.playtime += PLAYER_USE_NEW_MODEL ? 0.5f : 0.3f;
 	}
@@ -288,7 +336,7 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 	if (player.mode != FALL && player.mode != JUMPIN && player.mode != JUMPLOOP
 		&& player.mode != ATTACK) {
 		if (player.playtime > player.anim_totaltime) {
-			if ((player.mode == JUMPOUT) || (player.mode == ATTACKOUT)) {
+			if ((player.mode == JUMPOUT) || (player.mode == ATTACKOUT) || (player.mode == DAMAGE)) {
 				if (player.mode == ATTACKOUT) {
 					state.attackIndex = 0;
 					state.isHeavyAttack = false;
@@ -394,7 +442,6 @@ void CheckPlayerSpecialAttackHit(
 		MV1SetVisible(target.model1, FALSE);
 		game.AddScore(playerIndex, 100); game.AddScorePopup(playerIndex, 100);
 	}
-	printfDx("必殺技ヒット！残りHP:%d\n", target.enemyHP);
 }
 
 void UpdatePlayerInput(
@@ -416,10 +463,9 @@ void UpdatePlayerInput(
 	bool attackPressed = false;
 	bool heavyAttackPressed = false;
 	bool specialAttackPressed = false;
-	bool jumpPressed = false;
 
 	if (CanControlPlayerMode(player.mode)) {
-		state.key = GetJoypadInputState(input.padType);
+		state.key = ReadPlayerPadState(input.padType);
 		if (state.key < 0) {
 			// パッド未接続時は入力なしとして扱う。
 			state.key = 0;
@@ -429,15 +475,12 @@ void UpdatePlayerInput(
 			IsPadButtonDown(state.key, PAD_INPUT_10)) ? 1 : 0;
 		const int currentHeavyAttackButton = IsPadOrKeyDown(state.key, input.heavyAttackPadButton, input.heavyAttackKey) ? 1 : 0;
 		const int currentSpecialAttackButton = IsPadOrKeyDown(state.key, input.specialAttackPadButton, input.specialAttackKey) ? 1 : 0;
-		const int currentJumpButton = IsPadOrKeyDown(state.key, input.jumpPadButton, input.jumpKey) ? 1 : 0;
 		attackPressed = (currentAttackButton == 1 && state.prevAttackButton == 0);
 		heavyAttackPressed = (currentHeavyAttackButton == 1 && state.prevHeavyAttackButton == 0);
 		specialAttackPressed = (currentSpecialAttackButton == 1 && state.prevSpecialAttackButton == 0);
-		jumpPressed = (currentJumpButton == 1 && state.prevJumpButton == 0);
 		state.prevAttackButton = currentAttackButton;
 		state.prevHeavyAttackButton = currentHeavyAttackButton;
 		state.prevSpecialAttackButton = currentSpecialAttackButton;
-		state.prevJumpButton = currentJumpButton;
 	}
 	else {
 		state.key = 0;
@@ -469,12 +512,7 @@ void UpdatePlayerInput(
 				UpdatePlayerMovement(player, state, inputX, inputZ, animRun);
 			}
 
-			if (jumpPressed) {
-				player.mode = JUMPIN;
-				SetCharacterAnimation(player, animJumpIn, 0.3f);
-				MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
-				PlaySoundMem(seJumpHandle, DX_PLAYTYPE_NORMAL);
-			}
+            // The former jump button is reserved for resurrection in main.cpp.
 		}
 	}
 

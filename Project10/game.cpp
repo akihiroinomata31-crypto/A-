@@ -10,6 +10,18 @@ int red_goblin_anim_attack = -1;
 int red_goblin_anim_walk = -1;
 int weaponBaseModel = -1;
 
+bool PlaceEnemyOnGround(SCharaInfo& enemy) {
+    if (stagedata < 0) return false;
+    const auto hit = MV1CollCheck_Line(stagedata, -1,
+        VGet(enemy.pos.x, 2000.0f, enemy.pos.z), VGet(enemy.pos.x, -1000.0f, enemy.pos.z));
+    if (!hit.HitFlag) return false;
+    enemy.pos.y = hit.HitPosition.y;
+    enemy.move.y = 0.0f;
+    enemy.charahitinfo.CenterPosition = enemy.pos;
+    if (enemy.model1 >= 0) MV1SetPosition(enemy.model1, enemy.pos);
+    return true;
+}
+
 void GameManager::Init() {
     mainTimer = 99 * 60;
     goblinSpawnTimer = 0;
@@ -19,6 +31,7 @@ void GameManager::Init() {
     gameState = 0;
     deathCount[0] = 0;
     deathCount[1] = 0;
+    specialUseCount[0] = specialUseCount[1] = 0;
 
     for (int i = 0; i < 20; i++) {
         popups[i].active = false;
@@ -33,8 +46,8 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         mainTimer--;
     }
     else if (gameState == 0) {
-        if (p1Score > p2Score)      gameState = 1;
-        else if (p2Score > p1Score) gameState = 2;
+        if (FinalScore(0) > FinalScore(1))      gameState = 1;
+        else if (FinalScore(1) > FinalScore(0)) gameState = 2;
         else                        gameState = 3;
     }
 
@@ -59,21 +72,21 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
 
     if (activeEnemyCount < MAX_FIELD_ENEMIES) {
 
-        // --- 通常ゴブリン：約0.3秒（20フレーム）ごとに小分けスポーン ---
+        // Normal goblins: three per second at 60 FPS.
         goblinSpawnTimer++;
-        if (goblinSpawnTimer >= 280) {
+        if (goblinSpawnTimer >= 60) {
             goblinSpawnTimer = 0;
 
-            for (int k = 0; k < 9; k++) {
+            for (int k = 0; k < 3 && activeEnemyCount < MAX_FIELD_ENEMIES; k++, activeEnemyCount++) {
                 float spawnX = (float)(GetRand(4500) - 2250);
                 float spawnZ = (float)(GetRand(4500) - 2250);
                 ActivateEnemy(enemyList, spawnX, spawnZ);
             }
         }
 
-        // --- 赤ゴブリン：約3秒（180フレーム）ごとに1体 ---
+        // Red goblins: one every three seconds at 60 FPS.
         redSpawnTimer++;
-        if (redSpawnTimer >= 500) {
+        if (redSpawnTimer >= 180 && activeEnemyCount < MAX_FIELD_ENEMIES) {
             redSpawnTimer = 0;
 
             float spawnX = (float)(GetRand(3000) - 1500);
@@ -87,6 +100,7 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     if (seconds <= 50 && gameState == 0) {
         if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
             enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 30.0f, -150.0f);
+            if (!PlaceEnemyOnGround(enemyList[TEST_ENEMY_GOLEM])) return;
             enemyList[TEST_ENEMY_GOLEM].mode = STAND;
             enemyList[TEST_ENEMY_GOLEM].enemyHP = 10;
             enemyList[TEST_ENEMY_GOLEM].playtime = 0.0f;
@@ -116,16 +130,7 @@ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
 
             enemyList[i].pos = VGet(x, 0.0f, z);
 
-            VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
-            VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
-            MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
-
-            float baseFloorY = 0.0f;
-            if (LineRes.HitFlag == 1) {
-                baseFloorY = LineRes.HitPosition.y;
-            }
-
-            enemyList[i].pos.y = baseFloorY + 600.0f;
+            if (!PlaceEnemyOnGround(enemyList[i])) continue;
             enemyList[i].enemyWalking = false;
             enemyList[i].currentAnimType = 1;
             enemyList[i].invincibleTimer = 0;
@@ -157,16 +162,7 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
         if (enemyList[i].mode == NONE) {
             enemyList[i].pos = VGet(x, 0.0f, z);
 
-            VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
-            VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
-            MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
-
-            float baseFloorY = 0.0f;
-            if (LineRes.HitFlag == 1) {
-                baseFloorY = LineRes.HitPosition.y;
-            }
-
-            enemyList[i].pos.y = baseFloorY + 600.0f;
+            if (!PlaceEnemyOnGround(enemyList[i])) continue;
             enemyList[i].enemyWalking = false;
             enemyList[i].currentAnimType = 1;
             enemyList[i].invincibleTimer = 0;
@@ -338,11 +334,11 @@ void GameManager::DrawTimer(int sw, int sh) {
 void GameManager::AddScore(int playerIndex, int score) {
     if (playerIndex == 0) {
         p1Score += score;
-        if (p1Score < 0) p1Score = 0;
+
     }
     else {
         p2Score += score;
-        if (p2Score < 0) p2Score = 0;
+
     }
 }
 

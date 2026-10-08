@@ -52,15 +52,31 @@ public:
     int p2Score = 0;
     std::vector<ReplayFrame> replayData;
 
+    static constexpr int DeathPenalty = 3000;
+    static constexpr int SpecialPenalty = 1000;
+    int specialUseCount[2] = { 0, 0 };
     int deathCount[2] = { 0, 0 };
     int gameState = 0;
 
     void AddDeath(int playerIndex) {
         if (playerIndex >= 0 && playerIndex < 2) {
             deathCount[playerIndex]++;
+
+
         }
     }
 
+    int FinalScore(int playerIndex) const {
+        if (playerIndex < 0 || playerIndex >= 2) return 0;
+        const int earned = playerIndex == 0 ? p1Score : p2Score;
+        return earned - deathCount[playerIndex] * DeathPenalty - specialUseCount[playerIndex] * SpecialPenalty;
+    }
+    void RecordSpecialAttack(int playerIndex) {
+        if (playerIndex < 0 || playerIndex >= 2) return;
+        ++specialUseCount[playerIndex];
+
+
+    }
     bool isHit = false;
     int anim_neutral = -1;
     int anim_walk = -1;
@@ -102,3 +118,5 @@ extern int red_goblin_anim_neutral;
 extern int red_goblin_anim_attack;
 extern int weaponBaseModel;
 extern int red_goblin_anim_walk;
+
+bool PlaceEnemyOnGround(SCharaInfo& enemy);

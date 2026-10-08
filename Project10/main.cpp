@@ -35,6 +35,99 @@ static bool SetGameResourceDirectory() {
     return GetFileAttributesW(L"..\\Data\\Goblin\\Goblin.mv1") != INVALID_FILE_ATTRIBUTES;
 }
 
+static int MenuFont(int size) {
+    static int fontSmall = -1, label = -1, heading = -1, title = -1;
+    int* handle = size <= 17 ? &fontSmall : size <= 25 ? &label : size <= 40 ? &heading : &title;
+    if (*handle < 0) *handle = CreateFontToHandle("Yu Gothic", size <= 17 ? 16 : size <= 25 ? 24 : size <= 40 ? 36 : 54, 2, DX_FONTTYPE_ANTIALIASING_8X8);
+    return *handle;
+}
+static void MenuLabel(int x, int y, int size, const char* text, unsigned int color) {
+    DrawStringToHandle(x, y, text, color, MenuFont(size));
+}
+static void MenuText(int y, int size, const char* text, unsigned int color) {
+    const int font = MenuFont(size);
+    DrawStringToHandle((900 - GetDrawStringWidthToHandle(text, (int)strlen(text), font)) / 2, y, text, color, font);
+}
+static void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr) {
+    SetDrawArea(0, 0, 900, 600); SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0); ClearDrawScreen();
+    const auto gold = GetColor(222, 194, 137), white = GetColor(235, 236, 229), muted = GetColor(127, 145, 153);
+    // A quiet, layered background with a softly lit sword emblem.
+    for (int y = 0; y < 600; ++y) {
+        const float t = y / 600.0f;
+        DrawLine(0, y, 900, y, GetColor(8 + (int)(6*t), 17 + (int)(4*t), 25 + (int)(5*t)));
+    }
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 22);
+    for (int r = 295; r > 20; r -= 14) DrawCircle(675, 240, r, GetColor(41, 73, 78), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 65);
+    DrawCircle(675, 240, 145, gold, FALSE);
+    DrawCircle(675, 240, 157, GetColor(72, 109, 116), FALSE);
+    DrawLine(675, 62, 675, 418, GetColor(68, 105, 111));
+    DrawLine(500, 240, 850, 240, GetColor(68, 105, 111));
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    // Faceted blade, guard and grip, drawn from native geometry.
+    DrawTriangle(675, 92, 653, 271, 675, 292, GetColor(165, 184, 183), TRUE);
+    DrawTriangle(675, 92, 675, 292, 697, 271, GetColor(75, 104, 112), TRUE);
+    DrawLine(675, 95, 675, 289, GetColor(220, 231, 223), 2);
+    DrawLine(630, 293, 675, 283, gold, 5); DrawLine(675, 283, 720, 293, gold, 5);
+    DrawBox(669, 292, 681, 345, GetColor(46, 59, 65), TRUE);
+    for (int y = 302; y < 342; y += 10) DrawLine(670, y, 680, y, gold);
+    DrawCircle(675, 351, 8, gold, TRUE);
+    const float drift = GetNowCount() * 0.00015f;
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 65);
+    for (int i = 0; i < 22; ++i) {
+        const int x = 440 + (i * 83 % 440);
+        const int y = 60 + (int)fmodf(i * 47.0f + drift * 15, 450.0f);
+        DrawCircle(x, y, i % 4 == 0 ? 2 : 1, gold, TRUE);
+    }
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    if (!results) {
+        MenuLabel(108, 167, 54, "アリーナ", white);
+        MenuLabel(108, 230, 54, "バトル", white);
+        DrawLine(112, 320, 165, 320, gold, 2);
+    } else {
+        // Opaque score panel keeps the result information clear over the emblem.
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 225);
+        DrawBox(80, 65, 820, 416, GetColor(10, 21, 29), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        MenuText(85, 36, "試合結果", gold);
+        MenuText(139, 36, game.gameState == 1 ? "プレイヤー１の勝利" : game.gameState == 2 ? "プレイヤー２の勝利" : "引き分け", white);
+        DrawLine(120, 205, 780, 205, GetColor(53, 71, 78));
+        MenuLabel(180, 229, 24, "プレイヤー１", GetColor(131, 187, 207));
+        MenuLabel(525, 229, 24, "プレイヤー２", GetColor(219, 165, 140));
+        char text[80];
+        for (int p = 0; p < 2; ++p) {
+            const int x = p == 0 ? 180 : 525;
+            const int earned = p == 0 ? game.p1Score : game.p2Score;
+            const int score = game.FinalScore(p);
+            const int deathCost = game.deathCount[p] * GameManager::DeathPenalty;
+            const int specialCost = game.specialUseCount[p] * GameManager::SpecialPenalty;
+            sprintf_s(text, "獲得スコア   %d", earned); MenuLabel(x, 271, 16, text, muted);
+            sprintf_s(text, "死亡 %d回   -%d", game.deathCount[p], deathCost); MenuLabel(x, 301, 16, text, muted);
+            sprintf_s(text, "必殺技 %d回   -%d", game.specialUseCount[p], specialCost); MenuLabel(x, 331, 16, text, muted);
+            sprintf_s(text, "合計   %d", score); MenuLabel(x, 366, 24, text, white);
+        }
+    }
+    const int left = results ? 290 : 110, width = 320;
+    for (int row = 0; row < 2; ++row) {
+        const int y = (results ? 429 : 387) + row * 65;
+        if (row == selected) {
+            for (int x = 0; x < width; ++x) {
+                SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90 - x * 75 / width);
+                DrawLine(left + x, y, left + x, y + 49, GetColor(81, 99, 107));
+            }
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+            DrawBox(left, y, left + 3, y + 49, gold, TRUE);
+            DrawLine(left, y + 49, left + width, y + 49, GetColor(77, 90, 92));
+        }
+        MenuLabel(left + 25, y + 8, 24, row == 1 ? "終了" : results ? "メニューに戻る" : "ゲーム開始", row == selected ? gold : muted);
+        if (row == selected) MenuLabel(left + width - 32, y + 8, 24, ">", gold);
+    }
+    DrawLine(110, 548, 790, 548, GetColor(34, 51, 60));
+    MenuText(566, 16, "↑↓ 選択     A / Enter 決定", muted);
+    if (snapshot) SaveDrawScreenToPNG(0, 0, 900, 600, snapshot);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0); SetFontSize(20); ScreenFlip();
+}
+static int playerDamageAnimation = -1;
 struct GameRuntimeCleanup {
     bool dxReady = false;
     bool effectReady = false;
@@ -80,7 +173,6 @@ namespace {
 		sprintf_s(path, sizeof(path), "..\\Data\\Player\\%s", fileName);
 		handle = MV1LoadModel(path);
 		if (handle == -1) {
-			printfDx("Player asset load failed: %s\n", fileName);
 		}
 
 		return handle;
@@ -99,8 +191,11 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MessageBoxW(nullptr, L"Game resources could not be found. Rebuild the project or launch with TryNewPlayer.cmd.", L"Project10", MB_OK | MB_ICONERROR);
 		return -1;
 	}
+	int smokeLongRangeMoves = 0;
 	const bool mergeSmoke = strstr(lpC, "--merge-smoke") != nullptr;
-	const bool gameSmoke = mergeSmoke || strstr(lpC, "--game-smoke") != nullptr;
+	const bool deathSmoke = strstr(lpC, "--death-smoke") != nullptr;
+	const bool uiSmoke = strstr(lpC, "--ui-smoke") != nullptr;
+	const bool gameSmoke = uiSmoke || deathSmoke || mergeSmoke || strstr(lpC, "--game-smoke") != nullptr;
 	bool mergeAimPassed = false, mergeThrowPassed = false, mergeStunPassed = false;
 	int smokeFrames = 0;
 	int running = 0;
@@ -138,9 +233,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
 		// 1P: キーボード(WASD) + 1Pゲームパッド。
-		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_3, PAD_INPUT_2 },
+		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 },
 		// 2P: キーボード(矢印) + 2Pゲームパッド。
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, KEY_INPUT_RCONTROL, -1, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_3, PAD_INPUT_2 }
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, KEY_INPUT_RCONTROL, -1, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 }
 	};
 
 
@@ -270,7 +365,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	enemy_anim_neutral = baseGoblinModel;
 	if (baseGoblinModel == -1) {
-		printfDx("ゴブリンのベースモデル読み込み失敗！\n");
 	}
 
 	for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
@@ -283,7 +377,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		if (charainfo[i].model1 == -1) {
-			printfDx("ゴブリンのモデル生成失敗！(index:%d)\n", i);
 			continue;
 		}
 
@@ -333,7 +426,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].model1 = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? "new\\Player_MainModel.mv1" : "PC.mv1");
 		if (charainfo[i].model1 == -1) {
-			printfDx("プレイヤー%dのモデル読み込み失敗！\n", i + 1);
 			return -1;
 		}
 		MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
@@ -422,7 +514,70 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 		passed = passed && idlePassed;
 		if (report) fprintf(report, "idle loop and return after attack: %s\n", idlePassed ? "PASS" : "FAIL");
-		int swordEffect = LoadEffekseerEffect("..\\Data\\Effect\\Sword2.efkefc", PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION);
+		int hurtMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::damage]);
+        int deathMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::death]);
+        bool hurtDeathPassed = hurtMotion >= 0 && deathMotion >= 0;
+        for (int p = 0; p < PLAYER_COUNT && hurtDeathPassed; ++p) {
+            charainfo[p].mode = DAMAGE;
+            SetCharacterAnimation(charainfo[p], hurtMotion);
+            if (p == 0) {
+                auto savePose = [&](int motion, float time, const char* path) {
+                    SetCharacterAnimation(charainfo[0], motion, time);
+                    MV1SetAttachAnimTime(charainfo[0].model1, charainfo[0].attachidx, time);
+                    charainfo[0].pos = VGet(0, 0, 0);
+                    MV1SetPosition(charainfo[0].model1, charainfo[0].pos);
+                    ApplyPlayerMotionRoot(charainfo[0], playerStates[0]);
+                    SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
+                    SetCameraPositionAndTargetAndUpVec(VGet(180, 190, -400), VGet(0, 65, 0), VGet(0, 1, 0));
+                    MV1DrawModel(charainfo[0].model1);
+                    SaveDrawScreenToPNG(0, 0, 900, 600, path);
+                };
+                savePose(hurtMotion, MV1GetAnimTotalTime(hurtMotion, 0) * 0.5f, "..\\.merge-review\\damage-pose.png");
+                savePose(deathMotion, MV1GetAnimTotalTime(deathMotion, 0), "..\\.merge-review\\death-pose.png");
+                SetCharacterAnimation(charainfo[0], hurtMotion);
+            }
+            for (int frame = 0; frame < 400; ++frame) UpdatePlayerAnimationProgress(charainfo[p], playerStates[p], idleMotion);
+            hurtDeathPassed = hurtDeathPassed && charainfo[p].mode == STAND;
+            charainfo[p].mode = DOWNMODE;
+            SetCharacterAnimation(charainfo[p], deathMotion);
+            const float duration = charainfo[p].anim_totaltime;
+            for (int frame = 0; frame < 500; ++frame) UpdatePlayerAnimationProgress(charainfo[p], playerStates[p], idleMotion);
+            hurtDeathPassed = hurtDeathPassed && duration > 0 && charainfo[p].mode == DOWNMODE && charainfo[p].playtime == duration;
+            charainfo[p].mode = STAND;
+            SetCharacterAnimation(charainfo[p], idleMotion);
+            UpdatePlayerMovement(charainfo[p], playerStates[p], MOVE_SPEED, 0, runMotion);
+            hurtDeathPassed = hurtDeathPassed && charainfo[p].mode == RUN;
+        }
+        passed = passed && hurtDeathPassed;
+        if (report) fprintf(report, "two players: hurt recovery, death last frame, resurrection control: %s\n", hurtDeathPassed ? "PASS" : "FAIL");
+        if (hurtMotion >= 0) MV1DeleteModel(hurtMotion);
+        if (deathMotion >= 0) MV1DeleteModel(deathMotion);
+        GameManager scoreRules;
+        scoreRules.Init();
+        scoreRules.AddScore(0, 5000);
+        scoreRules.AddDeath(0);
+        scoreRules.RecordSpecialAttack(0);
+        scoreRules.RecordSpecialAttack(0);
+        scoreRules.AddDeath(1);
+        scoreRules.RecordSpecialAttack(1);
+        bool scorePassed = scoreRules.p1Score == 5000 && scoreRules.p2Score == 0 &&
+            scoreRules.FinalScore(0) == 0 && scoreRules.FinalScore(1) == -4000 &&
+            scoreRules.deathCount[0] == 1 && scoreRules.specialUseCount[0] == 2 && scoreRules.specialUseCount[1] == 1;
+        scoreRules.mainTimer = 0;
+        scoreRules.Update(charainfo, charainfo);
+        scorePassed = scorePassed && scoreRules.gameState == 1 && scoreRules.p1Score == 5000;
+        for (const auto& popup : scoreRules.popups) scorePassed = scorePassed && !popup.active;
+        scoreRules.AddDeath(0);
+        scoreRules.AddDeath(0);
+        scoreRules.gameState = 0;
+        scoreRules.Update(charainfo, charainfo);
+        scorePassed = scorePassed && scoreRules.gameState == 2 && scoreRules.FinalScore(0) == -6000 && scoreRules.p1Score == 5000;
+        scoreRules.Init();
+        scorePassed = scorePassed && scoreRules.p1Score == 0 && scoreRules.p2Score == 0 &&
+            scoreRules.deathCount[0] == 0 && scoreRules.specialUseCount[0] == 0 && scoreRules.specialUseCount[1] == 0;
+        passed = passed && scorePassed;
+        if (report) fprintf(report, "score rules: unchanged live scores, no penalty popup, settlement deductions, net winner and reset: %s\n", scorePassed ? "PASS" : "FAIL");
+        int swordEffect = LoadEffekseerEffect("..\\Data\\Effect\\Sword2.efkefc", PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION);
 		bool swordPassed = swordEffect >= 0;
 		if (swordPassed) {
 			for (int i = 0; i < PLAYER_COUNT; i++) playerStates[i].normalAttackEffectResourceHandle = swordEffect;
@@ -488,7 +643,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			UpdateEffekseer3D();
 			UpdatePlayerAnimationProgress(attacker, megaState, idleMotion);
 		}
-		megaPassed = megaPassed && !megaState.isSpecialAttackEffectPlaying && megaState.specialAttackPlayingHandle == -1;
+		megaPassed = megaPassed && !megaState.isSpecialAttackEffectPlaying && megaState.specialAttackPlayingHandle == -1 && !megaState.isSpecialAttack;
+        attacker.mode = ATTACK;
+        megaState.isSpecialAttack = true;
+        megaState.isSpecialAttackEffectPlaying = false;
+        UpdatePlayerAnimationProgress(attacker, megaState, idleMotion);
+        bool recoveryPassed = attacker.mode == STAND && !megaState.isSpecialAttack && megaState.attackIndex == 0;
+        UpdatePlayerMovement(attacker, megaState, MOVE_SPEED, 0, runMotion);
+        recoveryPassed = recoveryPassed && attacker.mode == RUN && attacker.move.x == MOVE_SPEED;
+        const float recoveryTime = attacker.playtime;
+        UpdatePlayerAnimationProgress(attacker, megaState, idleMotion);
+        recoveryPassed = recoveryPassed && fabsf(attacker.playtime - recoveryTime - (PLAYER_USE_NEW_MODEL ? 0.5f : 0.3f)) < 0.001f;
+        passed = passed && recoveryPassed;
+        if (report) fprintf(report, "special completion restores running speed and animation: %s\n", recoveryPassed ? "PASS" : "FAIL");
 		if (megaEffect >= 0) DeleteEffekseerEffect(megaEffect);
 		passed = passed && megaPassed;
 		if (report) fprintf(report, "SwordMega load, startup, forward strike, area, multiple targets, single hit and cleanup: %s\n", megaPassed ? "PASS" : "FAIL");
@@ -617,7 +784,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Golem.mv1");
 	if (charainfo[TEST_ENEMY_GOLEM].model1 == -1) {
-		printfDx("ゴーレムのモデル読み込み失敗！\n");
 	}
 	else {
 		// 最初は非表示にしておく
@@ -636,7 +802,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			MV1SetFrameUserLocalMatrix(charainfo[i].model1, rootflm, MGetIdent());
 		}
 		else {
-			printfDx("Player%d frame not found: root\n", i + 1);
 		}
 	}
 	rootflm = MV1SearchFrame(charainfo[TEST_ENEMY_INDEX].model1, "root");
@@ -652,7 +817,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		//武器フレーム
 		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, PLAYER_USE_NEW_MODEL ? "mixamorig:RightHand" : "wp");
 		if (playerWeaponFrame[i] == -1) {
-			printfDx("Player%d frame not found: wp\n", i + 1);
 		}
 		//鞘モデル
 		playerSayaModel[i] = PLAYER_USE_NEW_MODEL ? -1 : LoadPlayerAssetModel("Saya.mv1");
@@ -660,7 +824,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		//鞘フレーム
 		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
 		if (!PLAYER_USE_NEW_MODEL && playerSayaFrame[i] == -1) {
-			printfDx("Player%d frame not found: sayabone\n", i + 1);
 		}
 	}
 
@@ -769,7 +932,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 	anim_damage = LoadPlayerAssetModel("Anim_Damage.mv1");
 	if (anim_damage == -1) return -1;
-	anim_down = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? "new\\Player_MainModel.mv1" : "Anim_Down_Loop.mv1");
+	playerDamageAnimation = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::damage]) : anim_damage;
+	if (playerDamageAnimation < 0) return -1;
+	anim_down = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? PlayerMotions::files[PlayerMotions::death] : "Anim_Down_Loop.mv1");
 	if (anim_down == -1) return -1;
 	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// 被撃アニメ
 	if (enemy_anim_attack == -1) return -1;
@@ -793,7 +958,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	if (hpBarTex == -1) {
 		// 読み込みに失敗した場合のエラー処理（必要に応じて）
-		printfDx("HPバーの画像読み込み失敗！\n");
 	}
 
 
@@ -850,7 +1014,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", NormalAttackEffect_FilePath);
 	normalAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION);
 	if (normalAttackEffectResourceHandle == -1) {
-		printfDx("Normal attack Effekseer effect load failed.\n");
 		return -1;
 	}
 	for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -860,7 +1023,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	// 重攻撃エフェクトのスプライトシートを分割して読み込む。
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", HeavyAttackEffect_FilePath);
 	if (LoadDivGraph(String, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_ROW_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_HEIGHT, heavyAttackEffectHandle) == -1) {
-		printfDx("重攻撃エフェクトの読み込み失敗！\n");
 		return -1;
 	}
 
@@ -868,13 +1030,61 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", SpecialAttackEffect_FilePath);
 	specialAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
 	if (specialAttackEffectResourceHandle == -1) {
-		printfDx("必殺技エフェクトの読み込み失敗！\n");
 		return -1;
 	}
-	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0 && (!gameSmoke || smokeFrames++ < (mergeSmoke ? 520 : 360))) {
+    enum class Screen { Menu, Playing, Results };
+    Screen screen = gameSmoke && !uiSmoke ? Screen::Playing : Screen::Menu;
+    int menuSelection = 0;
+    bool prevMenuConfirm = false, prevMenuDirection = false;
+    bool uiStarted = false, uiResults = false, uiReturned = false, uiRestarted = false;
+    auto resetMatch = [&]() {
+        game.Init();
+        for (int p = 0; p < PLAYER_COUNT; ++p) {
+            auto old = playerStates[p];
+            if (old.normalAttackPlayingHandle >= 0) StopEffekseer3DEffect(old.normalAttackPlayingHandle);
+            if (old.specialAttackPlayingHandle >= 0) StopEffekseer3DEffect(old.specialAttackPlayingHandle);
+            playerStates[p] = PlayerRuntimeState{};
+            playerStates[p].normalAttackEffectResourceHandle = old.normalAttackEffectResourceHandle;
+            playerStates[p].motionRootFrame = old.motionRootFrame;
+            playerStates[p].motionRootX = old.motionRootX;
+            playerStates[p].motionRootZ = old.motionRootZ;
+            charainfo[p].pos = VGet(1300, 800, p == 0 ? 100.0f : -400.0f);
+            charainfo[p].HP = MAX_HP; charainfo[p].deaths = 0; charainfo[p].mode = STAND; charainfo[p].isHit = false;
+            ResetMove(charainfo[p]); SetCharacterAnimation(charainfo[p], anim_neutral);
+            MV1SetPosition(charainfo[p].model1, charainfo[p].pos);
+            isAiming[p] = false; prevAiming[p] = false; playerWhiteoutTimer[p] = 0; flashStock[p] = 1;
+        }
+        for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+            charainfo[e].mode = NONE; charainfo[e].invincibleTimer = 0;
+            if (charainfo[e].model1 >= 0) MV1SetVisible(charainfo[e].model1, FALSE);
+        }
+        for (int f = 0; f < MAX_THROWN_FLASH; ++f) thrownFlashes[f].active = false;
+        dropFlashItem.active = false; flashSpawnTimer = 0;
+    };
+	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0 && (!gameSmoke || smokeFrames++ < (uiSmoke ? 180 : (deathSmoke ? 1800 : (mergeSmoke ? 520 : 360))))) {
+        if (uiSmoke && screen == Screen::Playing && smokeFrames == 60) game.mainTimer = 1;
+        if (screen == Screen::Playing && game.gameState != 0) {
+            screen = Screen::Results; menuSelection = 0; prevMenuConfirm = true; uiResults = true;
+        }
+        if (screen != Screen::Playing) {
+            int pad = ReadPlayerPadState(DX_INPUT_PAD1) | ReadPlayerPadState(DX_INPUT_PAD2);
+            bool confirm = CheckHitKey(KEY_INPUT_RETURN) || (pad & PAD_INPUT_1);
+            bool direction = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_DOWN) || (pad & (PAD_INPUT_UP | PAD_INPUT_DOWN));
+            if (direction && !prevMenuDirection) menuSelection = 1 - menuSelection;
+            if (uiSmoke) confirm = smokeFrames == 10 || smokeFrames == 90 || smokeFrames == 120;
+            if (confirm && !prevMenuConfirm) {
+                if (menuSelection == 1) break;
+                if (screen == Screen::Results) { screen = Screen::Menu; uiReturned = true; }
+                else { resetMatch(); screen = Screen::Playing; if (uiStarted) uiRestarted = true; uiStarted = true; }
+            }
+            prevMenuConfirm = confirm; prevMenuDirection = direction;
+            if (screen != Screen::Playing) { DrawGameMenu(screen == Screen::Results, game, menuSelection, uiSmoke && smokeFrames == 1 ? TEXT("..\\.merge-review\\start-menu.png") : uiSmoke && smokeFrames == 65 ? TEXT("..\\.merge-review\\results.png") : nullptr); WaitTimer(16); }
+            continue;
+        }
 
 
 
+		if (deathSmoke && smokeFrames == 100) { charainfo[0].HP = 0; charainfo[1].HP = 0; }
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
 
@@ -890,18 +1100,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				charainfo[i].mode = DOWNMODE;
 
 				// 死亡アニメーション処理など
-				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
-				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
-				charainfo[i].playtime = 0.0f;
+				CancelPlayerCombat(playerStates[i]);
+				ResetMove(charainfo[i]);
+				SetCharacterAnimation(charainfo[i], anim_down);
+				isAiming[i] = false;
 
 				// ★ここでカウントする
-				game.AddScore(i, -500);
+
 			game.AddDeath(i);
 			}
 		}
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			// 死亡状態(DOWNMODE)で、ジャンプボタン（1P:SPACE, 2P:RETURN）が押されたら
-			if (charainfo[i].mode == DOWNMODE && CheckHitKey(playerInputs[i].jumpKey) == 1) {
+			if (charainfo[i].mode == DOWNMODE && (CheckHitKey(playerInputs[i].jumpKey) == 1 || (ReadPlayerPadState(playerInputs[i].padType) & playerInputs[i].jumpPadButton))) {
 
 				// 1. HPを回復
 				charainfo[i].HP = 6;
@@ -921,7 +1132,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		// 敵（ゴブリン）のAI・移動・アニメーション処理
 		// ==========================================
 
-		for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = GetJoypadInputState(playerInputs[p].padType);
+		for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(playerInputs[p].padType);
 		for (int p = 0; p < PLAYER_COUNT; p++) {
 			bool currentAimInput = false;
 			if (p == 0) {
@@ -1090,7 +1301,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 							charainfo[p].mode = DAMAGE;
 							charainfo[p].playtime = 0.0f;
 							MV1DetachAnim(charainfo[p].model1, charainfo[p].attachidx);
-							charainfo[p].attachidx = MV1AttachAnim(charainfo[p].model1, 0, anim_damage);
+							charainfo[p].attachidx = MV1AttachAnim(charainfo[p].model1, 0, playerDamageAnimation);
 							charainfo[p].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[p].model1, charainfo[p].attachidx);
 							playerWhiteoutTimer[p] = 120;
 						}
@@ -1149,30 +1360,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			VECTOR dir = VSub(charainfo[enemyTargetIndex].pos, charainfo[i].pos);
 			dir.y = 0;
 
-			const float activeRangeSq = 300.0f * 300.0f;
-			if (targetDistSq > activeRangeSq && charainfo[i].mode != ATTACK) {
-				if (charainfo[i].currentAnimType != 1) {
-					charainfo[i].currentAnimType = 1;
-					charainfo[i].playtime = 0.0f;
-					if (charainfo[i].attachidx != -1) {
-						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
-					}
-					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, animNeutral);
-					if (charainfo[i].attachidx != -1) {
-						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
-					}
-				}
-
-				charainfo[i].playtime += 0.2f;
-				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
-					charainfo[i].playtime = 0.0f;
-				}
-				if (charainfo[i].attachidx != -1) {
-					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
-				}
-				continue;
-			}
-
 			float angle = atan2f(dir.x, dir.z) + DX_PI_F;
 			MV1SetRotationXYZ(charainfo[i].model1, VGet(0.0f, angle, 0.0f));
 
@@ -1198,6 +1385,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					if (realDist > 0.001f) {
 						VECTOR moveDir = VGet(dir.x / realDist, 0.0f, dir.z / realDist);
 						charainfo[i].pos = VAdd(charainfo[i].pos, VScale(moveDir, 1.8f));
+                        if (mergeSmoke && targetDistSq > 300.0f * 300.0f) ++smokeLongRangeMoves;
 					}
 
 					if (charainfo[i].currentAnimType != 2) {
@@ -1227,6 +1415,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 								charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
 							{
 								charainfo[p].HP -= 1;
+                                if (charainfo[p].mode != DAMAGE) {
+                                    CancelPlayerCombat(playerStates[p]);
+                                    ResetMove(charainfo[p]);
+                                    SetCharacterAnimation(charainfo[p], playerDamageAnimation);
+                                    charainfo[p].mode = DAMAGE;
+                                    isAiming[p] = false;
+                                }
 								charainfo[i].isHit = true;
 								break;
 							}
@@ -1303,6 +1498,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			// 1P/2P の入力、移動、待機/走り切替、攻撃予約を共通処理する。
 			if (isAiming[i] || charainfo[i].mode == DAMAGE || charainfo[i].mode == DOWNMODE) { ResetMove(charainfo[i]); continue; }
+            const bool specialWasActive = playerStates[i].isSpecialAttack;
 			UpdatePlayerInput(
 				charainfo[i],
 				playerStates[i],
@@ -1317,6 +1513,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				SEjumpHandle,
 				specialAttackEffectResourceHandle
 			);
+            if (!specialWasActive && playerStates[i].isSpecialAttack) game.RecordSpecialAttack(i);
 			UpdatePlayerAttackState(
 				charainfo[i],
 				playerStates[i],
@@ -1338,87 +1535,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 		}
 		prevJKey = currentJKey;
-
-		int enemyTargetIndex = PLAYER1_INDEX;
-		float enemyDistP1 = VSize(VSub(charainfo[PLAYER1_INDEX].pos, charainfo[TEST_ENEMY_INDEX].pos));
-		float enemyDistP2 = VSize(VSub(charainfo[PLAYER2_INDEX].pos, charainfo[TEST_ENEMY_INDEX].pos));
-		if (enemyDistP2 < enemyDistP1) {
-			enemyTargetIndex = PLAYER2_INDEX;
-		}
-
-		if (charainfo[TEST_ENEMY_INDEX].mode == STAND) {
-			// 距離の近いプレイヤーを攻撃対象にする。
-			float dist = VSize(VSub(charainfo[enemyTargetIndex].pos, charainfo[TEST_ENEMY_INDEX].pos));
-			if (dist < 150.0f) {
-				charainfo[TEST_ENEMY_INDEX].mode = ATTACK;
-				SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_attack);
-			}
-		}
-
-		else if (charainfo[TEST_ENEMY_INDEX].mode == ATTACK) {
-
-			// 攻撃アニメーションの「振り下ろし」タイミング
-			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.4f &&
-				charainfo[TEST_ENEMY_INDEX].playtime <= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.6f)
-			{
-				// 攻撃がまだ一度も当たっていない場合のみ判定
-				if (charainfo[TEST_ENEMY_INDEX].isHit == false)
-				{
-					for (int i = 0; i < PLAYER_COUNT; i++) {
-						// テスト敵の攻撃は、範囲内のどちらのプレイヤーにも当たる。
-						if (HitCheck_Capsule_Capsule(
-							charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
-							charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)), charainfo[i].charahitinfo.Width / 2))
-						{
-
-								charainfo[i].HP -= 1; // ダメージ発生
-							charainfo[TEST_ENEMY_INDEX].isHit = true; // フラグを立てて連続ヒットを防止
-							printfDx("プレイヤー%d被弾！HP:%d\n", i + 1, charainfo[i].HP);
-							break;
-						}
-					}
-				}
-			}
-
-			// アニメーションが終わったらフラグをリセットして通常モードへ
-			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
-				charainfo[TEST_ENEMY_INDEX].mode = STAND;
-				SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
-				charainfo[TEST_ENEMY_INDEX].isHit = false;
-			}
-		}
-		HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[0].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[0].move));
-		WallNum = 0;
-		FloorNum = 0;
-		for (int i = 0; i < HitDim.HitNum; i++)
-		{
-			// 法線のY成分が小さい → 壁
-			if (fabs(HitDim.Dim[i].Normal.y) < 0.5f)
-			{
-				printf("壁扱い\n");
-
-				if (HitDim.Dim[i].Position[0].y > charainfo[0].pos.y + 1.0f ||
-					HitDim.Dim[i].Position[1].y > charainfo[0].pos.y + 1.0f ||
-					HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f)
-				{
-					if (WallNum < CHARA_MAX_HITCOLL)
-					{
-						Wall[WallNum] = &HitDim.Dim[i];
-						WallNum++;
-					}
-				}
-			}
-			else
-			{
-				// 床
-				if (FloorNum < CHARA_MAX_HITCOLL)
-				{
-					Floor[FloorNum] = &HitDim.Dim[i];
-					FloorNum++;
-				}
-			}
-		}
-
 
 		const bool isPlayerOverlappingNow = HitCheck_Capsule_Capsule(
 			charainfo[PLAYER1_INDEX].pos,
@@ -1477,6 +1593,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			if (charainfo[i].pos.y < DEATH_LINE) {
 				// 1. 死亡回数（DEATHS）を増やす
 				charainfo[i].deaths++;
+                if (charainfo[i].mode != DOWNMODE) game.AddDeath(i);
+                CancelPlayerCombat(playerStates[i]);
 
 				// 2. 復活位置（スポーン地点）へワープさせる
 				if (i == 0) {
@@ -1630,6 +1748,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		// Apply suction after enemy AI and player movement, before hit detection.
 		for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e)
 			UpdateWhirlwindPull(charainfo, playerStates, charainfo[e]);
+        // Update floor height after pursuit, separation and suction.
+        for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+            if (charainfo[e].mode != NONE) PlaceEnemyOnGround(charainfo[e]);
+        }
 
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -1813,8 +1935,33 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         bool redSpawned = false;
         for (int e = TEST_ENEMY_RED; e < MAX_CHARA; ++e) redSpawned = redSpawned || charainfo[e].mode != NONE;
         const bool timerPassed = game.mainTimer < 99 * 60;
-        const bool passed = mergeAimPassed && mergeThrowPassed && mergeStunPassed && redSpawned && timerPassed;
+        int activeSpawned = 0;
+        for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) if (charainfo[e].mode != NONE) ++activeSpawned;
+        if (report) fprintf(report, "spawn count=%d long range pursuit=%d\n", activeSpawned, smokeLongRangeMoves);
+        bool grounded = true;
+        for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+            if (charainfo[e].mode == NONE) continue;
+            const auto hit = MV1CollCheck_Line(stagedata, -1,
+                VGet(charainfo[e].pos.x, 2000, charainfo[e].pos.z),
+                VGet(charainfo[e].pos.x, -1000, charainfo[e].pos.z));
+            grounded = grounded && hit.HitFlag && fabsf(charainfo[e].pos.y - hit.HitPosition.y) < 0.1f;
+        }
+        if (report) fprintf(report, "enemy ground contact=%d\n", grounded);
+        const bool passed = mergeAimPassed && mergeThrowPassed && mergeStunPassed && redSpawned && timerPassed && grounded && activeSpawned >= 20 && smokeLongRangeMoves > 0;
         if (report) { fprintf(report, "aim=%d throw=%d stun=%d redSpawn=%d timer=%d %s\n", mergeAimPassed, mergeThrowPassed, mergeStunPassed, redSpawned, timerPassed, passed ? "PASS" : "FAIL"); fclose(report); }
+        if (!passed) return 1;
+    }
+    if (deathSmoke) {
+        FILE* report = nullptr; fopen_s(&report, "death-smoke.txt", "w");
+        const bool passed = game.deathCount[0] == 1 && game.deathCount[1] == 1 &&
+            charainfo[0].mode == DOWNMODE && charainfo[1].mode == DOWNMODE;
+        if (report) { fprintf(report, "both players dead; death counts=%d,%d; frames=%d; %s\n", game.deathCount[0], game.deathCount[1], smokeFrames, passed ? "PASS" : "FAIL"); fclose(report); }
+        if (!passed) return 1;
+    }
+    if (uiSmoke) {
+        FILE* report = nullptr; fopen_s(&report, "ui-smoke.txt", "w");
+        const bool passed = uiStarted && uiResults && uiReturned && uiRestarted && game.mainTimer > 0 && game.p1Score == 0 && game.p2Score == 0;
+        if (report) { fprintf(report, "start=%d results=%d menu=%d restart=%d %s\n", uiStarted, uiResults, uiReturned, uiRestarted, passed ? "PASS" : "FAIL"); fclose(report); }
         if (!passed) return 1;
     }
 	runtimeCleanup.effectReady = false; Effkseer_End();
@@ -1852,7 +1999,7 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 				}
 
 				MV1DetachAnim(target->model1, target->attachidx);
-				target->attachidx = MV1AttachAnim(target->model1, 0, (PLAYER_USE_NEW_MODEL && (target == &charainfo[0] || target == &charainfo[1])) ? target->model1 : anim_damage);
+				target->attachidx = MV1AttachAnim(target->model1, 0, (PLAYER_USE_NEW_MODEL && (target == &charainfo[0] || target == &charainfo[1])) ? playerDamageAnimation : anim_damage);
 				target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
 				target->playtime = 0.0f;
 				target->mode = DAMAGE;
@@ -1878,14 +2025,13 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 					else {
 						// まだHPが残っている場合はダメージモーション
 						MV1DetachAnim(target->model1, target->attachidx);
-						target->attachidx = MV1AttachAnim(target->model1, 0, (PLAYER_USE_NEW_MODEL && (target == &charainfo[0] || target == &charainfo[1])) ? target->model1 : anim_damage);
+						target->attachidx = MV1AttachAnim(target->model1, 0, (PLAYER_USE_NEW_MODEL && (target == &charainfo[0] || target == &charainfo[1])) ? playerDamageAnimation : anim_damage);
 						target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
 						target->playtime = 0.0f;
 						target->mode = DAMAGE;
 					}
 				}
 			}
-			printfDx("ヒット！残リHP:%d\n", (target == &charainfo[0] ? target->HP : target->enemyHP));
 		}
 	}
 }
