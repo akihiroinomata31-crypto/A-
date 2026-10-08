@@ -6,6 +6,32 @@
 #include "main.h"
 #include "game.h"
 #include "player.h"
+#include "taiki.h"
+
+
+
+
+	// ==========================================
+// 逆転バフ管理
+// ==========================================
+int buffPlayerIndex = -1;             // バフ中のプレイヤー（-1: なし, 0: P1, 1: P2）
+int buffDurationTimer = 0;            // バフ残りフレーム数
+const int BUFF_ACTIVE_SEC = 10;       // ★何秒間使えるか（10秒）
+const int BUFF_MAX_FRAMES = 60 * BUFF_ACTIVE_SEC;
+
+// バフ解除関数
+void ResetBuff(int& buffIdx, int& buffTimer, SCharaInfo* charas) {
+	if (buffIdx != -1) {
+		// 見た目（色加算）を通常に戻す
+		MV1SetMaterialDrawAddColorAll(charas[buffIdx].model1, 0, 0, 0);
+		if (buffIdx == PLAYER2_INDEX) {
+			MV1SetMaterialDrawAddColorAll(charas[PLAYER2_INDEX].model1, 0, 0, 60);
+		}
+	}
+	buffIdx = -1;
+	buffTimer = 0;
+}
+
 
 namespace {
 
@@ -29,6 +55,26 @@ namespace {
 
 } // namespace
 
+// ==========================================
+// 閃光弾・投擲構造体
+// ==========================================
+struct ThrownFlashbang {
+	int model;
+	VECTOR pos;
+	VECTOR move;
+	int timer;
+	bool active;
+	int ownerIndex; // 投げたプレイヤー（0: 1P, 1: 2P）
+};
+
+struct FlashDropItem {
+	int model;
+	VECTOR pos;
+	float basePosY;
+	float bobAngle;
+	bool active;
+};
+
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
 	int running = 0;
@@ -41,7 +87,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int red_goblin_anim_neutral = -1;
 	int red_goblin_anim_attack = -1;
 	int red_goblin_anim_walk = -1;
-
+	int gh_gauge_frame = -1;
+	int specialGauge[2] = { 0, 0 }; // [0]: P1, [1]: P2
 	int anim_attack[PLAYER_ATTACK_ANIM_COUNT];
 	int stagedata;
 	int sky;
@@ -52,13 +99,23 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
 	int prevJKey = 0;
 	int isBGMPlaying = 1;
+	
+	// ==========================================
+	// 99秒タイマー管理（60fps × 99秒）
+	// ==========================================
+	const int MATCH_TOTAL_FRAMES = 99 * 60;
+	int matchTimerFrames = MATCH_TOTAL_FRAMES;
 
 	// ==========================================
-	// 閃光弾エイム用変数
+	// 閃光弾エイム・投擲・耐性用変数
 	// ==========================================
 	bool isAiming[PLAYER_COUNT] = { false, false };
 	bool prevAiming[PLAYER_COUNT] = { false, false };
 	float aimAngle[PLAYER_COUNT] = { 0.0f, 0.0f };
+	int flashStock[PLAYER_COUNT] = { 1, 1 };
+	int playerWhiteoutTimer[PLAYER_COUNT] = { 0, 0 };
+	int flashImmunityTimer[PLAYER_COUNT] = { 0, 0 }; // スタン後の無敵耐性（クールダウン）
+
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
 
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
@@ -68,9 +125,16 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	const int SPAWN_INTERVAL = 300;
 	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
-
+	EnemyManager g_enemyMgr;
 	GameManager game;
 	VECTOR stagepos = VGet(0.0f, 0.0f, 1200.0f);
+
+	// while ループに入る前に宣言しておく
+	int buffPlayerIndex = -1;
+	int buffDurationTimer = 0;
+	const int BUFF_ACTIVE_SEC = 10;
+	const int BUFF_MAX_FRAMES = 60 * BUFF_ACTIVE_SEC;
+
 
 	// ステージコリジョン情報
 	MV1_COLL_RESULT_POLY_DIM HitDim;
@@ -222,12 +286,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		if (playerWeaponModel[i] == -1) return -1;
 		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "wp");
 
-		playerSayaModel[i] = LoadPlayerAssetModel("Sabel.mv1");
+		playerSayaModel[i] = LoadPlayerAssetModel("Saya.mv1");
 		if (playerSayaModel[i] == -1) return -1;
 		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
 	}
 
-	// ステージ背面カリング有効化（描画負荷削減）
+	// ステージ背面カリング有効化
 	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage_4545.mv1");
 	if (stagedata == -1) return -1;
 	MV1SetPosition(stagedata, stagepos);
@@ -240,26 +304,34 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	MV1SetPosition(sky, VGet(0, -1000, 0));
 
 	MV1SetupCollInfo(stagedata, -1);
+	
+	
+	// 修正後（OK: 先頭で作った実体に代入する）
+	
+	
+// ★ 1. まず黒色(0, 0, 0)を透明色として設定する
 	SetTransColor(0, 0, 0);
 
+	// ★ 2. その設定の状態で画像を読み込む
+	gh_gauge_frame = LoadGraph("..\\Data\\UI\\hisatu.png");
+
+	// 読み込みチェック
+	if (gh_gauge_frame == -1) {
+		MessageBox(NULL, "hisatu.png の読み込みに失敗しました", "エラー", MB_OK);
+	}
+
+	
+	
 	// ==========================================
-	// 閃光弾モデルと構造体
+	// 閃光弾モデルと構造体初期化
 	// ==========================================
 	if (grenadeBaseModel == -1) {
-		grenadeBaseModel = MV1LoadModel("..\\Data\\Weapon\\Senkou.mv1");
+		grenadeBaseModel = MV1LoadModel("..\\Data\\Weapon\\Senkoud.mv1");
 	}
 	if (grenadeBaseModel != -1) {
 		MV1SetVisible(grenadeBaseModel, FALSE);
+		MV1TerminateCollInfo(grenadeBaseModel, -1);
 	}
-
-	struct ThrownFlashbang {
-		int model;
-		VECTOR pos;
-		VECTOR move;
-		int timer;
-		bool active;
-		int ownerIndex; // 投げたプレイヤー（0:1P, 1:2P）
-	};
 
 	const int MAX_THROWN_FLASH = 2;
 	ThrownFlashbang thrownFlashes[MAX_THROWN_FLASH];
@@ -270,19 +342,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		if (thrownFlashes[f].model != -1) {
 			MV1SetVisible(thrownFlashes[f].model, FALSE);
 			MV1SetScale(thrownFlashes[f].model, VGet(1.0f, 1.0f, 1.0f));
+			MV1TerminateCollInfo(thrownFlashes[f].model, -1);
 		}
 	}
-
-	int flashStock[PLAYER_COUNT] = { 1, 1 };
-	int playerWhiteoutTimer[PLAYER_COUNT] = { 0, 0 };
-
-	struct FlashDropItem {
-		int model;
-		VECTOR pos;
-		float basePosY;
-		float bobAngle;
-		bool active;
-	};
 
 	FlashDropItem dropFlashItem;
 	dropFlashItem.active = false;
@@ -292,6 +354,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (dropFlashItem.model != -1) {
 		MV1SetVisible(dropFlashItem.model, FALSE);
 		MV1SetScale(dropFlashItem.model, VGet(1.3f, 1.3f, 1.3f));
+		MV1TerminateCollInfo(dropFlashItem.model, -1);
 	}
 
 	int flashSpawnTimer = 0;
@@ -326,10 +389,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	SetDrawScreen(DX_SCREEN_BACK);
 
-	// カメラの初期画角設定
 	SetupCamera_Perspective(60.0f * DX_PI_F / 180.0f);
 
-	// サウンド
 	sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
 	BGMSoundHandle = LoadSoundMem(String);
 	if (BGMSoundHandle != -1) {
@@ -342,13 +403,35 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	SEdamageHandle = LoadSoundMem(String);
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEjump_FilePath);
 	SEjumpHandle = LoadSoundMem(String);
+	const float DESPAWN_DIST_SQ = 700.0f * 700.0f; // 画面外に離れすぎた距離
 
+	
 	// ==========================================
 	// メインループ
 	// ==========================================
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
 
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
+		// --- P1の必殺技（Uキー） ---
+		if (CheckHitKey(KEY_INPUT_U) == 1 && specialGauge[0] >= MAX_SPECIAL_GAUGE) {
+			specialGauge[0] = 0; // ゲージを全消費
+			// ここに必殺技の処理（大技攻撃、範囲ダメージなど）
+		}
+
+		// --- P2の必殺技（Nキー） ---
+		if (CheckHitKey(KEY_INPUT_N) == 1 && specialGauge[1] >= MAX_SPECIAL_GAUGE) {
+			specialGauge[1] = 0; // ゲージを全消費
+			// ここに必殺技の処理
+		}
+		// 試合タイマーカウントダウン
+		if (matchTimerFrames > 0) {
+			matchTimerFrames--;
+		}
+		int remainingSec = matchTimerFrames / 60; // 残り秒数
+
+
+
+
 
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			UpdatePlayerAnimationProgress(charainfo[i], playerStates[i], anim_neutral);
@@ -374,6 +457,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 		}
 
+
+		// 閃光弾スタン耐性タイマー減算
+		for (int p = 0; p < PLAYER_COUNT; p++) {
+			if (flashImmunityTimer[p] > 0) {
+				flashImmunityTimer[p]--;
+			}
+		}
+
 		// ==========================================
 		// 閃光弾：エイム操作 ＆ リリース投擲
 		// ==========================================
@@ -386,7 +477,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				currentAimInput = (CheckHitKey(KEY_INPUT_RSHIFT) == 1) || (playerStates[p].key & PAD_INPUT_5);
 			}
 
-			if (flashStock[p] > 0 && charainfo[p].mode != DAMAGE && charainfo[p].mode != DOWNMODE) {
+			// ★ラスト30秒なら投擲ロック
+			bool isLast30Sec = (remainingSec <= 30);
+			bool canThrowFlash = (flashStock[p] > 0) && (!isLast30Sec) &&
+			                     (charainfo[p].mode != DAMAGE) && (charainfo[p].mode != DOWNMODE);
+
+			if (canThrowFlash) {
 				if (currentAimInput && !prevAiming[p]) {
 					isAiming[p] = true;
 					aimAngle[p] = charainfo[p].dir;
@@ -481,7 +577,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		// ==========================================
-		// 閃光弾の物理挙動 ＆ 炸裂処理（高速版）
+		// 閃光弾の物理挙動 ＆ 炸裂処理
 		// ==========================================
 		for (int f = 0; f < MAX_THROWN_FLASH; f++) {
 			if (!thrownFlashes[f].active) continue;
@@ -491,8 +587,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			thrownFlashes[f].pos.z += thrownFlashes[f].move.z;
 			thrownFlashes[f].move.y -= 0.45f;
 
-			if (thrownFlashes[f].pos.y <= 800.0f) {
-				thrownFlashes[f].pos.y = 800.0f;
+			if (thrownFlashes[f].pos.y <= 600.0f) {
+				thrownFlashes[f].pos.y = 600.0f;
 				thrownFlashes[f].move.y = -thrownFlashes[f].move.y * 0.3f;
 				thrownFlashes[f].move.x *= 0.6f;
 				thrownFlashes[f].move.z *= 0.6f;
@@ -507,7 +603,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 				const float FLASH_RANGE_SQ = 450.0f * 450.0f;
 
-				// ① 敵AIのスタン
+				// ① 敵AIスタン
 				for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
 					if (charainfo[i].mode == NONE) continue;
 					float edx = charainfo[i].pos.x - thrownFlashes[f].pos.x;
@@ -518,10 +614,11 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					}
 				}
 
-				// ② 相手プレイヤーの直視判定（投げた本人は食らわない）
+				// ② 相手プレイヤーの直視判定（投げた本人・耐性中は食らわない）
 				for (int p = 0; p < PLAYER_COUNT; p++) {
 					if (charainfo[p].mode == DOWNMODE) continue;
 					if (p == thrownFlashes[f].ownerIndex) continue; // 投げた本人は無効化
+					if (flashImmunityTimer[p] > 0) continue;         // 耐性中は無効化
 
 					float toX = thrownFlashes[f].pos.x - charainfo[p].pos.x;
 					float toZ = thrownFlashes[f].pos.z - charainfo[p].pos.z;
@@ -539,15 +636,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 							MV1DetachAnim(charainfo[p].model1, charainfo[p].attachidx);
 							charainfo[p].attachidx = MV1AttachAnim(charainfo[p].model1, 0, anim_damage);
 							charainfo[p].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[p].model1, charainfo[p].attachidx);
-							playerWhiteoutTimer[p] = 120;
+
+							playerWhiteoutTimer[p] = 120; // 2秒間ホワイトアウト
+							flashImmunityTimer[p] = 120 + 300; // スタン復帰後5秒間は耐性
 						}
 						else {
-							playerWhiteoutTimer[p] = 20;
+							playerWhiteoutTimer[p] = 20; // 回避成功
 						}
 					}
 				}
 			}
 		}
+
+		
 
 		// 敵AI処理
 		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
@@ -749,7 +850,22 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			if (charainfo[i].mode == DAMAGE) {
 				charainfo[i].move.x = 0.0f;
 				charainfo[i].move.z = 0.0f;
-				continue;
+
+				// ホワイトアウトのタイマー（スタン時間）が切れたら STAND に復帰
+				if (playerWhiteoutTimer[i] <= 0) {
+					charainfo[i].mode = STAND;
+					charainfo[i].playtime = 0.0f;
+
+					// アニメーションを通常（立ち）状態に戻す
+					if (charainfo[i].attachidx != -1) {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+					}
+					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
+					if (charainfo[i].attachidx != -1) {
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+					}
+				}
+				continue; // スタン中はこのフレームの入力を受け付けない
 			}
 
 			UpdatePlayerInput(
@@ -804,6 +920,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				{
 					if (charainfo[TEST_ENEMY_INDEX].isHit == false) {
 						for (int p = 0; p < PLAYER_COUNT; p++) {
+							if (charainfo[p].mode == DOWNMODE) continue;
+
 							if (HitCheck_Capsule_Capsule(
 								charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
 								charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
@@ -1050,7 +1168,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
 			}
 
-			// 閃光弾
+			// 投擲中の閃光弾
 			for (int f = 0; f < MAX_THROWN_FLASH; f++) {
 				if (thrownFlashes[f].active && thrownFlashes[f].model != -1) {
 					MV1DrawModel(thrownFlashes[f].model);
@@ -1082,7 +1200,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				DrawLine(centerX, centerY + 12, centerX, centerY + 26, GetColor(0, 255, 200), 2);
 			}
 
-			// ホワイトアウト描画
+			// ホワイトアウト演出
 			if (playerWhiteoutTimer[pIdx] > 0) {
 				playerWhiteoutTimer[pIdx]--;
 				int alpha = (playerWhiteoutTimer[pIdx] > 40) ? 255 : (playerWhiteoutTimer[pIdx] * 255 / 40);
@@ -1090,6 +1208,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
 				DrawBox(startX, 0, endX, 600, GetColor(255, 255, 255), TRUE);
 				SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+			}
+
+			// 閃光弾ストック数 & 投擲ロックHUD
+			SetFontSize(16);
+			DrawFormatString(startX + 20, 500, GetColor(255, 255, 255), "FLASH: %d", flashStock[pIdx]);
+
+			if (remainingSec <= 30) {
+				DrawString(startX + 20, 520, "FLASH: TIME LOCKED", GetColor(255, 80, 80));
+			}
+
+			if (flashImmunityTimer[pIdx] > 0) {
+				SetFontSize(14);
+				DrawString(startX + 20, 540, "[FLASH RESIST ACTIVE]", GetColor(100, 200, 255));
 			}
 		}
 
@@ -1177,10 +1308,20 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 						if (attacker == &charainfo[0]) {
 							game.AddScore(0, 100);
 							game.AddScorePopup(0, 100);
+							// ★追加：撃破時にゲージを15%増加
+							specialGauge[0] += 15;
+							if (specialGauge[0] > MAX_SPECIAL_GAUGE) {
+								specialGauge[0] = MAX_SPECIAL_GAUGE;
+							}
 						}
 						else if (attacker == &charainfo[1]) {
 							game.AddScore(1, 100);
 							game.AddScorePopup(1, 100);
+							// ★追加：撃破時にゲージを15%増加
+							specialGauge[0] += 15;
+							if (specialGauge[0] > MAX_SPECIAL_GAUGE) {
+								specialGauge[0] = MAX_SPECIAL_GAUGE;
+							}
 						}
 					}
 					else {

@@ -1,5 +1,5 @@
 #pragma once
-#include "DxLib.h"
+#include <DxLib.h>
 #include <vector>
 
 struct SCharaInfo;
@@ -34,6 +34,92 @@ struct Flashbang {
     int ownerIdx;
     bool active;
 };
+
+
+class EnemyPool {
+private:
+    // 生きている敵の「実際の配列インデックス」のリスト
+    std::vector<int> activeIndices;
+    // 出番を待っている「空きスロット」のインデックス一覧（スタック）
+    std::vector<int> freeIndices;
+
+public:
+    // 初期化（ゲーム開始時に1度だけ呼ぶ）
+    void Init(int startIndex, int endIndex) {
+        activeIndices.clear();
+        freeIndices.clear();
+        // 使えるインデックスをすべて「出番待ち」に登録
+        for (int i = startIndex; i < endIndex; i++) {
+            freeIndices.push_back(i);
+        }
+    }
+
+    // ① 新鮮な敵を1体出撃させる（探索ループなし！O(1)の瞬速処理）
+    int Spawn(SCharaInfo* charaArray, VECTOR spawnPos, int defaultHP) {
+        if (freeIndices.empty()) {
+            return -1; // 空き枠がなければ安全に何もしない（溢れ防止）
+        }
+
+        // 待機リストの末尾から1つ取り出す
+        int slot = freeIndices.back();
+        freeIndices.pop_back();
+
+        // 生存リストへ登録
+        activeIndices.push_back(slot);
+
+        // ★スロットを完璧に「新鮮な状態」に初期化
+        SCharaInfo& e = charaArray[slot];
+        e.mode = STAND;
+        e.pos = spawnPos;
+        e.move = VGet(0.0f, 0.0f, 0.0f);
+        e.enemyHP = defaultHP;
+        e.playtime = 0.0f;
+        e.isHit = false;
+        e.currentAnimType = 1;
+
+        if (e.model1 != -1) {
+            MV1SetPosition(e.model1, e.pos);
+            MV1SetVisible(e.model1, TRUE);
+            if (e.attachidx != -1) {
+                MV1SetAttachAnimTime(e.model1, e.attachidx, 0.0f);
+            }
+        }
+
+        return slot;
+    }
+
+    // ② 敵が死んだ／画面外で消す時の即時リサイクル（完全成仏処理）
+    void Despawn(SCharaInfo* charaArray, int activeListIndex) {
+        int slot = activeIndices[activeListIndex];
+
+        // ★データを完全に白紙化
+        SCharaInfo& e = charaArray[slot];
+        e.mode = NONE;
+        e.enemyHP = 0;
+        e.playtime = 0.0f;
+        e.isHit = false;
+        e.pos = VGet(-99999.0f, -99999.0f, -99999.0f); // 画面外奈落へ退避
+        if (e.model1 != -1) {
+            MV1SetVisible(e.model1, FALSE);
+            MV1SetPosition(e.model1, e.pos);
+        }
+
+        // 空き待機リストへ返却（これで次回最優先で再利用される）
+        freeIndices.push_back(slot);
+
+        // 生存リストから削除（末尾と入れ替えてpopすることで超高速削除: O(1)）
+        activeIndices[activeListIndex] = activeIndices.back();
+        activeIndices.pop_back();
+    }
+
+    // 生きている敵の数
+    int GetActiveCount() const { return (int)activeIndices.size(); }
+
+    // 生きている敵のスロット番号を取得
+    int GetActiveSlot(int index) const { return activeIndices[index]; }
+};
+
+
 
 class GameManager {
 public:

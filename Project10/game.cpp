@@ -2,13 +2,17 @@
 #include "main.h"
 #include "player.h"
 #include <math.h>
+#include "taiki.h"
 int stagedata = -1;
 int enemy_anim_attack = -1;
 int redGoblinBaseModel = -1;
 int red_goblin_anim_neutral = -1;
 int red_goblin_anim_attack = -1;
 int weaponBaseModel = -1;
+int specialGauge[2] = { 0, 0 };
+int gh_gauge_frame = -1;
 
+EnemyManager g_enemyMgr;
 void GameManager::Init() {
     mainTimer = 99 * 60;
     goblinSpawnTimer = 0;
@@ -18,7 +22,7 @@ void GameManager::Init() {
     gameState = 0;
     deathCount[0] = 0;
     deathCount[1] = 0;
-
+    g_enemyMgr.Init(TEST_ENEMY_INDEX, TEST_ENEMY_RED, 60);
     for (int i = 0; i < 20; i++) {
         popups[i].active = false;
     }
@@ -26,7 +30,7 @@ void GameManager::Init() {
 
 void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     // ==========================================
-    // 1. メイン制限時間タイマー（他から完全に独立）
+    // 1. メイン制限時間タイマー
     // ==========================================
     if (mainTimer > 0) {
         mainTimer--;
@@ -37,51 +41,75 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         else                        gameState = 3;
     }
 
+    // ==========================================
+    // 2. 待機キューの自動補充（メイン枠が空いていれば即出撃）
+    // ==========================================
+    g_enemyMgr.UpdateQueue(enemyList);
 
-    
-    
-    
-    
-    
     // ==========================================
-    // 2. 敵スポーン処理（mainTimer とは無関係に動作）
+    // 3. 敵スポーン要求（タイマー制御）
     // ==========================================
-    int activeEnemyCount = 0;
-    for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-        if (enemyList[i].mode != NONE) {
-            activeEnemyCount++;
-        }
+    // --- 通常ゴブリン：約0.5秒（30フレーム）ごとにP1/P2周辺へスポーン要求 ---
+    goblinSpawnTimer++;
+    if (goblinSpawnTimer >= 30) {
+        goblinSpawnTimer = 0;
+
+        // プレイヤー1または2の周辺から新鮮な座標を計算（交互またはランダム）
+        int targetPlayer = GetRand(1);
+        float angle = (float)GetRand(360) * DX_PI_F / 180.0f;
+        float dist = 500.0f + (float)GetRand(300); // プレイヤーから500〜800離れた位置
+
+        float sx = players[targetPlayer].pos.x + cosf(angle) * dist;
+        float sz = players[targetPlayer].pos.z + sinf(angle) * dist;
+        VECTOR spawnPos = VGet(sx, 0.0f, sz); // 地面の高さ(0.0f)
+
+        // 空いていれば即出現、満杯なら待機キューへ自動退避
+        g_enemyMgr.RequestSpawn(enemyList, spawnPos, 2, 0);
     }
 
-    // 同時生存数の上限（無双向けに35体程度をキープ）
-    const int MAX_FIELD_ENEMIES = 200;
+    // --- 赤ゴブリン：約5秒（300フレーム）ごとに1体要求 ---
+    redSpawnTimer++;
+    if (redSpawnTimer >= 300) {
+        redSpawnTimer = 0;
 
-    if (activeEnemyCount < MAX_FIELD_ENEMIES) {
+        float spawnX = (float)(GetRand(3000) - 1500);
+        float spawnZ = (float)(GetRand(3000) - 1500);
+        VECTOR redSpawnPos = VGet(spawnX, 0.0f, spawnZ);
 
-        // --- 通常ゴブリン：約0.3秒（20フレーム）ごとに小分けスポーン ---
-        goblinSpawnTimer++;
-        if (goblinSpawnTimer >= 280) {
-            goblinSpawnTimer = 0;
+        // 赤ゴブリン（HP: 5, タイプ: 1）
+        g_enemyMgr.RequestSpawn(enemyList, redSpawnPos, 5, 1);
+    }
 
-            for (int k = 0; k < 9; k++) {
-                float spawnX = (float)(GetRand(4500) - 2250);
-                float spawnZ = (float)(GetRand(4500) - 2250);
-                ActivateEnemy(enemyList, spawnX, spawnZ);
+    // ==========================================
+    // 4. 生きている敵の更新＆自動回収（成仏・リサイクル）
+    // ==========================================
+    for (int a = 0; a < g_enemyMgr.GetActiveCount(); a++) {
+        int i = g_enemyMgr.GetActiveSlot(a); // 実体インデックス
+
+        // プレイヤーとの距離判定（離れすぎ回収用）
+        float distP1 = VSize(VSub(enemyList[i].pos, players[0].pos));
+        float distP2 = VSize(VSub(enemyList[i].pos, players[1].pos));
+
+        // ① 撃破された（HP<=0）または ② プレイヤーから遠すぎる（1500以上）
+        if (enemyList[i].enemyHP <= 0 || (distP1 > 1500.0f && distP2 > 1500.0f)) {
+            // 撃破時のスコア加算などはここで行う
+            if (enemyList[i].enemyHP <= 0) {
+                // AddScore(...);
             }
+
+            // メイン配列から外し、空き枠へ戻す（待機キューの敵が入れるようになる）
+            g_enemyMgr.Despawn(enemyList, a);
+            a--; // 要素が詰められたので1つ戻す
+            continue;
         }
 
-        // --- 赤ゴブリン：約3秒（180フレーム）ごとに1体 ---
-        redSpawnTimer++;
-        if (redSpawnTimer >= 500) {
-            redSpawnTimer = 0;
-
-            float spawnX = (float)(GetRand(3000) - 1500);
-            float spawnZ = (float)(GetRand(3000) - 1500);
-            ActivateRedGoblin(enemyList, spawnX, spawnZ);
-        }
+        // --- ここに敵の移動AIやアニメーション更新処理 ---
+        // 例: プレイヤーへ近づく処理など
     }
 
-    // 特殊ゴーレムの出現条件（残り約50秒以下）
+    // ==========================================
+    // 5. 特殊ゴーレムの出現条件（残り約50秒以下）
+    // ==========================================
     int seconds = mainTimer / 60;
     if (seconds <= 50 && gameState == 0) {
         if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
@@ -103,62 +131,15 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         }
     }
 }
-
-void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
-    for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
-        if (enemyList[i].mode == NONE) {
-            if (enemyList[i].model1 == -1 && redGoblinBaseModel != -1) {
-                enemyList[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
-            }
-            if (enemyList[i].model1 == -1) continue;
-
-            enemyList[i].pos = VGet(x, 0.0f, z);
-
-            VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
-            VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
-            MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
-
-            float baseFloorY = 0.0f;
-            if (LineRes.HitFlag == 1) {
-                baseFloorY = LineRes.HitPosition.y;
-            }
-
-            enemyList[i].pos.y = baseFloorY + 600.0f;
-            enemyList[i].mode = STAND;
-            enemyList[i].enemyHP = 5;
-            enemyList[i].playtime = 0.0f;
-            enemyList[i].isHit = false;
-
-            MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
-            MV1SetVisible(enemyList[i].model1, TRUE);
-
-            if (enemyList[i].attachidx != -1) {
-                MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
-            }
-            enemyList[i].attachidx = MV1AttachAnim(enemyList[i].model1, 0, red_goblin_anim_neutral);
-            if (enemyList[i].attachidx != -1) {
-                enemyList[i].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[i].model1, enemyList[i].attachidx);
-            }
-            break;
-        }
-    }
-}
-
+// ==========================================
+// 通常ゴブリンのスポーン（軽量版）
+// ==========================================
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
     for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
         if (enemyList[i].mode == NONE) {
-            enemyList[i].pos = VGet(x, 0.0f, z);
+            // ★ポリゴン判定を全カットし、床の高さ（例: 800.0f や 30.0f）に直接配置
+            enemyList[i].pos = VGet(x, 600.0f, z);
 
-            VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
-            VECTOR cal_pos2 = VGet(enemyList[i].pos.x, -1000.0f, enemyList[i].pos.z);
-            MV1_COLL_RESULT_POLY LineRes = MV1CollCheck_Line(stagedata, -1, cal_pos1, cal_pos2);
-
-            float baseFloorY = 0.0f;
-            if (LineRes.HitFlag == 1) {
-                baseFloorY = LineRes.HitPosition.y;
-            }
-
-            enemyList[i].pos.y = baseFloorY + 600.0f;
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 2;
             enemyList[i].playtime = 0.0f;
@@ -171,6 +152,40 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
                 MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
             }
             enemyList[i].attachidx = MV1AttachAnim(enemyList[i].model1, 0, enemy_anim_neutral);
+            if (enemyList[i].attachidx != -1) {
+                enemyList[i].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[i].model1, enemyList[i].attachidx);
+            }
+            break;
+        }
+    }
+}
+
+// ==========================================
+// 赤ゴブリンのスポーン（軽量版）
+// ==========================================
+void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
+    for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
+        if (enemyList[i].mode == NONE) {
+            if (enemyList[i].model1 == -1 && redGoblinBaseModel != -1) {
+                enemyList[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
+            }
+            if (enemyList[i].model1 == -1) continue;
+
+            // ★ポリゴン判定を全カット
+            enemyList[i].pos = VGet(x, 600.0f, z);
+
+            enemyList[i].mode = STAND;
+            enemyList[i].enemyHP = 5;
+            enemyList[i].playtime = 0.0f;
+            enemyList[i].isHit = false;
+
+            MV1SetPosition(enemyList[i].model1, enemyList[i].pos);
+            MV1SetVisible(enemyList[i].model1, TRUE);
+
+            if (enemyList[i].attachidx != -1) {
+                MV1DetachAnim(enemyList[i].model1, enemyList[i].attachidx);
+            }
+            enemyList[i].attachidx = MV1AttachAnim(enemyList[i].model1, 0, red_goblin_anim_neutral);
             if (enemyList[i].attachidx != -1) {
                 enemyList[i].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[i].model1, enemyList[i].attachidx);
             }
@@ -196,7 +211,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         int color = GetColor(255, 255, 0);
         if (gameState == 1)      DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
         else if (gameState == 2) DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
-        else                     DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
+        //else                     DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
         SetFontSize(20);
     }
 
@@ -280,6 +295,71 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
             }
         }
     }
+
+    // ==========================================
+    // 必殺技ゲージ描画
+    // ==========================================
+    int dispGaugeW = 220; // ゲージ幅
+    int dispGaugeH = 22;  // ゲージ高さ
+    int halfW = sw / 2;
+
+    int gaugeX = 0;
+    int gaugeY = sh - dispGaugeH - 25; // 画面下部
+
+    // P1は左画面の右下、P2は右画面の左下に配置
+    if (pIdx == 0) {
+        gaugeX = halfW - dispGaugeW - 20; // 左画面の右下
+    }
+    else {
+        gaugeX = halfW + 20;              // 右画面の左下
+    }
+
+    // 1. 中身（青バー）の幅計算
+    float rate = (float)specialGauge[pIdx] / (float)MAX_SPECIAL_GAUGE;
+    if (rate > 1.0f) rate = 1.0f;
+    int fillW = (int)((dispGaugeW - 8) * rate);
+
+    // 2. 青ゲージ描画（枠の内側）
+    if (fillW > 0) {
+        int barColor = (specialGauge[pIdx] >= MAX_SPECIAL_GAUGE)
+            ? GetColor(0, 220, 255)
+            : GetColor(30, 120, 255);
+        DrawBox(gaugeX + 4, gaugeY + 3, gaugeX + 4 + fillW, gaugeY + dispGaugeH - 3, barColor, TRUE);
+    }
+
+    // 3. 上から枠画像を描画（透過ON）
+    DrawExtendGraph(gaugeX, gaugeY, gaugeX + dispGaugeW, gaugeY + dispGaugeH, gh_gauge_frame, TRUE);
+
+    // 4. 文字表示
+    SetFontSize(16);
+    if (specialGauge[pIdx] >= MAX_SPECIAL_GAUGE) {
+        char keyText[32];
+        sprintf_s(keyText, "SPECIAL READY! [%s]", (pIdx == 0) ? "U" : "N");
+        DrawString(gaugeX, gaugeY - 18, keyText, GetColor(255, 255, 0));
+    }
+    else {
+        DrawFormatString(gaugeX, gaugeY - 18, GetColor(200, 200, 255), "SPECIAL %d%%", specialGauge[pIdx]);
+    }
+    SetFontSize(20);
+
+    // 描画前にブレンドモードを正常化しておく
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // 画像ハンドルが正常（!= -1）なときだけ描画
+    if (gh_gauge_frame != -1) {
+        DrawExtendGraph(gaugeX, gaugeY, gaugeX + dispGaugeW, gaugeY + dispGaugeH, gh_gauge_frame, TRUE);
+    }
+    else {
+        // 読み込み失敗時の保険：とりあえず白い枠線を自前で描く
+        DrawBox(gaugeX, gaugeY, gaugeX + dispGaugeW, gaugeY + dispGaugeH, GetColor(255, 255, 255), FALSE);
+    }
+
+    if (gh_gauge_frame != -1) {
+        SetDrawBlendMode(DX_BLENDMODE_ADD, 255);
+        DrawExtendGraph(gaugeX, gaugeY, gaugeX + dispGaugeW, gaugeY + dispGaugeH, gh_gauge_frame, FALSE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
 }
 
 // ==========================================
@@ -331,6 +411,9 @@ void GameManager::AddScore(int playerIndex, int score) {
         p2Score += score;
         if (p2Score < 0) p2Score = 0;
     }
+
+
+
 }
 
 void GameManager::AddScorePopup(int playerIdx, int score) {
@@ -345,5 +428,8 @@ void GameManager::AddScorePopup(int playerIdx, int score) {
         }
     }
 }
+
+
+
 
 

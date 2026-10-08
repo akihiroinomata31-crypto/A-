@@ -20,8 +20,8 @@
 
 #define MAIN_H
 #define MAIN_H
+#define MAX_SPECIAL_GAUGE 100
 
-// 他のインクルードなどはそのまま
 
 // ここに extern をつけて宣言を追加
 class GameManager;
@@ -95,6 +95,8 @@ struct SCharaInfo
 	int weaponFrame;
 	int currentAnimType;
 	float dir;
+	
+
 };
 
 // キャラクターの当たり判定の情
@@ -116,3 +118,5 @@ extern void CheckAttackHit(
 );
 
 extern void DrawCrownIcon(int pIdx, int xOffset, int startY, int p1Score, int p2Score, int crownGraphHandle);
+extern int specialGauge[2];
+extern int gh_gauge_frame;

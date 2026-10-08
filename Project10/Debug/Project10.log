@@ -1,5 +1,53 @@
-﻿  map.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\map.cpp(1,10): fatal error C1083: include ファイルを開けません。'DxLib.h':No such file or directory
-  game.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\game.cpp(1,10): fatal error C1083: include ファイルを開けません。'DxLib.h':No such file or directory
+﻿  game.cpp
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(72,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(72,18): error C2065: 'STAND': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(73,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(74,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(75,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(76,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(77,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(78,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(80,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(81,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(81,1): error C2660: 'DxLib::MV1SetPosition': 関数に 1 個の引数を指定できません。
+C:\Users\akihi\OneDrive\Desktop\DxLib_VC\Dxlib\DxLib.h(5221,14): message : 'DxLib::MV1SetPosition' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(82,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(83,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(84,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(84,1): error C2660: 'DxLib::MV1SetAttachAnimTime': 関数に 2 個の引数を指定できません。
+C:\Users\akihi\OneDrive\Desktop\DxLib_VC\Dxlib\DxLib.h(5274,14): message : 'DxLib::MV1SetAttachAnimTime' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(89,1): error C2036: 'SCharaInfo *': サイズが不明です。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(97,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(97,18): error C2065: 'NONE': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(98,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(99,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(100,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(101,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(102,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(103,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(104,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(104,1): error C2660: 'DxLib::MV1SetPosition': 関数に 1 個の引数を指定できません。
+C:\Users\akihi\OneDrive\Desktop\DxLib_VC\Dxlib\DxLib.h(5221,14): message : 'DxLib::MV1SetPosition' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(113,1): error C2036: 'SCharaInfo *': サイズが不明です。
+  taiki.cpp
   コードを生成中...
