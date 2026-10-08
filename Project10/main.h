@@ -5,7 +5,8 @@
 
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
-#define MAX_CHARA 500
+#define MAX_CHARA 1000
+
 #define CHARA_ENUM_DEFAULT_SIZE		200.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
 #define CHARA_MAX_HITCOLL			2048		// 処理するコリジョンポリゴンの最大数
 
@@ -49,6 +50,7 @@ enum CharaMode
 	ATTACKOUT,
 	DAMAGE,
 	DOWNMODE,
+	ANIM_RUN,
 	NONE,
 };
 /* ------------------------------------------------------------------------
@@ -70,7 +72,7 @@ typedef struct
 struct SCharaInfo
 {// 構造体の中にコンストラクタを追加する
 	SCharaInfo() : angle(0.0f), anim_time(0.0f), HP(0), isHit(false), model1(-1) {}
-	int invincibleTimer; // ★追加：無敵時間カウンター（フレーム数）
+	int invincibleTimer = 0; // ★追加：無敵時間カウンター（フレーム数）
 	int model1;
 	int timeLimit = 1000; // ゲーム制限時間など（必要であれば適宜設定）
 	int spawnTimer = 0;   // スポーンカウント用
@@ -83,21 +85,27 @@ struct SCharaInfo
 	SCharaHitInfo charahitinfo;
 	int				mode;				// キャラの状態
 	int enemyHP;
+	int enemyIdleAnimation = -1;
+	int enemyWalkAnimation = -1;
+	bool enemyWalking = false;
 	int HP;
 	float angle;
 	bool isHit;
 	int deaths;
 	float anim_time;
-
+	int popups;
 	float anim_total;
-
+	int weaponModel;  // 武器のモデルハンドル
+	int weaponFrame;
+	int currentAnimType = 1;
+	float dir;
 };
 
 // キャラクターの当たり判定の情
 
 // 当たり判定の幅、高さ
 // 当たり判定の中心座標
-extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
+extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_run, enemy_anim_neutral;
 
 
 extern void CheckAttackHit(

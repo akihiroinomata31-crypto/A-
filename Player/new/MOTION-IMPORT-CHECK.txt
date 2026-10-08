@@ -1,0 +1,16 @@
+new\Great Sword Pack\great sword attack.mv1 frames=36.0 boneMotion=69.456 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword high spin attack.mv1 frames=56.0 boneMotion=144.332 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword jump attack.mv1 frames=65.0 boneMotion=160.634 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword kick.mv1 frames=45.0 boneMotion=89.742 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword kick (2).mv1 frames=51.0 boneMotion=184.998 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash.mv1 frames=38.0 boneMotion=79.839 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (2).mv1 frames=106.0 boneMotion=128.393 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (3).mv1 frames=55.0 boneMotion=134.445 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (4).mv1 frames=54.0 boneMotion=137.828 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (5).mv1 frames=43.0 boneMotion=141.360 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slide attack.mv1 frames=64.0 boneMotion=127.876 rootTravel=0.000 PASS
+new\Running.mv1 frames=21.0 boneMotion=88.122 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword idle.mv1 frames=60.0 boneMotion=3.655 rootTravel=0.000 PASS
+movement facing and uninterrupted playback: PASS
+idle loop and return after attack: PASS
+Sword1 load, three combo stages, two players and completion: PASS

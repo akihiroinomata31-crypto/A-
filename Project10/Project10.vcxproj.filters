@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="draw.cpp" />
@@ -7,6 +7,7 @@
     <ClCompile Include="Mapps.cpp" />
     <ClCompile Include="player.cpp" />
     <ClCompile Include="winer.cpp" />
+    <ClCompile Include="senk.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
@@ -14,5 +15,7 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
     <ClInclude Include="player.h" />
+    <ClInclude Include="PlayerMotionAssets.h" />
+    <ClInclude Include="senk.h" />
   </ItemGroup>
 </Project>

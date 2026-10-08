@@ -70,6 +70,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <!-- Keep generated files outside OneDrive and imported build artifacts. -->
+  <PropertyGroup>
+    <IntDir>$(LocalAppData)\Project10Build\$(ProjectGuid)\obj\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(LocalAppData)\Project10Build\$(ProjectGuid)\bin\$(Platform)\$(Configuration)\</OutDir>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -159,6 +165,7 @@
     <ClCompile Include="game.cpp" />
     <ClCompile Include="Mapps.cpp" />
     <ClCompile Include="player.cpp" />
+    <ClCompile Include="senk.cpp" />
     <ClCompile Include="winer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -166,9 +173,14 @@
     <ClInclude Include="game.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
+    <ClInclude Include="senk.h" />
     <ClInclude Include="player.h" />
+    <ClInclude Include="PlayerMotionAssets.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="WriteGameResourceDirectory" AfterTargets="Build">
+    <WriteLinesToFile File="$(OutDir)Project10.assets.txt" Lines="$(ProjectDir)" Overwrite="true" Encoding="UTF-8" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

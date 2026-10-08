@@ -1,5 +1,0 @@
-﻿  map.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\map.cpp(1,10): fatal error C1083: include ファイルを開けません。'DxLib.h':No such file or directory
-  game.cpp
-C:\Users\akihi\OneDrive\Desktop\workspace\Project10\Project10\game.cpp(1,10): fatal error C1083: include ファイルを開けません。'DxLib.h':No such file or directory
-  コードを生成中...
