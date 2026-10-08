@@ -1,4 +1,4 @@
-// DXƒ‰ƒCƒuƒ‰ƒŠ[‚ÌƒCƒ“ƒNƒ‹[ƒh
+ï»¿// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªãƒ¼ã®ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰
 #include <DxLib.h>
 #include <EffekseerForDXLib.h>
 #include <math.h>
@@ -8,30 +8,32 @@
 #include "game.h"
 #include "player.h"
 
+
+
+
 namespace {
 
-int LoadPlayerAssetModel(const char* fileName) {
-	char path[256];
+	int LoadPlayerAssetModel(const char* fileName) {
+		char path[256];
 
-	// æ‚ÉV‚µ‚­’u‚¢‚½ Player ƒtƒHƒ‹ƒ_‚ğ“Ç‚ŞB
-	sprintf_s(path, sizeof(path), "..\\Player\\%s", fileName);
-	int handle = MV1LoadModel(path);
-	if (handle != -1) {
+		// å…ˆã«æ–°ã—ãç½®ã„ãŸ Player ãƒ•ã‚©ãƒ«ãƒ€ã‚’èª­ã‚€ã€‚
+		sprintf_s(path, sizeof(path), "..\\Player\\%s", fileName);
+		int handle = MV1LoadModel(path);
+		if (handle != -1) {
+			return handle;
+		}
+
+		// è¦‹ã¤ã‹ã‚‰ãªã„å ´åˆã¯ã€æ—¢å­˜ã® Data\\Player ãƒ•ã‚©ãƒ«ãƒ€ã‹ã‚‰èª­ã‚€ã€‚
+		sprintf_s(path, sizeof(path), "..\\Data\\Player\\%s", fileName);
+		handle = MV1LoadModel(path);
+		if (handle == -1) {
+			printfDx("Player asset load failed: %s\n", fileName);
+		}
+
 		return handle;
 	}
 
-	// Œ©‚Â‚©‚ç‚È‚¢ê‡‚ÍAŠù‘¶‚Ì Data\\Player ƒtƒHƒ‹ƒ_‚©‚ç“Ç‚ŞB
-	sprintf_s(path, sizeof(path), "..\\Data\\Player\\%s", fileName);
-	handle = MV1LoadModel(path);
-	if (handle == -1) {
-		printfDx("Player asset load failed: %s\n", fileName);
-	}
-
-	return handle;
-}
-
 } // namespace
-
 
 
 
@@ -42,13 +44,21 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int running = 0;
 	int rootflm;
 	MATRIX wpmatrix[PLAYER_COUNT], sayamatrix[PLAYER_COUNT];
-	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
+	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral{};
 
+	//int redGoblinBaseModel = -1;
+
+	 // â˜…ã“ã‚ŒãŒã‚ã‚‹ã‹ç¢ºèªï¼
+//	int red_goblin_anim_neutral;      // â˜…ã“ã‚ŒãŒã‚ã‚‹ã‹ç¢ºèªï¼
+	int red_goblin_anim_attack;       // â˜…ã“ã‚ŒãŒã‚ã‚‹ã‹ç¢ºèªï¼
+
+	int red_goblin_anim_walk = -1;
+	//int redGoblinBaseModel;
 	int anim_attack[PLAYER_ATTACK_ANIM_COUNT];
 	int		stagedata;
 	int sky;
 	float skyRot = 0;
-	SCharaInfo charainfo[MAX_CHARA];
+	static SCharaInfo charainfo[MAX_CHARA];//ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ãƒ¼ã®ãƒ¡ãƒ¢ãƒªç®¡ç†ã‚’é…åˆ—ã§è¡Œã£ã¦ã‚‹
 	int playerWeaponModel[PLAYER_COUNT], playerWeaponFrame[PLAYER_COUNT];
 	int playerSayaModel[PLAYER_COUNT], playerSayaFrame[PLAYER_COUNT];
 	int normalAttackEffectHandle[PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT];
@@ -57,116 +67,121 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int prevJKey = 0;
 	int isBGMPlaying = 1;
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
+
 	PlayerInputConfig playerInputs[PLAYER_COUNT] = {
-		// 1P: ƒL[ƒ{[ƒh(WASD) + 1PƒQ[ƒ€ƒpƒbƒhB
+		// 1P: ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰(WASD) + 1Pã‚²ãƒ¼ãƒ ãƒ‘ãƒƒãƒ‰ã€‚
 		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_3, PAD_INPUT_2 },
-		// 2P: ƒL[ƒ{[ƒh(–îˆó) + 2PƒQ[ƒ€ƒpƒbƒhB
+		// 2P: ã‚­ãƒ¼ãƒœãƒ¼ãƒ‰(çŸ¢å°) + 2Pã‚²ãƒ¼ãƒ ãƒ‘ãƒƒãƒ‰ã€‚
 		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, KEY_INPUT_RCONTROL, -1, PAD_INPUT_1, PAD_INPUT_4, PAD_INPUT_3, PAD_INPUT_2 }
 	};
 
 
-	int enemyCount = 0;          // Œ»İ‚Ì“G‚Ì”
-	int spawnTimer = 0;          // oŒ»‚Ü‚Å‚ÌƒJƒEƒ“ƒg—p
-	const int SPAWN_INTERVAL = 300; // oŒ»ŠÔŠu
+
+	int enemyCount = 0;          // ç¾åœ¨ã®æ•µã®æ•°
+//	int spawnTimer = 0;          // å‡ºç¾ã¾ã§ã®ã‚«ã‚¦ãƒ³ãƒˆç”¨
+	const int SPAWN_INTERVAL = 300; // å‡ºç¾é–“éš”
 
 	float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
 
+
 	GameManager game;
-	VECTOR stagepos = VGet(0.0f, 2000.0f, 0.0f);
-
-	VECTOR cpos, ctgt;
-	// ƒJƒƒ‰ƒ|ƒWƒVƒ‡ƒ“ cpos:ƒJƒƒ‰ˆÊ’u@ctgt:ƒJƒƒ‰’‹“_
-	cpos = VGet(0.0f, 1000.0f, -800.0f);
-	ctgt = VGet(0.0f, 500.0f, 0.0f);
+	VECTOR stagepos = VGet(0.0f, 0.0f,0.0f);
 
 
-	// ƒXƒe[ƒWƒRƒŠƒWƒ‡ƒ“î•ñ
+
+	// ã‚¹ãƒ†ãƒ¼ã‚¸ã‚³ãƒªã‚¸ãƒ§ãƒ³æƒ…å ±
 	MV1_COLL_RESULT_POLY_DIM HitDim;
 	int WallNum;
-	int FloorNum;										// °ƒ|ƒŠƒSƒ“‚Æ”»’f‚³‚ê‚½ƒ|ƒŠƒSƒ“‚Ì”
+	int FloorNum;										// åºŠãƒãƒªã‚´ãƒ³ã¨åˆ¤æ–­ã•ã‚ŒãŸãƒãƒªã‚´ãƒ³ã®æ•°
 	MV1_COLL_RESULT_POLY* Wall[CHARA_MAX_HITCOLL];
 	MV1_COLL_RESULT_POLY* Floor[CHARA_MAX_HITCOLL];
 	int HitFlag = 0;
+	int timeLimit = 1000; // ã‚²ãƒ¼ãƒ åˆ¶é™æ™‚é–“ãªã©ï¼ˆå¿…è¦ã§ã‚ã‚Œã°é©å®œè¨­å®šï¼‰
+	static int spawnTimer = 0;
+	spawnTimer++; // æ¯ãƒ•ãƒ¬ãƒ¼ãƒ åŠ ç®—
 	MV1_COLL_RESULT_POLY* Poly;
 	HITRESULT_LINE LineRes;
 
-	// ƒLƒƒƒ‰‚ªƒqƒbƒg‚µ‚½°‚Ìƒ|ƒŠƒSƒ“•\¦‚ÌÀ•W
+	// ã‚­ãƒ£ãƒ©ãŒãƒ’ãƒƒãƒˆã—ãŸåºŠã®ãƒãƒªã‚´ãƒ³è¡¨ç¤ºã®åº§æ¨™
 	VECTOR PolyCharaHitField[3];
 
 
 
-	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMƒtƒ@ƒCƒ‹–¼
-	char String[256];						// ƒƒ‚ƒŠ“WŠJ‚·‚éÛ‚Ég‚¤•¶š—ñ
-	int BGMSoundHandle;						// BGMƒTƒEƒ“ƒhƒnƒ“ƒhƒ‹
+
+
+	char BGM0_FilePath[] = "BGM_stg0.ogg";	// BGMãƒ•ã‚¡ã‚¤ãƒ«å
+	char String[256];						// ãƒ¡ãƒ¢ãƒªå±•é–‹ã™ã‚‹éš›ã«ä½¿ã†æ–‡å­—åˆ—
+	int BGMSoundHandle;						// BGMã‚µã‚¦ãƒ³ãƒ‰ãƒãƒ³ãƒ‰ãƒ«
 	int BGMLoopStartPosition = -1;
 	int BGMLoopEndPosition = -1;
 
-	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEƒtƒ@ƒCƒ‹–¼
+	char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";	// SEãƒ•ã‚¡ã‚¤ãƒ«å
 	char NormalAttackEffect_FilePath[] = "NormalAttack.png";
-	char HeavyAttackEffect_FilePath[] = "dUŒ‚.png";
+	char HeavyAttackEffect_FilePath[] = "é‡æ”»æ’ƒ.png";
 	char SpecialAttackEffect_FilePath[] = "SpecialAttack\\ToonWater.efkefc";
 	int SEattackHandle, SEjumpHandle, SEdamageHandle;
 	int specialAttackEffectResourceHandle = -1;
+	int hpBarTex = -1;
 
 
-//ƒLƒƒƒ‰î•ñ
+//ã‚­ãƒ£ãƒ©æƒ…å ±
 
-	// 0”Ô‚ğ1PA1”Ô‚ğ2PA2”Ô‚ğƒeƒXƒg—p“G‚Æ‚µ‚Äg‚¤B
+	// 0ç•ªã‚’1Pã€1ç•ªã‚’2Pã€2ç•ªã‚’ãƒ†ã‚¹ãƒˆç”¨æ•µã¨ã—ã¦ä½¿ã†ã€‚
 	for (int i = 0; i < MAX_CHARA; i++) {
 		charainfo[i].model1 = -1;
 		charainfo[i].attachidx = -1;
 		charainfo[i].mode = NONE;
 		charainfo[i].direction = Direction::DOWN;
 		ResetMove(charainfo[i]);
-		charainfo[i].pos = VGet(0.0f, 0.0f, 0.0f);
 		charainfo[i].charahitinfo.Height = PC_HEIGHT;
 		charainfo[i].charahitinfo.Width = PC_WIDTH;
-		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		charainfo[i].HP = 0;
 		charainfo[i].enemyHP = 0;
 		charainfo[i].isHit = false;
 	}
-
-	charainfo[PLAYER1_INDEX].pos = VGet(850.0f, 0.0f, -400.0f);
-	charainfo[PLAYER2_INDEX].pos = VGet(1050.0f, 0.0f, -400.0f);
-	charainfo[TEST_ENEMY_INDEX].pos = VGet(1000.0f, 0.0f, -150.0f);
+	// åˆæœŸåŒ–ã®å ´æ‰€ï¼ˆGameInité–¢æ•°ãªã©ï¼‰
+	charainfo[0].deaths = 0;
+	charainfo[1].deaths = 0;
+	charainfo[PLAYER1_INDEX].pos = VGet(1300.0f, 800.0f, 100.0f);
+	charainfo[PLAYER2_INDEX].pos = VGet(1300.0f, 800.0f, -400.0f);
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].mode = STAND;
+
 		charainfo[i].HP = 6;
 		charainfo[i].charahitinfo.Height = PC_HEIGHT * PLAYER_MODEL_SCALE;
 		charainfo[i].charahitinfo.Width = PC_WIDTH * PLAYER_MODEL_SCALE;
-		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
+		charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos; // åº§æ¨™ç¢ºå®šå¾Œã«ä»£å…¥
 	}
 
 	charainfo[TEST_ENEMY_INDEX].mode = STAND;
-	charainfo[TEST_ENEMY_INDEX].enemyHP = 6;
+	charainfo[TEST_ENEMY_INDEX].enemyHP = 2;
 	charainfo[TEST_ENEMY_INDEX].charahitinfo.CenterPosition = charainfo[TEST_ENEMY_INDEX].pos;
 
-	//ƒ‚ƒfƒ‹À•W‰ŠúƒZƒbƒg
-	VECTOR pos[2] = { VGet(450.0f, 200.0f, -350.0f),VGet(700.0f, 200.0f, -350.0f) };
+	//ãƒ¢ãƒ‡ãƒ«åº§æ¨™åˆæœŸã‚»ãƒƒãƒˆ
+	//VECTOR pos[2] = { VGet(1300.0f, 0.0f, 100.0f),VGet(1300.0f, 0.0f, 200.0f) };
 
-	VECTOR cposdistance = VSub(cpos, pos[0]);
-	VECTOR ctgtdistance = VSub(ctgt, pos[0]);
 
-	//ƒTƒEƒ“ƒhƒtƒ@ƒCƒ‹‚Ì“Ç‚İƒXƒgƒŠ[ƒ~ƒ“ƒOİ’è‚É‚·‚é
+
+	//ã‚µã‚¦ãƒ³ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«ã®èª­è¾¼ã¿ã‚¹ãƒˆãƒªãƒ¼ãƒŸãƒ³ã‚°è¨­å®šã«ã™ã‚‹
 	SetCreateSoundDataType(DX_SOUNDDATATYPE_FILE);
 
-	// ƒEƒCƒ“ƒhƒEƒ‚[ƒh‚ÌØ‚è‘Ö‚¦
+	// ã‚¦ã‚¤ãƒ³ãƒ‰ã‚¦ãƒ¢ãƒ¼ãƒ‰ã®åˆ‡ã‚Šæ›¿ãˆ
 	ChangeWindowMode(TRUE);
 
-	// ƒEƒCƒ“ƒhƒEƒTƒCƒY‚Ì•ÏX
+	// ã‚¦ã‚¤ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚ºã®å¤‰æ›´
 	SetGraphMode(900, 600, 32);
 
-	// Effekseer ‚ğ—˜—p‚·‚é‚½‚ßADxLib ‚ğ DirectX 11 ‚Å‰Šú‰»‚·‚éB
+	// Effekseer ã‚’åˆ©ç”¨ã™ã‚‹ãŸã‚ã€DxLib ã‚’ DirectX 11 ã§åˆæœŸåŒ–ã™ã‚‹ã€‚
 	SetUseDirect3DVersion(DX_DIRECT3D_11);
 
-	// DXƒ‰ƒCƒuƒ‰ƒŠ‚Ì‰Šú‰»
+	// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®åˆæœŸåŒ–
 	if (DxLib_Init() == -1) {
+
 		return -1;
 	}
 
-	// “¯‚É•\¦‚Å‚«‚éÅ‘åƒp[ƒeƒBƒNƒ‹”‚ğw’è‚µ‚Ä Effekseer ‚ğ‰Šú‰»‚·‚éB
+	// åŒæ™‚ã«è¡¨ç¤ºã§ãã‚‹æœ€å¤§ãƒ‘ãƒ¼ãƒ†ã‚£ã‚¯ãƒ«æ•°ã‚’æŒ‡å®šã—ã¦ Effekseer ã‚’åˆæœŸåŒ–ã™ã‚‹ã€‚
 	if (Effekseer_Init(8000) == -1) {
 		DxLib_End();
 		return -1;
@@ -182,27 +197,105 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 
+	int  redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
 
-	//ƒ‚ƒfƒ‹“Ç‚İ‚İ
+	//red_goblin_anim_neutral = redGoblinBaseModel;
+	if (redGoblinBaseModel == -1) {
+		printfDx("ã‚´ãƒ–ãƒªãƒ³ã®ãƒ™ãƒ¼ã‚¹ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n");
+	}
+	int red_goblin_anim_neutral = 0;
+	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+		if (redGoblinBaseModel != -1) {
+			// ãƒ¢ãƒ‡ãƒ«ã‚’è¤‡è£½
+			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
+		}
+		else {
+			charainfo[i].model1 = -1;
+		}
+
+		if (charainfo[i].model1 == -1) {
+			printfDx("ã‚´ãƒ–ãƒªãƒ³ã®ãƒ¢ãƒ‡ãƒ«ç”Ÿæˆå¤±æ•—ï¼(index:%d)\n", i);
+			continue;
+		}
+
+		// æœ€åˆã¯éè¡¨ç¤º
+		MV1SetVisible(charainfo[i].model1, FALSE);
+		charainfo[i].mode = NONE;
+
+		// â˜…è¿½åŠ ï¼šè¤‡è£½ã—ãŸã‚´ãƒ–ãƒªãƒ³ã«æœ€åˆã‹ã‚‰ãƒ‹ãƒ¥ãƒ¼ãƒˆãƒ©ãƒ«ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’ã‚¢ã‚¿ãƒƒãƒã—ã¦ãŠã
+		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, red_goblin_anim_neutral);
+		if (charainfo[i].attachidx != -1) {
+			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+		}
+
+		charainfo[i].playtime = 0.0f;
+	}
+
+
+
+	int baseGoblinModel = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
+
+	enemy_anim_neutral = baseGoblinModel;
+	if (baseGoblinModel == -1) {
+		printfDx("ã‚´ãƒ–ãƒªãƒ³ã®ãƒ™ãƒ¼ã‚¹ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n");
+	}
+
+	for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+		if (baseGoblinModel != -1) {
+			// ãƒ¢ãƒ‡ãƒ«ã‚’è¤‡è£½
+			charainfo[i].model1 = MV1DuplicateModel(baseGoblinModel);
+		}
+		else {
+			charainfo[i].model1 = -1;
+		}
+
+		if (charainfo[i].model1 == -1) {
+			printfDx("ã‚´ãƒ–ãƒªãƒ³ã®ãƒ¢ãƒ‡ãƒ«ç”Ÿæˆå¤±æ•—ï¼(index:%d)\n", i);
+			continue;
+		}
+
+		// æœ€åˆã¯éè¡¨ç¤º
+		MV1SetVisible(charainfo[i].model1, FALSE);
+		charainfo[i].mode = NONE;
+
+		// â˜…è¿½åŠ ï¼šè¤‡è£½ã—ãŸã‚´ãƒ–ãƒªãƒ³ã«æœ€åˆã‹ã‚‰ãƒ‹ãƒ¥ãƒ¼ãƒˆãƒ©ãƒ«ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’ã‚¢ã‚¿ãƒƒãƒã—ã¦ãŠã
+		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
+		if (charainfo[i].attachidx != -1) {
+			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+		}
+
+		charainfo[i].playtime = 0.0f;
+	}
+
+
+	//ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].model1 = LoadPlayerAssetModel("PC.mv1");
 		if (charainfo[i].model1 == -1) {
-			printfDx("ƒvƒŒƒCƒ„[%d‚Ìƒ‚ƒfƒ‹“Ç‚İ‚İ¸”sI\n", i + 1);
+			printfDx("ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼%dã®ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n", i + 1);
 			return -1;
 		}
 		MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
 		MV1SetScale(charainfo[i].model1, VGet(PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE, PLAYER_MODEL_SCALE));
 	}
-	// 2P ‚Í‰¼‚Å­‚µÂ‚­‚µ‚ÄA“¯‚¶ƒ‚ƒfƒ‹‚Å‚àŒ©•ª‚¯‚â‚·‚­‚·‚éB
+	// 2P ã¯ä»®ã§å°‘ã—é’ãã—ã¦ã€åŒã˜ãƒ¢ãƒ‡ãƒ«ã§ã‚‚è¦‹åˆ†ã‘ã‚„ã™ãã™ã‚‹ã€‚
 	MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
 
-	charainfo[TEST_ENEMY_INDEX].model1 = MV1LoadModel("..\\Data\\Goblin\\Goblin.mv1");
-	MV1SetPosition(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].pos);
-	if (charainfo[TEST_ENEMY_INDEX].model1 == -1) {
-		printfDx("ƒSƒuƒŠƒ“‚Ìƒ‚ƒfƒ‹“Ç‚İ‚İ¸”sI\n");
+	charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Golem.mv1");
+	if (charainfo[TEST_ENEMY_GOLEM].model1 == -1) {
+		printfDx("ã‚´ãƒ¼ãƒ¬ãƒ ã®ãƒ¢ãƒ‡ãƒ«èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n");
+	}
+	else {
+		// æœ€åˆã¯éè¡¨ç¤ºã«ã—ã¦ãŠã
+		MV1SetVisible(charainfo[TEST_ENEMY_GOLEM].model1, FALSE);
+		charainfo[TEST_ENEMY_GOLEM].mode = NONE;
+		MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f)); // å¿…è¦ãªã‚‰ã‚µã‚¤ã‚ºèª¿æ•´
 	}
 
-	//ƒ‹[ƒgƒtƒŒ[ƒ€
+
+
+
+	//ãƒ«ãƒ¼ãƒˆãƒ•ãƒ¬ãƒ¼ãƒ 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		rootflm = MV1SearchFrame(charainfo[i].model1, "root");
 		if (rootflm != -1) {
@@ -217,19 +310,20 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		MV1SetFrameUserLocalMatrix(charainfo[TEST_ENEMY_INDEX].model1, rootflm, MGetIdent());
 	}
 
+
 	for (int i = 0; i < PLAYER_COUNT; i++) {
-		//•Šíƒ‚ƒfƒ‹
+		//æ­¦å™¨ãƒ¢ãƒ‡ãƒ«
 		playerWeaponModel[i] = LoadPlayerAssetModel("Sabel.mv1");
 		if (playerWeaponModel[i] == -1) return -1;
-		//•ŠíƒtƒŒ[ƒ€
+		//æ­¦å™¨ãƒ•ãƒ¬ãƒ¼ãƒ 
 		playerWeaponFrame[i] = MV1SearchFrame(charainfo[i].model1, "wp");
 		if (playerWeaponFrame[i] == -1) {
 			printfDx("Player%d frame not found: wp\n", i + 1);
 		}
-		//âƒ‚ƒfƒ‹
+		//é˜ãƒ¢ãƒ‡ãƒ«
 		playerSayaModel[i] = LoadPlayerAssetModel("Saya.mv1");
 		if (playerSayaModel[i] == -1) return -1;
-		//âƒtƒŒ[ƒ€
+		//é˜ãƒ•ãƒ¬ãƒ¼ãƒ 
 		playerSayaFrame[i] = MV1SearchFrame(charainfo[i].model1, "sayabone");
 		if (playerSayaFrame[i] == -1) {
 			printfDx("Player%d frame not found: sayabone\n", i + 1);
@@ -237,23 +331,30 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 
 
-	// ƒXƒe[ƒWî•ñ‚Ì“Ç‚İ‚İ
-	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage.mv1");
+
+
+	// ã‚¹ãƒ†ãƒ¼ã‚¸æƒ…å ±ã®èª­ã¿è¾¼ã¿
+	stagedata = MV1LoadModel("..\\Data\\Stage\\Stage_4545.mv1");
 	if (stagedata == -1) return -1;
 	MV1SetPosition(stagedata, stagepos);
-	sky = MV1LoadModel("..\\Data\\Stage\\Stage00_sky.mv1");
+	int meshNum = MV1GetMeshNum(stagedata);
+	for (int i = 0; i < meshNum; i++)
+	{
+		MV1SetMeshBackCulling(stagedata, i, FALSE);
+	}
+	sky = MV1LoadModel("..\\Data\\Stage\\Sage_1214.mv1");
 	if (sky == -1) return -1;
 	MV1SetPosition(sky, VGet(0, -1000, 0));
 
-	// ƒ‚ƒfƒ‹‘S‘Ì‚ÌƒRƒŠƒWƒ‡ƒ“î•ñ‚ÌƒZƒbƒgƒAƒbƒv
+	// ãƒ¢ãƒ‡ãƒ«å…¨ä½“ã®ã‚³ãƒªã‚¸ãƒ§ãƒ³æƒ…å ±ã®ã‚»ãƒƒãƒˆã‚¢ãƒƒãƒ—
 	MV1SetupCollInfo(stagedata, -1);
 
 	int MeshNum;
 
-	// ƒ‚ƒfƒ‹‚ÉŠÜ‚Ü‚ê‚éƒƒbƒVƒ…‚Ì”‚ğæ“¾‚·‚é
+	// ãƒ¢ãƒ‡ãƒ«ã«å«ã¾ã‚Œã‚‹ãƒ¡ãƒƒã‚·ãƒ¥ã®æ•°ã‚’å–å¾—ã™ã‚‹
 	MeshNum = MV1GetMeshNum(stagedata);
-
-
+	SetTransColor(0, 0, 0);
+	int crownGraphHandle = LoadGraph("..\\Data\\UI\\win.png");
 
 	anim_neutral = LoadPlayerAssetModel("Anim_Neutral.mv1");
 	if (anim_neutral == -1) return -1;
@@ -275,12 +376,29 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (anim_damage == -1) return -1;
 	anim_down = LoadPlayerAssetModel("Anim_Down_Loop.mv1");
 	if (anim_down == -1) return -1;
-	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// ”íŒ‚ƒAƒjƒ
-	if (anim_down == -1) return -1;
-	enemy_anim_walk = MV1LoadModel("..\\Data\\Goblin\\Anim_Walk.mv1");		// ”íŒ‚ƒAƒjƒ
-	if (anim_down == -1) return -1;
-	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// ”íŒ‚ƒAƒjƒ
-	if (anim_down == -1) return -1;
+	enemy_anim_attack = MV1LoadModel("..\\Data\\Goblin\\Anim_Attack1.mv1");		// è¢«æ’ƒã‚¢ãƒ‹ãƒ¡
+	if (enemy_anim_attack == -1) return -1;
+	enemy_anim_walk = MV1LoadModel("..\\Data\\Goblin\\Anim_Walk.mv1");		// è¢«æ’ƒã‚¢ãƒ‹ãƒ¡
+	if (enemy_anim_walk == -1) return -1;
+
+	enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");		// è¢«æ’ƒã‚¢ãƒ‹ãƒ¡
+	if (enemy_anim_neutral == -1) return -1;
+	game.enemy_anim_neutral = enemy_anim_neutral;
+
+	SetTransColor(255, 255, 255);
+	hpBarTex = LoadGraph("..\\Data\\UI\\Hpbar023.png"); // â€»å®Ÿéš›ã®ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‘ã‚¹ã«åˆã‚ã›ã¦èª¿æ•´ã—ã¦ãã ã•ã„
+
+	if (hpBarTex == -1) {
+		// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸå ´åˆã®ã‚¨ãƒ©ãƒ¼å‡¦ç†ï¼ˆå¿…è¦ã«å¿œã˜ã¦ï¼‰
+		printfDx("HPãƒãƒ¼ã®ç”»åƒèª­ã¿è¾¼ã¿å¤±æ•—ï¼\n");
+	}
+
+
+	 redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
+	 red_goblin_anim_neutral = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Neutral.mv1");
+	 red_goblin_anim_walk = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Walk.mv1");
+	 red_goblin_anim_attack = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Attack1.mv1");
+
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
@@ -291,91 +409,256 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
 	SetDrawScreen(DX_SCREEN_BACK);
-	//ƒJƒƒ‰‚Ì‰Šú‰»
-	SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
+	//ã‚«ãƒ¡ãƒ©ã®åˆæœŸåŒ–
+	//SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 1.0f, 0.0f));
 
-	// ‚a‚f‚l—p‚ÌƒTƒEƒ“ƒhƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
+	// ï¼¢ï¼§ï¼­ç”¨ã®ã‚µã‚¦ãƒ³ãƒ‰ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
 	sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
 	BGMSoundHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (BGMSoundHandle == -1) {
 		return false;
 	}
-	// —LŒø‚Èƒ‹[ƒvƒ|ƒCƒ“ƒg‚ª‚ ‚éê‡‚Íƒ‹[ƒvÄ¶‚·‚é
+	// æœ‰åŠ¹ãªãƒ«ãƒ¼ãƒ—ãƒã‚¤ãƒ³ãƒˆãŒã‚ã‚‹å ´åˆã¯ãƒ«ãƒ¼ãƒ—å†ç”Ÿã™ã‚‹
 	PlaySoundMem(BGMSoundHandle,
 		BGMLoopStartPosition >= 0 ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK);
 
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Weapon\\Sword\\%s", SEattack_FilePath);
+
 	SEattackHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (SEattackHandle == -1) {
 		return false;
 	}
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEdamage_FilePath);
 	SEdamageHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (SEdamageHandle == -1) {
 		return false;
 	}
 	sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Player\\%s", SEjump_FilePath);
 	SEjumpHandle = LoadSoundMem(String);
-	// “Ç‚İ‚İ‚É¸”s‚µ‚½‚çƒGƒ‰[
+	// èª­ã¿è¾¼ã¿ã«å¤±æ•—ã—ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 	if (SEjumpHandle == -1) {
 		return false;
 	}
 
-	// ’ÊíUŒ‚ƒGƒtƒFƒNƒg‚ÌƒXƒvƒ‰ƒCƒgƒV[ƒg‚ğ•ªŠ„‚µ‚Ä“Ç‚İ‚ŞB
+	// é€šå¸¸æ”»æ’ƒã‚¨ãƒ•ã‚§ã‚¯ãƒˆã®ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆã‚·ãƒ¼ãƒˆã‚’åˆ†å‰²ã—ã¦èª­ã¿è¾¼ã‚€ã€‚
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", NormalAttackEffect_FilePath);
 	if (LoadDivGraph(String, PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT, PLAYER_NORMAL_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_NORMAL_ATTACK_EFFECT_ROW_COUNT, PLAYER_NORMAL_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_NORMAL_ATTACK_EFFECT_FRAME_HEIGHT, normalAttackEffectHandle) == -1) {
 		printfDx("Normal attack effect load failed.\n");
 		return -1;
 	}
 
-	// dUŒ‚ƒGƒtƒFƒNƒg‚ÌƒXƒvƒ‰ƒCƒgƒV[ƒg‚ğ•ªŠ„‚µ‚Ä“Ç‚İ‚ŞB
+	// é‡æ”»æ’ƒã‚¨ãƒ•ã‚§ã‚¯ãƒˆã®ã‚¹ãƒ—ãƒ©ã‚¤ãƒˆã‚·ãƒ¼ãƒˆã‚’åˆ†å‰²ã—ã¦èª­ã¿è¾¼ã‚€ã€‚
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", HeavyAttackEffect_FilePath);
 	if (LoadDivGraph(String, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_ROW_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_HEIGHT, heavyAttackEffectHandle) == -1) {
-		printfDx("dUŒ‚ƒGƒtƒFƒNƒg‚Ì“Ç‚İ‚İ¸”sI\n");
+		printfDx("é‡æ”»æ’ƒã‚¨ãƒ•ã‚§ã‚¯ãƒˆã®èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n");
 		return -1;
 	}
 
-	// •KE‹Z‚Í Effekseer ‚Ì3DƒGƒtƒFƒNƒg‚ğ‚»‚Ì‚Ü‚Ü“Ç‚İ‚İA‘S180ƒtƒŒ[ƒ€‚ğÄ¶‚·‚éB
+	// å¿…æ®ºæŠ€ã¯ Effekseer ã®3Dã‚¨ãƒ•ã‚§ã‚¯ãƒˆã‚’ãã®ã¾ã¾èª­ã¿è¾¼ã¿ã€å…¨180ãƒ•ãƒ¬ãƒ¼ãƒ ã‚’å†ç”Ÿã™ã‚‹ã€‚
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", SpecialAttackEffect_FilePath);
 	specialAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
 	if (specialAttackEffectResourceHandle == -1) {
-		printfDx("•KE‹ZƒGƒtƒFƒNƒg‚Ì“Ç‚İ‚İ¸”sI\n");
+		printfDx("å¿…æ®ºæŠ€ã‚¨ãƒ•ã‚§ã‚¯ãƒˆã®èª­ã¿è¾¼ã¿å¤±æ•—ï¼\n");
 		return -1;
 	}
 	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0) {
+
+
+
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
+
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// 1P/2P ‚ÌÄ¶ŠÔ‚Æ‘Ò‹@•œ‹A‚ğ‹¤’Êˆ—‚·‚éB
+			// 1P/2P ã®å†ç”Ÿæ™‚é–“ã¨å¾…æ©Ÿå¾©å¸°ã‚’å…±é€šå‡¦ç†ã™ã‚‹ã€‚
 			UpdatePlayerAnimationProgress(charainfo[i], playerStates[i], anim_neutral);
 		}
-		//“GƒAƒjƒ[ƒVƒ‡ƒ“is
-		charainfo[TEST_ENEMY_INDEX].playtime += 0.5f;
-		if (charainfo[TEST_ENEMY_INDEX].playtime > charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
-			charainfo[TEST_ENEMY_INDEX].playtime = 0.0f;
-			if (charainfo[TEST_ENEMY_INDEX].mode == DAMAGE) {
-				if (charainfo[TEST_ENEMY_INDEX].enemyHP <= 0) {
-					MV1DetachAnim(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, anim_down);
-					charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].mode = DOWNMODE;
-				}
-				else {
-					MV1DetachAnim(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].attachidx = MV1AttachAnim(charainfo[TEST_ENEMY_INDEX].model1, 0, enemy_anim_neutral);
-					charainfo[TEST_ENEMY_INDEX].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx);
-					charainfo[TEST_ENEMY_INDEX].mode = STAND;
-				}
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			// HPãŒ0ä»¥ä¸‹ã§ã€ã¾ã DOWNMODEã«ãªã£ã¦ã„ãªã„å ´åˆ
+			if (charainfo[i].HP <= 0 && charainfo[i].mode != DOWNMODE) {
+
+				// çŠ¶æ…‹ã‚’DOWNMODEã¸
+				charainfo[i].mode = DOWNMODE;
+
+				// æ­»äº¡ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å‡¦ç†ãªã©
+				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_down);
+				charainfo[i].playtime = 0.0f;
+
+				// â˜…ã“ã“ã§ã‚«ã‚¦ãƒ³ãƒˆã™ã‚‹
+				game.AddDeath(i);
+			}
+		}
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			// æ­»äº¡çŠ¶æ…‹(DOWNMODE)ã§ã€ã‚¸ãƒ£ãƒ³ãƒ—ãƒœã‚¿ãƒ³ï¼ˆ1P:SPACE, 2P:RETURNï¼‰ãŒæŠ¼ã•ã‚ŒãŸã‚‰
+			if (charainfo[i].mode == DOWNMODE && CheckHitKey(playerInputs[i].jumpKey) == 1) {
+
+				// 1. HPã‚’å›å¾©
+				charainfo[i].HP = 6;
+
+				// 2. ãƒ¢ãƒ¼ãƒ‰ã‚’ STAND ã«æˆ»ã™
+				charainfo[i].mode = STAND;
+
+				// 3. ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’é€šå¸¸ã«æˆ»ã™
+				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
+				charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+				charainfo[i].playtime = 0.0f;
 			}
 		}
 
+		// ==========================================
+		// æ•µï¼ˆã‚´ãƒ–ãƒªãƒ³ï¼‰ã®AIãƒ»ç§»å‹•ãƒ»ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³å‡¦ç†
+		// ==========================================
 
-		// ƒL[‘€ì
+		for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
+			if (charainfo[i].mode == NONE) continue;
+
+			// ã‚‚ã—ãƒ€ãƒ¡ãƒ¼ã‚¸ï¼ˆè¢«å¼¾ï¼‰ä¸­ã®å ´åˆ
+			if (charainfo[i].mode == DAMAGE) {
+				// è¢«å¼¾ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³ã‚’æœ€å¾Œã¾ã§å†ç”Ÿã—ãŸã‚‰ STAND ã«æˆ»ã™
+				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+					charainfo[i].mode = STAND;
+					charainfo[i].playtime = 0.0f;
+					charainfo[i].isHit = false;
+
+					if (charainfo[i].attachidx != -1) {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+					}
+					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
+					if (charainfo[i].attachidx != -1) {
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+					}
+				}
+
+				// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³æ™‚é–“ã‚’é€²ã‚ã‚‹
+				charainfo[i].playtime += 0.2f;
+				if (charainfo[i].attachidx != -1) {
+					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+				}
+
+				// â˜…ãƒ€ãƒ¡ãƒ¼ã‚¸ä¸­ã®ã¨ãã¯ã€ä¸‹ã®é€šå¸¸ã®ç§»å‹•ãƒ»æ”»æ’ƒAIã«é€²ã¾ã›ãªã„ã‚ˆã†ã«ã“ã“ã§ã‚¹ã‚­ãƒƒãƒ—ï¼
+				continue;
+			}
+
+			// 1. ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã¨ã®è·é›¢ã‚’æ¸¬ã‚Šã€è¿‘ã„æ–¹ã‚’ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã«ã™ã‚‹
+			int enemyTargetIndex = PLAYER1_INDEX;
+			float enemyDistP1 = VSize(VSub(charainfo[PLAYER1_INDEX].pos, charainfo[i].pos));
+			float enemyDistP2 = VSize(VSub(charainfo[PLAYER2_INDEX].pos, charainfo[i].pos));
+			if (enemyDistP2 < enemyDistP1) {
+				enemyTargetIndex = PLAYER2_INDEX;
+			}
+
+			VECTOR dir = VSub(charainfo[enemyTargetIndex].pos, charainfo[i].pos);
+			dir.y = 0;
+			float dist = VSize(dir);
+
+			// â˜…å¾Œã‚å‘ãã«ãªã‚‹å ´åˆã¯ã“ã“ã« DX_PI_F ã‚’è¶³ã—ã¦å‘ãã‚’åˆã‚ã›ã¾ã™
+			float angle = atan2f(dir.x, dir.z) + DX_PI_F;
+			MV1SetRotationXYZ(charainfo[i].model1, VGet(0.0f, angle, 0.0f));
+
+			if (charainfo[i].mode == STAND) {
+				if (dist > 150.0f) {
+					VECTOR moveDir = VNorm(dir);
+					moveDir.y = 0.0f;
+					charainfo[i].pos = VAdd(charainfo[i].pos, VScale(moveDir, 1.5f));
+				}
+
+				// ==========================================
+				// â˜…è¿½åŠ ï¼šä»–ã®ã‚´ãƒ–ãƒªãƒ³ã¨å¯†é›†ã—ã™ããŸã‚‰æŠ¼ã—è¿”ã™å‡¦ç†
+				// ==========================================
+				for (int j = TEST_ENEMY_INDEX; j < MAX_CHARA; j++) {
+					if (i == j) continue;
+					if (charainfo[j].mode == NONE) continue;
+
+					VECTOR diff = VSub(charainfo[i].pos, charainfo[j].pos);
+					diff.y = 0.0f;
+					float enemyDist = VSize(diff);
+
+					// åˆ¤å®šè·é›¢ã‚’å°‘ã—åºƒã’ã‚‹ï¼ˆä¾‹: 70.0fï¼‰
+					float minDistance = 170.0f;
+					if (enemyDist < minDistance && enemyDist > 0.0001f) {
+						VECTOR pushDir = VNorm(diff);
+						// æŠ¼ã—å‡ºã™åŠ›ã‚‚å°‘ã—å¼·ã‚ã«ã™ã‚‹ï¼ˆä¾‹: 1.5fï¼‰
+						charainfo[i].pos = VAdd(charainfo[i].pos, VScale(pushDir, 1.5f));
+					}
+				}
+				// ==========================================
+
+
+
+				MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
+
+				// 150pxä»¥å†…ã«å…¥ã£ãŸã‚‰æ”»æ’ƒã¸ç§»è¡Œ
+				if (dist <= 150.0f) {
+					charainfo[i].mode = ATTACK;
+					charainfo[i].playtime = 0.0f;
+					charainfo[i].isHit = false;
+
+					if (charainfo[i].attachidx != -1) {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+					}
+					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_attack);
+					if (charainfo[i].attachidx != -1) {
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+					}
+				}
+			}
+			else if (charainfo[i].mode == ATTACK) {
+				if (charainfo[i].playtime >= charainfo[i].anim_totaltime * 0.2f &&
+					charainfo[i].playtime <= charainfo[i].anim_totaltime * 0.6f)
+				{
+					if (charainfo[i].isHit == false) {
+						for (int p = 0; p < PLAYER_COUNT; p++) {
+							if (charainfo[p].mode == DOWNMODE) continue;
+
+							if (HitCheck_Capsule_Capsule(
+								charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, 50, 0)), 60.0f,
+								charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
+							{
+								charainfo[p].HP -= 1;
+								charainfo[i].isHit = true;
+								printfDx("ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼%dãŒã‚´ãƒ–ãƒªãƒ³ã®æ”»æ’ƒã‚’å—ã‘ãŸï¼ HP:%d\n", p + 1, charainfo[p].HP);
+								break;
+							}
+						}
+					}
+				}
+
+				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+					charainfo[i].mode = STAND;
+					charainfo[i].playtime = 0.0f;
+					charainfo[i].isHit = false;
+
+					if (charainfo[i].attachidx != -1) {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+					}
+					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, enemy_anim_neutral);
+					if (charainfo[i].attachidx != -1) {
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+					}
+				}
+			}
+
+			// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³æ™‚é–“ã®é€²è¡Œ
+			charainfo[i].playtime += 0.2f;
+
+			// â˜…STANDï¼ˆå¾…æ©Ÿãƒ»ç§»å‹•ä¸­ï¼‰ã®ã¨ãã¯ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚’ãƒ«ãƒ¼ãƒ—ã•ã›ã‚‹
+			if (charainfo[i].mode == STAND) {
+				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+					charainfo[i].playtime = 0.0f;
+				}
+			}
+
+			if (charainfo[i].attachidx != -1) {
+				MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+			}
+		}
+		// ã‚­ãƒ¼æ“ä½œ
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			// 1P/2P ‚Ì“ü—ÍAˆÚ“®A‘Ò‹@/‘–‚èØ‘ÖAUŒ‚—\–ñ‚ğ‹¤’Êˆ—‚·‚éB
+			// 1P/2P ã®å…¥åŠ›ã€ç§»å‹•ã€å¾…æ©Ÿ/èµ°ã‚Šåˆ‡æ›¿ã€æ”»æ’ƒäºˆç´„ã‚’å…±é€šå‡¦ç†ã™ã‚‹ã€‚
 			UpdatePlayerInput(
 				charainfo[i],
 				playerStates[i],
@@ -418,7 +701,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 		if (charainfo[TEST_ENEMY_INDEX].mode == STAND) {
-			// ‹——£‚Ì‹ß‚¢ƒvƒŒƒCƒ„[‚ğUŒ‚‘ÎÛ‚É‚·‚éB
+			// è·é›¢ã®è¿‘ã„ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã‚’æ”»æ’ƒå¯¾è±¡ã«ã™ã‚‹ã€‚
 			float dist = VSize(VSub(charainfo[enemyTargetIndex].pos, charainfo[TEST_ENEMY_INDEX].pos));
 			if (dist < 150.0f) {
 				charainfo[TEST_ENEMY_INDEX].mode = ATTACK;
@@ -428,29 +711,30 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 		else if (charainfo[TEST_ENEMY_INDEX].mode == ATTACK) {
 
-			// UŒ‚ƒAƒjƒ[ƒVƒ‡ƒ“‚ÌuU‚è‰º‚ë‚µvƒ^ƒCƒ~ƒ“ƒO
+			// æ”»æ’ƒã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®ã€ŒæŒ¯ã‚Šä¸‹ã‚ã—ã€ã‚¿ã‚¤ãƒŸãƒ³ã‚°
 			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.4f &&
 				charainfo[TEST_ENEMY_INDEX].playtime <= charainfo[TEST_ENEMY_INDEX].anim_totaltime * 0.6f)
 			{
-				// UŒ‚‚ª‚Ü‚¾ˆê“x‚à“–‚½‚Á‚Ä‚¢‚È‚¢ê‡‚Ì‚İ”»’è
+				// æ”»æ’ƒãŒã¾ã ä¸€åº¦ã‚‚å½“ãŸã£ã¦ã„ãªã„å ´åˆã®ã¿åˆ¤å®š
 				if (charainfo[TEST_ENEMY_INDEX].isHit == false)
 				{
 					for (int i = 0; i < PLAYER_COUNT; i++) {
-						// ƒeƒXƒg“G‚ÌUŒ‚‚ÍA”ÍˆÍ“à‚Ì‚Ç‚¿‚ç‚ÌƒvƒŒƒCƒ„[‚É‚à“–‚½‚éB
+						// ãƒ†ã‚¹ãƒˆæ•µã®æ”»æ’ƒã¯ã€ç¯„å›²å†…ã®ã©ã¡ã‚‰ã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã«ã‚‚å½“ãŸã‚‹ã€‚
 						if (HitCheck_Capsule_Capsule(
 							charainfo[TEST_ENEMY_INDEX].pos, VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, 50, 0)), 60.0f,
 							charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)), charainfo[i].charahitinfo.Width / 2))
 						{
-							charainfo[i].HP -= 1; // ƒ_ƒ[ƒW”­¶
-							charainfo[TEST_ENEMY_INDEX].isHit = true; // ƒtƒ‰ƒO‚ğ—§‚Ä‚Ä˜A‘±ƒqƒbƒg‚ğ–h~
-							printfDx("ƒvƒŒƒCƒ„[%d”í’eIHP:%d\n", i + 1, charainfo[i].HP);
+
+								charainfo[i].HP -= 1; // ãƒ€ãƒ¡ãƒ¼ã‚¸ç™ºç”Ÿ
+							charainfo[TEST_ENEMY_INDEX].isHit = true; // ãƒ•ãƒ©ã‚°ã‚’ç«‹ã¦ã¦é€£ç¶šãƒ’ãƒƒãƒˆã‚’é˜²æ­¢
+							printfDx("ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼%dè¢«å¼¾ï¼HP:%d\n", i + 1, charainfo[i].HP);
 							break;
 						}
 					}
 				}
 			}
 
-			// ƒAƒjƒ[ƒVƒ‡ƒ“‚ªI‚í‚Á‚½‚çƒtƒ‰ƒO‚ğƒŠƒZƒbƒg‚µ‚Ä’Êíƒ‚[ƒh‚Ö
+			// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ãŒçµ‚ã‚ã£ãŸã‚‰ãƒ•ãƒ©ã‚°ã‚’ãƒªã‚»ãƒƒãƒˆã—ã¦é€šå¸¸ãƒ¢ãƒ¼ãƒ‰ã¸
 			if (charainfo[TEST_ENEMY_INDEX].playtime >= charainfo[TEST_ENEMY_INDEX].anim_totaltime) {
 				charainfo[TEST_ENEMY_INDEX].mode = STAND;
 				SetCharacterAnimation(charainfo[TEST_ENEMY_INDEX], enemy_anim_neutral);
@@ -460,38 +744,35 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[0].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[0].move));
 		WallNum = 0;
 		FloorNum = 0;
-		// ŒŸo‚³‚ê‚½ƒ|ƒŠƒSƒ“‚Ì”‚¾‚¯ŒJ‚è•Ô‚µ
-		for (int i = 0; i < HitDim.HitNum; i++) {
-			// ‚w‚y•½–Ê‚É‚’¼‚©‚Ç‚¤‚©‚Íƒ|ƒŠƒSƒ“‚Ì–@ü‚Ì‚x¬•ª‚ª‚O‚ÉŒÀ‚è‚È‚­‹ß‚¢‚©‚Ç‚¤‚©‚Å”»’f‚·‚é
-			if (HitDim.Dim[i].Normal.y < 0.000001f && HitDim.Dim[i].Normal.y > -0.000001f) {
-				printf("•Çˆµ‚¢\n");
-				// •Çƒ|ƒŠƒSƒ“‚Æ”»’f‚³‚ê‚½ê‡‚Å‚àAƒLƒƒƒ‰ƒNƒ^[‚Ì‚xÀ•W{‚PD‚O‚†‚æ‚è‚‚¢ƒ|ƒŠƒSƒ“‚Ì‚İ“–‚½‚è”»’è‚ğs‚¤
+		for (int i = 0; i < HitDim.HitNum; i++)
+		{
+			// æ³•ç·šã®Yæˆåˆ†ãŒå°ã•ã„ â†’ å£
+			if (fabs(HitDim.Dim[i].Normal.y) < 0.5f)
+			{
+				printf("å£æ‰±ã„\n");
+
 				if (HitDim.Dim[i].Position[0].y > charainfo[0].pos.y + 1.0f ||
 					HitDim.Dim[i].Position[1].y > charainfo[0].pos.y + 1.0f ||
-					HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f) {
-					// ƒ|ƒŠƒSƒ“‚Ì”‚ª—ñ‹“‚Å‚«‚éŒÀŠE”‚É’B‚µ‚Ä‚¢‚È‚©‚Á‚½‚çƒ|ƒŠƒSƒ“‚ğ”z—ñ‚É’Ç‰Á
-					if (WallNum < CHARA_MAX_HITCOLL) {
-						// ƒ|ƒŠƒSƒ“‚Ì\‘¢‘Ì‚ÌƒAƒhƒŒƒX‚ğ•Çƒ|ƒŠƒSƒ“ƒ|ƒCƒ“ƒ^”z—ñ‚É•Û‘¶‚·‚é
+					HitDim.Dim[i].Position[2].y > charainfo[0].pos.y + 1.0f)
+				{
+					if (WallNum < CHARA_MAX_HITCOLL)
+					{
 						Wall[WallNum] = &HitDim.Dim[i];
-
-						// •Çƒ|ƒŠƒSƒ“‚Ì”‚ğ‰ÁZ‚·‚é
 						WallNum++;
 					}
 				}
 			}
-			else {
-				// ƒ|ƒŠƒSƒ“‚Ì”‚ª—ñ‹“‚Å‚«‚éŒÀŠE”‚É’B‚µ‚Ä‚¢‚È‚©‚Á‚½‚çƒ|ƒŠƒSƒ“‚ğ”z—ñ‚É’Ç‰Á
-				if (FloorNum < CHARA_MAX_HITCOLL) {
-					// ƒ|ƒŠƒSƒ“‚Ì\‘¢‘Ì‚ÌƒAƒhƒŒƒX‚ğ°ƒ|ƒŠƒSƒ“ƒ|ƒCƒ“ƒ^”z—ñ‚É•Û‘¶‚·‚é
+			else
+			{
+				// åºŠ
+				if (FloorNum < CHARA_MAX_HITCOLL)
+				{
 					Floor[FloorNum] = &HitDim.Dim[i];
-
-					// °ƒ|ƒŠƒSƒ“‚Ì”‚ğ‰ÁZ‚·‚é
 					FloorNum++;
 				}
 			}
 		}
-		float MaxY;
-		float MaxY_poly;
+
 
 		const bool isPlayerOverlappingNow = HitCheck_Capsule_Capsule(
 			charainfo[PLAYER1_INDEX].pos,
@@ -508,181 +789,227 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			VAdd(VAdd(charainfo[PLAYER2_INDEX].pos, charainfo[PLAYER2_INDEX].move), VGet(0, charainfo[PLAYER2_INDEX].charahitinfo.Height, 0)),
 			charainfo[PLAYER2_INDEX].charahitinfo.Width / 2) == TRUE;
 		if (!isPlayerOverlappingNow && willPlayerOverlapNext) {
-			// V‚µ‚­ƒvƒŒƒCƒ„[“¯m‚ªd‚È‚è‚»‚¤‚Èê‡‚¾‚¯A‰¡ˆÚ“®‚ğ~‚ß‚éB
-			// Šù‚Éd‚È‚Á‚Ä‚¢‚éê‡‚ÍA—£‚ê‚é‚½‚ß‚ÌˆÚ“®‚ğ‹–‰Â‚·‚éB
+			// æ–°ã—ããƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼åŒå£«ãŒé‡ãªã‚Šãã†ãªå ´åˆã ã‘ã€æ¨ªç§»å‹•ã‚’æ­¢ã‚ã‚‹ã€‚
+			// æ—¢ã«é‡ãªã£ã¦ã„ã‚‹å ´åˆã¯ã€é›¢ã‚Œã‚‹ãŸã‚ã®ç§»å‹•ã‚’è¨±å¯ã™ã‚‹ã€‚
 			charainfo[PLAYER1_INDEX].move.x = 0.0f;
 			charainfo[PLAYER1_INDEX].move.z = 0.0f;
 			charainfo[PLAYER2_INDEX].move.x = 0.0f;
 			charainfo[PLAYER2_INDEX].move.z = 0.0f;
 		}
 
+
+
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			const bool isEnemyOverlappingNow = HitCheck_Capsule_Capsule(
-				charainfo[i].pos,
-				VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)),
-				charainfo[i].charahitinfo.Width / 2,
-				charainfo[TEST_ENEMY_INDEX].pos,
-				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
-				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2) == TRUE;
-			const bool willEnemyOverlapNext = HitCheck_Capsule_Capsule(
-				VAdd(charainfo[i].pos, charainfo[i].move),
-				VAdd(VAdd(charainfo[i].pos, charainfo[i].move), VGet(0, charainfo[i].charahitinfo.Height, 0)),
-				charainfo[i].charahitinfo.Width / 2,
-				charainfo[TEST_ENEMY_INDEX].pos,
-				VAdd(charainfo[TEST_ENEMY_INDEX].pos, VGet(0, charainfo[TEST_ENEMY_INDEX].charahitinfo.Height, 0)),
-				charainfo[TEST_ENEMY_INDEX].charahitinfo.Width / 2) == TRUE;
-			if (charainfo[TEST_ENEMY_INDEX].mode != DOWNMODE && !isEnemyOverlappingNow && willEnemyOverlapNext) {
-				// V‚µ‚­ƒeƒXƒg“G‚Æd‚È‚è‚»‚¤‚Èê‡‚¾‚¯A‚»‚ÌƒvƒŒƒCƒ„[‚Ì‰¡ˆÚ“®‚ğ~‚ß‚éB
-				charainfo[i].move.x = 0.0f;
-				charainfo[i].move.z = 0.0f;
+			for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
+				if (charainfo[e].mode == NONE || charainfo[e].mode == DOWNMODE) continue;
+				const bool isEnemyOverlappingNow = HitCheck_Capsule_Capsule(
+					charainfo[i].pos,
+					VAdd(charainfo[i].pos, VGet(0, charainfo[i].charahitinfo.Height, 0)),
+					charainfo[i].charahitinfo.Width / 2,
+					charainfo[e].pos,
+					VAdd(charainfo[e].pos, VGet(0, charainfo[e].charahitinfo.Height, 0)),
+					charainfo[e].charahitinfo.Width / 2) == TRUE;
+				const bool willEnemyOverlapNext = HitCheck_Capsule_Capsule(
+					VAdd(charainfo[i].pos, charainfo[i].move),
+					VAdd(VAdd(charainfo[i].pos, charainfo[i].move), VGet(0, charainfo[i].charahitinfo.Height, 0)),
+					charainfo[i].charahitinfo.Width / 2,
+					charainfo[e].pos,
+					VAdd(charainfo[e].pos, VGet(0, charainfo[e].charahitinfo.Height, 0)),
+					charainfo[e].charahitinfo.Width / 2) == TRUE;
+				if (charainfo[e].mode != DOWNMODE && !isEnemyOverlappingNow && willEnemyOverlapNext) {
+					// æ–°ã—ããƒ†ã‚¹ãƒˆæ•µã¨é‡ãªã‚Šãã†ãªå ´åˆã ã‘ã€ãã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®æ¨ªç§»å‹•ã‚’æ­¢ã‚ã‚‹ã€‚
+					charainfo[i].move.x = 0.0f;
+					charainfo[i].move.z = 0.0f;
+				}
 			}
-		}
-		// °ƒ|ƒŠƒSƒ“‚Æ‚Ì“–‚½‚è”»’è
-		if (FloorNum != 0) {
-			// °ƒ|ƒŠƒSƒ“‚É“–‚½‚Á‚½‚©‚Ç‚¤‚©‚Ìƒtƒ‰ƒO‚ğ“|‚µ‚Ä‚¨‚­
-			HitFlag = 0;
-			// ˆê”Ô‚‚¢°ƒ|ƒŠƒSƒ“‚É‚Ô‚Â‚¯‚éˆ×‚Ì”»’è—p•Ï”‚ğ‰Šú‰»
-			MaxY = 0.0f;
-			MaxY_poly = 0.0f;
 
-			// °ƒ|ƒŠƒSƒ“‚Ì”‚¾‚¯ŒJ‚è•Ô‚µ
-			for (int i = 0; i < FloorNum; i++) {
-				// i”Ô–Ú‚Ì°ƒ|ƒŠƒSƒ“‚ÌƒAƒhƒŒƒX‚ğ°ƒ|ƒŠƒSƒ“ƒ|ƒCƒ“ƒ^”z—ñ‚©‚çæ“¾
-				Poly = Floor[i];
+			// ==========================================
+			// å ´å¤–è½ä¸‹ï¼ˆãƒ‡ã‚¹ï¼‰åˆ¤å®š
+			// ==========================================
+			float DEATH_LINE = -300.0f; // ã“ã®Yåº§æ¨™ã‚’ä¸‹å›ã£ãŸã‚‰è½ä¸‹æ­»ï¼ˆã‚¹ãƒ†ãƒ¼ã‚¸ã«åˆã‚ã›ã¦èª¿æ•´ï¼‰
 
-				VECTOR cal_pos1 = VAdd(charainfo[0].pos, VGet(0.0f, PC_HEIGHT, 0.0f));
-				VECTOR cal_pos2 = VAdd(charainfo[0].pos, VGet(0.0f, -5.0f, 0.0f));
-				// ‘–‚Á‚Ä‚¢‚éê‡‚Í“ª‚Ìæ‚©‚ç‚»‚±‚»‚±’á‚¢ˆÊ’u‚ÌŠÔ‚Å“–‚½‚Á‚Ä‚¢‚é‚©‚ğ”»’è( ŒXÎ‚Å—‰ºó‘Ô‚ÉˆÚs‚µ‚Ä‚µ‚Ü‚í‚È‚¢ˆ× )
-				LineRes = HitCheck_Line_Triangle(cal_pos1, cal_pos2, Poly->Position[0], Poly->Position[1], Poly->Position[2]);
+			if (charainfo[i].pos.y < DEATH_LINE) {
+				// 1. æ­»äº¡å›æ•°ï¼ˆDEATHSï¼‰ã‚’å¢—ã‚„ã™
+				charainfo[i].deaths++;
 
-				// “–‚½‚Á‚Ä‚¢‚È‚©‚Á‚½‚ç‰½‚à‚µ‚È‚¢
-				if (LineRes.HitFlag == TRUE) {
-					PolyCharaHitField[0] = Poly->Position[0];
-					PolyCharaHitField[1] = Poly->Position[1];
-					PolyCharaHitField[2] = Poly->Position[2];
+				// 2. å¾©æ´»ä½ç½®ï¼ˆã‚¹ãƒãƒ¼ãƒ³åœ°ç‚¹ï¼‰ã¸ãƒ¯ãƒ¼ãƒ—ã•ã›ã‚‹
+				if (i == 0) {
+					charainfo[i].pos = VGet(0.0f, 800.0f, 0.0f); // 1Pã®å¾©æ´»ä½ç½®
 				}
 				else {
-					continue;
+					charainfo[i].pos = VGet(100.0f, 800.0f, 0.0f); // 2Pã®å¾©æ´»ä½ç½®
 				}
 
-				// Šù‚É“–‚½‚Á‚½ƒ|ƒŠƒSƒ“‚ª‚ ‚èAŠ‚Â¡‚Ü‚ÅŒŸo‚µ‚½°ƒ|ƒŠƒSƒ“‚æ‚è’á‚¢ê‡‚Í‰½‚à‚µ‚È‚¢
-				if (HitFlag == 1 && MaxY > LineRes.Position.y) {
-					continue;
-				}
+				// 3. ç§»å‹•é‡ã‚„é€Ÿåº¦ã‚’ãƒªã‚»ãƒƒãƒˆï¼ˆè½ä¸‹ã—ãŸå‹¢ã„ã‚’æ¶ˆã™ï¼‰
+				charainfo[i].move = VGet(0.0f, 0.0f, 0.0f);
 
-				// ƒ|ƒŠƒSƒ“‚É“–‚½‚Á‚½ƒtƒ‰ƒO‚ğ—§‚Ä‚é
-				HitFlag = 1;
+				// 4. HPã‚’å›å¾©ã•ã›ã‚‹ï¼ˆãƒ˜ãƒƒãƒ€ãƒ¼ã«åˆã‚ã›ã¦ HP ã‚’å¤§æ–‡å­—ã«ï¼‰
+				charainfo[i].HP = 100; // æœ€å¤§HPã®å¤‰æ•°ãŒãªã„ãŸã‚ã€å…¨å¿«ã™ã‚‹æ•°å€¤ã‚’ç›´æ¥æŒ‡å®š
 
-				// ÚG‚µ‚½‚xÀ•W‚ğ•Û‘¶‚·‚é
-				MaxY = LineRes.Position.y;
-				MaxY_poly = Poly->Position[1].y;
+				// 5. ãƒ¢ãƒ¼ãƒ‰ã‚’é€šå¸¸çŠ¶æ…‹ï¼ˆSTANDï¼‰ã«æˆ»ã™
+				charainfo[i].mode = STAND;
+				MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+
+				// å¾…æ©Ÿãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³ï¼ˆanim_neutral ã‚’ä½¿ç”¨ï¼‰ã«è¨­å®š
+				charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_neutral);
+				charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+				charainfo[i].playtime = 0.0f;
 			}
 		}
-		if (HitFlag == 1) {
 
-			charainfo[0].move.y = MaxY - charainfo[0].pos.y;
 
-			if (charainfo[0].mode == JUMPLOOP || charainfo[0].mode == FALL) {
+			// å„ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®åºŠãƒãƒªã‚´ãƒ³ã¨ã®å½“ãŸã‚Šåˆ¤å®š
+			// ==========================================
+		for (int i = 0; i < PLAYER_COUNT; i++) {
+			if (charainfo[i].mode == DOWNMODE) continue;
+
+			HitDim = MV1CollCheck_Sphere(stagedata, -1, charainfo[i].pos, CHARA_ENUM_DEFAULT_SIZE + VSize(charainfo[i].move));
+			WallNum = 0;
+			FloorNum = 0;
+			for (int h = 0; h < HitDim.HitNum; h++)
+			{
+				if (fabs(HitDim.Dim[h].Normal.y) < 0.5f)
 				{
-					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].mode = JUMPOUT;
-					charainfo[0].playtime = 0.0f;
-					charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_jumpout);
-					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].move.x = 0.0f;
-					charainfo[0].move.y = 0.0f;
-					charainfo[0].move.z = 0.0f;
+					if (HitDim.Dim[h].Position[0].y > charainfo[i].pos.y + 1.0f ||
+						HitDim.Dim[h].Position[1].y > charainfo[i].pos.y + 1.0f ||
+						HitDim.Dim[h].Position[2].y > charainfo[i].pos.y + 1.0f)
+					{
+						if (WallNum < CHARA_MAX_HITCOLL)
+						{
+							Wall[WallNum] = &HitDim.Dim[h];
+							WallNum++;
+						}
+					}
 				}
-
-			}
-			else if (charainfo[0].mode == JUMPIN) {
-				if (charainfo[0].playtime > charainfo[0].anim_totaltime) {
-					MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].attachidx = MV1AttachAnim(
-						charainfo[0].model1, 0, anim_jumploop);
-					charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(
-						charainfo[0].model1, charainfo[0].attachidx);
-					charainfo[0].mode = JUMPLOOP;
-					charainfo[0].move.y = 15.0f;
-					//ƒWƒƒƒ“ƒv’¼Œã‚Ì’n–Ê‚ß‚è‚İ‚ğ”ğ‚¯‚é‚½‚ß
-					charainfo[0].pos.y += charainfo[0].move.y;
+				else
+				{
+					if (FloorNum < CHARA_MAX_HITCOLL)
+					{
+						Floor[FloorNum] = &HitDim.Dim[h];
+						FloorNum++;
+					}
 				}
 			}
-		}
-		else
-		{
-			// ƒAƒjƒ‚Ìƒ‹[ƒvŠÇ—
-			if (charainfo[0].mode != JUMPLOOP && charainfo[0].mode != FALL) {
-				MV1DetachAnim(charainfo[0].model1, charainfo[0].attachidx);
-				charainfo[0].mode = FALL;
-				charainfo[0].attachidx = MV1AttachAnim(charainfo[0].model1, 0, anim_jumploop);
-				charainfo[0].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[0].model1, charainfo[0].attachidx);
-				charainfo[0].playtime = 7.0f;
-				MV1SetAttachAnimTime(charainfo[0].model1, charainfo[0].attachidx, charainfo[0].playtime);
+
+			float MaxY = 0.0f;
+			int hitFloorFlag = 0;
+
+			if (FloorNum != 0) {
+				for (int f = 0; f < FloorNum; f++) {
+					Poly = Floor[f];
+
+					VECTOR cal_pos1 = VAdd(charainfo[i].pos, VGet(0.0f, PC_HEIGHT, 0.0f));
+					VECTOR cal_pos2 = VAdd(charainfo[i].pos, VGet(0.0f, -5.0f, 0.0f));
+					LineRes = HitCheck_Line_Triangle(cal_pos1, cal_pos2, Poly->Position[0], Poly->Position[1], Poly->Position[2]);
+
+					if (LineRes.HitFlag == TRUE) {
+						if (i == 0) { // ãƒ‡ãƒãƒƒã‚°ç”¨ã®æç”»ã¯1Pã®ã‚‚ã®ã‚’ä»£è¡¨ã•ã›ã‚‹å ´åˆ
+							PolyCharaHitField[0] = Poly->Position[0];
+							PolyCharaHitField[1] = Poly->Position[1];
+							PolyCharaHitField[2] = Poly->Position[2];
+						}
+					}
+					else {
+						continue;
+					}
+
+					if (hitFloorFlag == 1 && MaxY > LineRes.Position.y) {
+						continue;
+					}
+
+					hitFloorFlag = 1;
+					MaxY = LineRes.Position.y;
+				}
 			}
+
+			if (hitFloorFlag == 1) {
+				charainfo[i].move.y = MaxY - charainfo[i].pos.y;
+
+				if (charainfo[i].mode == JUMPLOOP || charainfo[i].mode == FALL) {
+					MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+					charainfo[i].mode = JUMPOUT;
+					charainfo[i].playtime = 0.0f;
+					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_jumpout);
+					charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+					charainfo[i].move.x = 0.0f;
+					charainfo[i].move.y = 0.0f;
+					charainfo[i].move.z = 0.0f;
+				}
+				else if (charainfo[i].mode == JUMPIN) {
+					if (charainfo[i].playtime > charainfo[i].anim_totaltime) {
+						MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_jumploop);
+						charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+						charainfo[i].mode = JUMPLOOP;
+						charainfo[i].move.y = 15.0f;
+						charainfo[i].pos.y += charainfo[i].move.y;
+					}
+				}
+			}
+			else
+			{
+				if (charainfo[i].mode != JUMPLOOP && charainfo[i].mode != FALL) {
+					MV1DetachAnim(charainfo[i].model1, charainfo[i].attachidx);
+					charainfo[i].mode = FALL;
+					charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, anim_jumploop);
+					charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
+					charainfo[i].playtime = 7.0f;
+					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
+				}
+			}
+
+			if (charainfo[i].mode == FALL || charainfo[i].mode == JUMPLOOP) {
+				charainfo[i].move.y -= GRAVITY;
+			}
+
+			MV1CollResultPolyDimTerminate(HitDim);
 		}
-
-
-		// ƒWƒƒƒ“ƒv’†‚¾‚Á‚½‚çd—Í’Ç‰Á‚³‚¹‚é
-		if (charainfo[0].mode == FALL || charainfo[0].mode == JUMPLOOP) {
-			charainfo[0].move.y -= GRAVITY;
-		}
-
-
-		// ŒŸo‚µ‚½ƒLƒƒƒ‰ƒNƒ^[‚ÌüˆÍ‚Ìƒ|ƒŠƒSƒ“î•ñ‚ğŠJ•ú‚·‚é
-		MV1CollResultPolyDimTerminate(HitDim);
-
-		// ˆÚ“®ˆ—
+		// ç§»å‹•å‡¦ç†
 		for (int i = 0; i < PLAYER_COUNT; i++) {
 			charainfo[i].pos.x += charainfo[i].move.x;
 			charainfo[i].pos.y += charainfo[i].move.y;
 			charainfo[i].pos.z += charainfo[i].move.z;
-			// ˆÚ“®Œã‚ÌÀ•W‚ğUŒ‚”»’è—p‚Ì’†S‚É‚à”½‰f‚·‚éB
+			// ç§»å‹•å¾Œã®åº§æ¨™ã‚’æ”»æ’ƒåˆ¤å®šç”¨ã®ä¸­å¿ƒã«ã‚‚åæ˜ ã™ã‚‹ã€‚
 			charainfo[i].charahitinfo.CenterPosition = charainfo[i].pos;
 		}
 
-		cpos.x += charainfo[0].move.x;
-		cpos.y += charainfo[0].move.y;
-		cpos.z += charainfo[0].move.z;
 
-		ctgt.x += charainfo[0].move.x;
-		ctgt.y += charainfo[0].move.y;
-		ctgt.z += charainfo[0].move.z;
-		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
+
+
+
+
+
 
 
 		DrawTriangle3D(PolyCharaHitField[0], PolyCharaHitField[1], PolyCharaHitField[2], GetColor(255, 0, 0), TRUE);
 		for (int i = 0; i < PLAYER_COUNT; i++) {
-			MV1SetPosition(charainfo[i].model1, charainfo[i].pos);
-			//â‚ÌÀ•WXV
+			MV1SetPosition(charainfo[i].model1, charainfo[
+				i].pos);
+			//é˜ã®åº§æ¨™æ›´æ–°
 			if (playerSayaFrame[i] != -1 && playerSayaModel[i] != -1) {
 				sayamatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerSayaFrame[i]);
 				MV1SetMatrix(playerSayaModel[i], sayamatrix[i]);
 			}
-			//•Ší‚ÌÀ•WXV
+			//æ­¦å™¨ã®åº§æ¨™æ›´æ–°
 			if (playerWeaponFrame[i] != -1 && playerWeaponModel[i] != -1) {
 				wpmatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerWeaponFrame[i]);
 				MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
-				//UŒ‚”»’è‚ÌXV
+				//æ”»æ’ƒåˆ¤å®šã®æ›´æ–°
 				wpPosStart[i] = VGet(0.0f, 0.0f, 0.0f);
 				wpPosEnd[i] = VGet(0.0f, -90.0f, 0.0f);
 				wpPosStart[i] = VTransform(wpPosStart[i], wpmatrix[i]);
 				wpPosEnd[i] = VTransform(wpPosEnd[i], wpmatrix[i]);
-
-				// •KE‹Z’†‚ÍŒ•‚Ì”»’è‚ğ~‚ßAŒõü”»’è‚Æ‚Ì“ñdƒqƒbƒg‚ğ–h‚®B
-				if (!playerStates[i].isSpecialAttack) {
-					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[TEST_ENEMY_INDEX], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+				for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
+					// ç”Ÿæˆã•ã‚Œã¦ã„ãªã„æ•µï¼ˆNONEï¼‰ã¯ã‚¹ã‚­ãƒƒãƒ—
+					if (playerStates[i].isSpecialAttack || charainfo[e].mode == NONE) continue;
+					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[e], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
 				}
 			}
 
-			CheckPlayerSpecialAttackHit(
-				game,
-				charainfo[i],
-				playerStates[i],
-				charainfo[TEST_ENEMY_INDEX],
-				SEdamageHandle,
-				anim_damage
-			);
+			for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
+				CheckPlayerSpecialAttackHit(game, charainfo[i], playerStates[i], charainfo[e],
+					SEdamageHandle, anim_damage, i);
+			}
 		}
 
 		MV1SetAttachAnimTime(charainfo[TEST_ENEMY_INDEX].model1, charainfo[TEST_ENEMY_INDEX].attachidx, charainfo[TEST_ENEMY_INDEX].playtime);
@@ -694,57 +1021,86 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-		//ƒJƒƒ‰’Ç]
-		// 2l‚Ì’†ŠÔ’n“_‚ğŒ©‚é‚æ‚¤‚É‚µ‚ÄA“¯‚¶‰æ–Ê“à‚É“ü‚è‚â‚·‚­‚·‚éB
-		VECTOR cameraCenter = VScale(VAdd(charainfo[PLAYER1_INDEX].pos, charainfo[PLAYER2_INDEX].pos), 0.5f);
-		ctgt = VAdd(cameraCenter, VGet(0.0f, 0.0f, 0.0f));
-		cpos = VAdd(ctgt, VGet(0.0f, 300.0f, -1200.0f));
-		SetCameraPositionAndTargetAndUpVec(cpos, ctgt, VGet(0.0f, 0.0f, 1.0f));
-
-		// DxLib ‚ÌÅIƒJƒƒ‰İ’è‚ğ Effekseer ‚É“¯Šú‚µ‚Ä‚©‚çAƒGƒtƒFƒNƒg‚ğ1ƒtƒŒ[ƒ€i‚ß‚éB
-		Effekseer_Sync3DSetting();
+		// ç”»é¢ã®æ¶ˆå»
 		UpdateEffekseer3D();
-
-		// ‰æ–Ê‚ÌÁ‹
-		ClearDrawScreen();
-
-		// lŠpŒ`‚ğ•\¦ ÅŒã‚Ìˆø”‚ğfalse‚É‚·‚é‚Æ“h‚è‚Â‚Ô‚µ–³‚µ
-		DrawBox(0, 0, 900, 600, GetColor(0, 0, 0), true);
-		//ƒ‚ƒfƒ‹•`‰æ
-		for (int i = 0; i < PLAYER_COUNT; i++) {
-			MV1DrawModel(charainfo[i].model1);
-		}
-		MV1DrawModel(charainfo[TEST_ENEMY_INDEX].model1);
-		for (int i = 0; i < PLAYER_COUNT; i++) {
-			if (playerWeaponModel[i] != -1) {
-				MV1DrawModel(playerWeaponModel[i]);
-			}
-			if (playerSayaModel[i] != -1) {
-				MV1DrawModel(playerSayaModel[i]);
-			}
-		}
-		MV1DrawModel(stagedata);
 		skyRot += 0.001f;
 		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
-		MV1DrawModel(sky);
+		ClearDrawScreen();
 
-		for (int i = 0; i < PLAYER_COUNT; i++) {
-			DrawPlayerNormalAttackEffect(charainfo[i], playerStates[i], normalAttackEffectHandle);
-			DrawPlayerHeavyAttackEffect(charainfo[i], playerStates[i], heavyAttackEffectHandle);
+
+
+		// å››è§’å½¢ã‚’è¡¨ç¤º æœ€å¾Œã®å¼•æ•°ã‚’falseã«ã™ã‚‹ã¨å¡—ã‚Šã¤ã¶ã—ç„¡ã—
+		DrawBox(0, 0, 900, 600, GetColor(255, 255, 255), true);
+
+
+
+
+
+		//ã“ã“ã‹ã‚‰ä¸‹ãŒï¼’é‡ãƒ«ãƒ¼ãƒ—ã«ãªã£ã¦ã¦é‡ããªã£ã¦ã‚‹åŸå› ï¼
+		for (int pIdx = 0; pIdx < PLAYER_COUNT; pIdx++) {
+
+			// 1. å·¦å³ã®ç”»é¢é ˜åŸŸï¼ˆãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆï¼‰ã‚’æ±ºå®š
+			int startX = (pIdx == 0) ? 0 : 450;
+			int endX = (pIdx == 0) ? 450 : 900;
+
+			SetDrawArea(startX, 0, endX, 600);
+
+			// 2. ç¾åœ¨ã®ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®åº§æ¨™ã‚’å–å¾—
+			VECTOR pPos = charainfo[pIdx].pos;
+
+			// 3. ã€ã‚«ãƒ¡ãƒ©ä½ç½®ã¨æ³¨è¦–ç‚¹ã®èª¿æ•´ï¼ˆæ–œã‚ä¸Šè¦‹ä¸‹ã‚ã—è¦–ç‚¹ï¼‰ã€‘
+			VECTOR cPos, cTarget;
+
+			if (pIdx == 0) {
+				// ã€ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼1ç”¨ï¼ˆå·¦ç”»é¢ï¼‰ã€‘
+				// æ³¨è¦–ç‚¹ã‚’ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®å°‘ã—ä¸Šã«ã™ã‚‹
+				cTarget = VAdd(pPos, VGet(300.0f, 150.0f, 0.0f));
+
+				// æ–œã‚ä¸Šã‹ã‚‰è¦‹ä¸‹ã‚ã™ï¼ˆX:å°‘ã—æ¨ªã«ãšã‚‰ã™, Y:é«˜ã•, Z:å¾Œã‚ã«é›¢ã™ï¼‰
+				cPos = VAdd(cTarget, VGet(-200.0f, 450.0f, -900.0f));
+			}
+			else {
+				// ã€ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼2ç”¨ï¼ˆå³ç”»é¢ï¼‰ã€‘
+				cTarget = VAdd(pPos, VGet(-300.0f, 150.0f, 0.0f));
+
+				// ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼2ã‚‚åŒæ§˜ã«åå¯¾å´ã®æ–œã‚ä¸Šã‹ã‚‰è¦‹ä¸‹ã‚ã™
+				cPos = VAdd(cTarget, VGet(200.0f, 450.0f, -900.0f));
+			}
+
+			// 4. ã‚«ãƒ¡ãƒ©ã‚’é©ç”¨
+			SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
+
+
+
+
+			for (int i = 0; i < MAX_CHARA; i++) {
+				if (charainfo[i].mode != NONE && charainfo[i].model1 != -1) {
+					MV1DrawModel(charainfo[i].model1);
+				}
+			}
+			MV1DrawModel(stagedata);
+			MV1DrawModel(sky);
+
+			for (int i = 0; i < PLAYER_COUNT; i++) {
+				if (playerWeaponModel[i] != -1) MV1DrawModel(playerWeaponModel[i]);
+				if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
+			}
+
+			Effekseer_Sync3DSetting();
+			for (int i = 0; i < PLAYER_COUNT; i++) {
+				DrawPlayerNormalAttackEffect(charainfo[i], playerStates[i], normalAttackEffectHandle);
+				DrawPlayerHeavyAttackEffect(charainfo[i], playerStates[i], heavyAttackEffectHandle);
+			}
+			DrawEffekseer3D();
+			game.DrawUI(pIdx, 900, 600, charainfo, hpBarTex, crownGraphHandle);
+			//DrawCrownIcon(pIdx, startX, 20, game.p1Score, game.p2Score, crownGraphHandle);
+
 		}
-
-		// 1P/2P ‚ªÄ¶‚µ‚Ä‚¢‚é Effekseer ‚Ì•KE‹Z‚ğ‚Ü‚Æ‚ß‚Ä•`‰æ‚·‚éB
-		DrawEffekseer3D();
-
-		game.Update(charainfo);
-
-		game.DrawUI();
-
-		// •\‰æ–Ê‚Æ— ‰æ–Ê‚ÌØ‚è‘Ö‚¦
+		SetDrawArea(0, 0, 900, 600);
+		game.Update(charainfo, charainfo);
 		ScreenFlip();
-
 	}
-	// DXƒ‰ƒCƒuƒ‰ƒŠ‚ÌI—¹ˆ—
+	// DXãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®çµ‚äº†å‡¦ç†
 	for (int i = 0; i < PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT; i++) {
 		if (normalAttackEffectHandle[i] != -1) {
 			DeleteGraph(normalAttackEffectHandle[i]);
@@ -762,19 +1118,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	DxLib_End();
 
+
 	return 0;
 }
 
-
 void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage) {
-	// UŒ‚’†‚©‚ÂAƒ^[ƒQƒbƒg‚ªƒ_ƒEƒ“/ƒ_ƒ[ƒWd’¼’†‚Å‚È‚¢ê‡‚Ì‚İ”»’è
+	// æ”»æ’ƒä¸­ã‹ã¤ã€ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãŒãƒ€ã‚¦ãƒ³ä¸­ãƒ»ãƒ€ãƒ¡ãƒ¼ã‚¸ç¡¬ç›´ä¸­ãƒ»ã™ã§ã«HPãŒ0ä»¥ä¸‹ã®å ´åˆã¯åˆ¤å®šã—ãªã„
 	if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
 	{
 		if (attacker->isHit == true) {
 			return;
 		}
 
-		// ”¼Œa‚ğ 30.0f ‚ÉŠg‘å (“–‚½‚ç‚È‚¢ê‡‚Í‚±‚±‚ğ‘å‚«‚­’²®‚µ‚Ä‚­‚¾‚³‚¢)
+		// åŠå¾„ã‚’ 30.0f ã«æ‹¡å¤§
 		if (HitCheck_Capsule_Capsule(start, end, 30.0f,
 			target->pos,
 			VAdd(target->pos, VGet(0, target->charahitinfo.Height, 0)),
@@ -782,28 +1138,51 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 		{
 			attacker->isHit = true;
 
-			// ”í’eƒAƒjƒ[ƒVƒ‡ƒ“‚Ö‘JˆÚ
-			MV1DetachAnim(target->model1, target->attachidx);
-			target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
-			target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
-			target->playtime = 0.0f;
-			target->mode = DAMAGE;
-
-			// SEÄ¶
+			// SEå†ç”Ÿ
 			PlaySoundMem(SEdamageHandle, DX_PLAYTYPE_BACK);
 
-			// HPŒ¸­
-			if (target == &charainfo[0]) {
-				target->HP--;
+			if (target == &charainfo[0] || target == &charainfo[1]) {
+
+				// ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãŒãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®å ´åˆ
+				if (target->HP > 0) {
+					target->HP--;
+				}
+
+				MV1DetachAnim(target->model1, target->attachidx);
+				target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
+				target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
+				target->playtime = 0.0f;
+				target->mode = DAMAGE;
 			}
 			else {
-				target->enemyHP--;
-				if (target->enemyHP <= 0) {
-					game.AddScore(100);
+				// ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãŒæ•µã®å ´åˆ
+				if (target->enemyHP > 0) {
+					target->enemyHP--;
+
+					// æ•µã®HPãŒ0ä»¥ä¸‹ã«ãªã£ãŸã‚‰æ¶ˆæ»…ã•ã›ã‚‹
+					if (target->enemyHP <= 0) {
+						target->mode = NONE; // çŠ¶æ…‹ã‚’ç„¡åŠ¹ã«ã™ã‚‹
+						MV1SetVisible(target->model1, FALSE); // ç”»é¢ã‹ã‚‰æ¶ˆã™
+
+						// æ”»æ’ƒè€…ãŒãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼1ã ã£ãŸã‚‰ã‚¹ã‚³ã‚¢åŠ ç®—
+						if (attacker == &charainfo[0]) {
+							game.AddScore(0, 100);
+						}
+						else if (attacker == &charainfo[1]) {
+							game.AddScore(1, 100);
+						}
+					}
+					else {
+						// ã¾ã HPãŒæ®‹ã£ã¦ã„ã‚‹å ´åˆã¯ãƒ€ãƒ¡ãƒ¼ã‚¸ãƒ¢ãƒ¼ã‚·ãƒ§ãƒ³
+						MV1DetachAnim(target->model1, target->attachidx);
+						target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
+						target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
+						target->playtime = 0.0f;
+						target->mode = DAMAGE;
+					}
 				}
 			}
-
-			printfDx("ƒqƒbƒgIc‚èHP:%d\n", (target == &charainfo[0] ? target->HP : target->enemyHP));
+			printfDx("ãƒ’ãƒƒãƒˆï¼æ®‹ãƒªHP:%d\n", (target == &charainfo[0] ? target->HP : target->enemyHP));
 		}
 	}
 }

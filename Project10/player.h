@@ -9,6 +9,7 @@ constexpr int PLAYER_COUNT = 2;
 constexpr int PLAYER1_INDEX = 0;
 constexpr int PLAYER2_INDEX = 1;
 constexpr int TEST_ENEMY_INDEX = 2;
+constexpr int TEST_ENEMY_GOLEM = 3;
 constexpr float PLAYER_MODEL_SCALE = 1.1f;
 constexpr int PLAYER_NORMAL_ATTACK_EFFECT_FRAME_COUNT = 60;
 constexpr int PLAYER_NORMAL_ATTACK_EFFECT_COLUMN_COUNT = 8;
@@ -36,6 +37,7 @@ constexpr float PLAYER_SPECIAL_ATTACK_MAX_RADIUS = 210.0f;
 // 現在のテスト用HPでは通常攻撃1回を1としているため、必殺技300は2ダメージに換算する。
 constexpr int PLAYER_SPECIAL_ATTACK_DAMAGE = 2;
 
+const int MAX_HP = 6;
 // 1人分の入力設定。
 // キーボードとゲームパッド入力を、同じ処理で扱うためにまとめる。
 struct PlayerInputConfig {
@@ -102,7 +104,8 @@ void CheckPlayerSpecialAttackHit(
 	PlayerRuntimeState& state,
 	SCharaInfo& target,
 	int seDamageHandle,
-	int animDamage
+	int animDamage,
+	int playerIndex
 );
 
 // プレイヤーの入力、移動、待機/走り切り替え、攻撃開始を処理する。

@@ -5,8 +5,8 @@
 
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
-#define MAX_CHARA 6
-#define CHARA_ENUM_DEFAULT_SIZE		500.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
+#define MAX_CHARA 500
+#define CHARA_ENUM_DEFAULT_SIZE		200.0f		// 周囲のポリゴン検出に使用する球の初期サイズ
 #define CHARA_MAX_HITCOLL			2048		// 処理するコリジョンポリゴンの最大数
 
 
@@ -17,6 +17,13 @@
 #define ATTACK_FIRST_ENDTIME 15.0f
 #define ATTACK_SECOND_ENDTIME 15.0f
 #define ATTACK_THIERD_ENDTIME 30.0f
+
+#define MAIN_H
+#define MAIN_H
+
+// 他のインクルードなどはそのまま
+
+// ここに extern をつけて宣言を追加
 class GameManager;
 struct SCharaInfo;
 enum Direction
@@ -26,6 +33,8 @@ enum Direction
 	UP = 2,
 	RIGHT = 3
 };
+
+
 
 // --- キャラの状態
 enum CharaMode
@@ -50,7 +59,7 @@ typedef struct
 {
 	float	Width, Height;
 	VECTOR CenterPosition;
-	
+
 
 } SCharaHitInfo;
 
@@ -59,13 +68,17 @@ typedef struct
 
 
 struct SCharaInfo
-{
+{// 構造体の中にコンストラクタを追加する
+	SCharaInfo() : angle(0.0f), anim_time(0.0f), HP(0), isHit(false), model1(-1) {}
+	int invincibleTimer; // ★追加：無敵時間カウンター（フレーム数）
 	int model1;
-
+	int timeLimit = 1000; // ゲーム制限時間など（必要であれば適宜設定）
+	int spawnTimer = 0;   // スポーンカウント用
 	Direction direction;
 	int attachidx;
 	float playtime = 0, anim_totaltime;
 	VECTOR pos;
+	float rot;
 	VECTOR move;
 	SCharaHitInfo charahitinfo;
 	int				mode;				// キャラの状態
@@ -73,10 +86,11 @@ struct SCharaInfo
 	int HP;
 	float angle;
 	bool isHit;
-
+	int deaths;
 	float anim_time;
 
 	float anim_total;
+
 };
 
 // キャラクターの当たり判定の情
@@ -84,6 +98,8 @@ struct SCharaInfo
 // 当たり判定の幅、高さ
 // 当たり判定の中心座標
 extern  int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral;
+
+
 extern void CheckAttackHit(
 	GameManager& game,
 	SCharaInfo* charainfo,
@@ -94,3 +110,5 @@ extern void CheckAttackHit(
 	int SEdamageHandle,
 	int anim_damage
 );
+
+extern void DrawCrownIcon(int pIdx, int xOffset, int startY, int p1Score, int p2Score, int crownGraphHandle);

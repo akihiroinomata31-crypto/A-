@@ -357,7 +357,8 @@ void CheckPlayerSpecialAttackHit(
 	PlayerRuntimeState& state,
 	SCharaInfo& target,
 	int seDamageHandle,
-	int animDamage
+	int animDamage,
+	int playerIndex
 ) {
 	// 水波が見えるフレームだけ、プレイヤー中心の円形判定を有効にする。
 	if (!state.isSpecialAttack || !state.isSpecialAttackEffectPlaying || state.isSpecialHitDone) {
@@ -367,7 +368,7 @@ void CheckPlayerSpecialAttackHit(
 		state.specialAttackEffectFrame > PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME) {
 		return;
 	}
-	if (target.mode == DOWNMODE || target.mode == DAMAGE) {
+	if (target.mode == NONE || target.mode == DOWNMODE || target.mode == DAMAGE || target.enemyHP <= 0) {
 		return;
 	}
 
@@ -395,7 +396,9 @@ void CheckPlayerSpecialAttackHit(
 	target.enemyHP -= PLAYER_SPECIAL_ATTACK_DAMAGE;
 	if (target.enemyHP <= 0) {
 		target.enemyHP = 0;
-		game.AddScore(100);
+		target.mode = NONE;
+		MV1SetVisible(target.model1, FALSE);
+		game.AddScore(playerIndex, 100);
 	}
 	printfDx("必殺技ヒット！残りHP:%d\n", target.enemyHP);
 }
