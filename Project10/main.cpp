@@ -1,5 +1,5 @@
 ﻿// DXライブラリーのインクルード
-#include <DxLib.h>
+#include "Dxlib.h"
 #include <math.h>
 #include <stdio.h>
 

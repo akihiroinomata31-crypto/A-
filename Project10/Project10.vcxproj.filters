@@ -18,5 +18,6 @@
     <ClInclude Include="player.h" />
     <ClInclude Include="senk.h" />
     <ClInclude Include="taiki.h" />
+    <ClInclude Include="Dxlib.h" />
   </ItemGroup>
 </Project>

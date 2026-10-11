@@ -1,7 +1,7 @@
 #pragma once
 
 // ‘SŠp‚ð”¼Šp‚É’¼‚·
-#include <DxLib.h>
+#include "Dxlib.h"
 
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f

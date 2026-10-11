@@ -1,53 +1,197 @@
-﻿  game.cpp
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(72,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(72,18): error C2065: 'STAND': 定義されていない識別子です。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(73,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(74,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(75,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(76,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(77,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(78,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(80,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(81,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(81,1): error C2660: 'DxLib::MV1SetPosition': 関数に 1 個の引数を指定できません。
-C:\Users\akihi\OneDrive\Desktop\DxLib_VC\Dxlib\DxLib.h(5221,14): message : 'DxLib::MV1SetPosition' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(82,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(83,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(84,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(84,1): error C2660: 'DxLib::MV1SetAttachAnimTime': 関数に 2 個の引数を指定できません。
-C:\Users\akihi\OneDrive\Desktop\DxLib_VC\Dxlib\DxLib.h(5274,14): message : 'DxLib::MV1SetAttachAnimTime' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(89,1): error C2036: 'SCharaInfo *': サイズが不明です。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(97,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(97,18): error C2065: 'NONE': 定義されていない識別子です。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(98,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(99,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(100,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(101,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(102,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(103,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(104,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(104,1): error C2660: 'DxLib::MV1SetPosition': 関数に 1 個の引数を指定できません。
-C:\Users\akihi\OneDrive\Desktop\DxLib_VC\Dxlib\DxLib.h(5221,14): message : 'DxLib::MV1SetPosition' の宣言を確認してください
-C:\Users\akihi\OneDrive\Desktop\Project10\Project10\game.h(113,1): error C2036: 'SCharaInfo *': サイズが不明です。
+﻿  main.cpp
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,9): error C3646: 'CenterPosition': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,23): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,9): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,12): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,9): error C3646: 'move': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,13): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(114,2): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,15): error C2143: 構文エラー: ',' が '[' の前にありません。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,18): error C2238: ';' の前に無効なトークンがあります。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,12): error C3646: 'vel': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(58,39): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,11): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,17): error C2065: 'spawnPos': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,11): error C2039: 'move': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,18): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(75,21): error C2065: 'defaultHP': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,40): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(82,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(84,17): error C3861: 'MV1SetAttachAnimTime': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,11): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,17): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(103,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,40): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(166,40): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(177,22): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\Dxlib.h(481,10): fatal error C1083: include ファイルを開けません。'EffekseerForDXLib.h':No such file or directory
+  game.cpp
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,9): error C3646: 'CenterPosition': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,23): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,9): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,12): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,9): error C3646: 'move': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,13): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(114,2): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\Dxlib.h(481,10): fatal error C1083: include ファイルを開けません。'EffekseerForDXLib.h':No such file or directory
+  Mapps.cpp
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,9): error C3646: 'CenterPosition': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,23): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,9): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,12): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,9): error C3646: 'move': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,13): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(114,2): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,15): error C2143: 構文エラー: ',' が '[' の前にありません。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,18): error C2238: ';' の前に無効なトークンがあります。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,12): error C3646: 'vel': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(58,39): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,11): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,17): error C2065: 'spawnPos': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,11): error C2039: 'move': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,18): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(75,21): error C2065: 'defaultHP': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,40): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(82,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(84,17): error C3861: 'MV1SetAttachAnimTime': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,11): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,17): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(103,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,40): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(166,40): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(177,22): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\Dxlib.h(481,10): fatal error C1083: include ファイルを開けません。'EffekseerForDXLib.h':No such file or directory
+  player.cpp
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,15): error C2143: 構文エラー: ',' が '[' の前にありません。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,18): error C2238: ';' の前に無効なトークンがあります。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,12): error C3646: 'vel': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(58,39): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(72,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(72,18): error C2065: 'STAND': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,17): error C2065: 'spawnPos': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,18): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(75,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(75,21): error C2065: 'defaultHP': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(76,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(77,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(78,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(80,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(82,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(82,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(83,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(84,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(84,17): error C3861: 'MV1SetAttachAnimTime': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(89,1): error C2036: 'SCharaInfo *': サイズが不明です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(97,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(97,18): error C2065: 'NONE': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(98,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(99,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(100,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,17): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(102,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(103,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(103,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,1): error C2027: 認識できない型 'SCharaInfo' が使われています。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(113,1): error C2036: 'SCharaInfo *': サイズが不明です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(166,40): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(177,22): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\Dxlib.h(481,10): fatal error C1083: include ファイルを開けません。'EffekseerForDXLib.h':No such file or directory
   taiki.cpp
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,9): error C3646: 'CenterPosition': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(62,23): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,9): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(81,12): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,9): error C3646: 'move': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(83,13): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\main.h(114,2): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,15): error C2143: 構文エラー: ',' が '[' の前にありません。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(8,18): error C2238: ';' の前に無効なトークンがあります。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(22,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,12): error C3646: 'pos': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(31,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,12): error C3646: 'vel': 不明なオーバーライド指定子です
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(32,15): error C4430: 型指定子がありません - int と仮定しました。メモ: C++ は int を既定値としてサポートしていません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(58,39): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,11): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(73,17): error C2065: 'spawnPos': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,11): error C2039: 'move': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(74,18): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(75,21): error C2065: 'defaultHP': 定義されていない識別子です。
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,40): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(81,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(82,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(84,17): error C3861: 'MV1SetAttachAnimTime': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,11): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(101,17): error C3861: 'VGet': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(103,13): error C3861: 'MV1SetVisible': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,40): error C2039: 'pos': 'SCharaInfo' のメンバーではありません
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(5): message : 'SCharaInfo' の宣言を確認してください
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(104,13): error C3861: 'MV1SetPosition': 識別子が見つかりませんでした
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(166,40): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\game.h(177,22): error C2061: 構文エラー: 識別子 'VECTOR'
+C:\Users\akihi\OneDrive\Desktop\a\Project10\DxLib.h(481,10): fatal error C1083: include ファイルを開けません。'EffekseerForDXLib.h':No such file or directory
   コードを生成中...

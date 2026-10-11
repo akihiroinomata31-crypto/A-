@@ -161,6 +161,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
+    <ClInclude Include="Dxlib.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />

@@ -1,7 +1,8 @@
 ﻿#include "player.h"
 
-#include <DxLib.h>
+
 #include <math.h>
+#include "Dxlib.h"
 
 namespace {
 

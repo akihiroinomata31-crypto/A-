@@ -1,5 +1,6 @@
-#include <DxLib.h>
+
 #include <cmath>
+#include "Dxlib.h"
 
 class Map {
 public:
