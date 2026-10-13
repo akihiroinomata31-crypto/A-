@@ -70,6 +70,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <!-- Keep generated files outside OneDrive and imported build artifacts. -->
+  <PropertyGroup>
+    <IntDir>$(LocalAppData)\Project10Build\$(ProjectGuid)\obj\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(LocalAppData)\Project10Build\$(ProjectGuid)\bin\$(Platform)\$(Configuration)\</OutDir>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
@@ -88,14 +94,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\EffekseerForDXLib;$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalUsingDirectories>$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalIncludeDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)ThirdParty\EffekseerForDXLib;$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -120,14 +128,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalUsingDirectories>$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
+      <LanguageStandard>Default</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\EffekseerForDXLib;C:\Users\akihi\OneDrive\Desktop\A-\DXLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalUsingDirectories>C:\Users\akihi\OneDrive\Desktop\A-\DXLib;$(SolutionDir)ThirdParty\EffekseerForDXLib</AdditionalUsingDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)ThirdParty\EffekseerForDXLib;$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -149,27 +159,28 @@
   <ItemGroup>
     <ClCompile Include="draw.cpp" />
     <ClCompile Include="main.cpp">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)ThirdParty\EffekseerForDXLib;$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalUsingDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)..\..\DxLib_VC\Dxlib;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
     </ClCompile>
     <ClCompile Include="game.cpp" />
     <ClCompile Include="Mapps.cpp" />
     <ClCompile Include="player.cpp" />
     <ClCompile Include="senk.cpp" />
-    <ClCompile Include="taiki.cpp" />
     <ClCompile Include="winer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
-    <ClInclude Include="Dxlib.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
-    <ClInclude Include="player.h" />
     <ClInclude Include="senk.h" />
-    <ClInclude Include="taiki.h" />
+    <ClInclude Include="player.h" />
+    <ClInclude Include="PlayerMotionAssets.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="WriteGameResourceDirectory" AfterTargets="Build">
+    <WriteLinesToFile File="$(OutDir)Project10.assets.txt" Lines="$(ProjectDir)" Overwrite="true" Encoding="UTF-8" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

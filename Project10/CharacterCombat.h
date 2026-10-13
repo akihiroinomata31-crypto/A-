@@ -1,9 +1,11 @@
 ﻿#pragma once
 
-#include "DxLib.h"
+
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
+#include "../DXLib/DxLib.h"
 
 namespace CharacterCombat {
 

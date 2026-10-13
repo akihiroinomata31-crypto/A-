@@ -1,5 +1,5 @@
 #pragma once
-#include "Dxlib.h"
+#include "../DXLib/DxLib.h"
 #include <vector>
 
 struct SCharaInfo;
@@ -35,100 +35,22 @@ struct Flashbang {
     bool active;
 };
 
-
-class EnemyPool {
-private:
-    // 生きている敵の「実際の配列インデックス」のリスト
-    std::vector<int> activeIndices;
-    // 出番を待っている「空きスロット」のインデックス一覧（スタック）
-    std::vector<int> freeIndices;
-
-public:
-    // 初期化（ゲーム開始時に1度だけ呼ぶ）
-    void Init(int startIndex, int endIndex) {
-        activeIndices.clear();
-        freeIndices.clear();
-        // 使えるインデックスをすべて「出番待ち」に登録
-        for (int i = startIndex; i < endIndex; i++) {
-            freeIndices.push_back(i);
-        }
-    }
-
-    // ① 新鮮な敵を1体出撃させる（探索ループなし！O(1)の瞬速処理）
-    int Spawn(SCharaInfo* charaArray, VECTOR spawnPos, int defaultHP) {
-        if (freeIndices.empty()) {
-            return -1; // 空き枠がなければ安全に何もしない（溢れ防止）
-        }
-
-        // 待機リストの末尾から1つ取り出す
-        int slot = freeIndices.back();
-        freeIndices.pop_back();
-
-        // 生存リストへ登録
-        activeIndices.push_back(slot);
-
-        // ★スロットを完璧に「新鮮な状態」に初期化
-        SCharaInfo& e = charaArray[slot];
-        e.mode = STAND;
-        e.pos = spawnPos;
-        e.move = VGet(0.0f, 0.0f, 0.0f);
-        e.enemyHP = defaultHP;
-        e.playtime = 0.0f;
-        e.isHit = false;
-        e.currentAnimType = 1;
-
-        if (e.model1 != -1) {
-            MV1SetPosition(e.model1, e.pos);
-            MV1SetVisible(e.model1, TRUE);
-            if (e.attachidx != -1) {
-                MV1SetAttachAnimTime(e.model1, e.attachidx, 0.0f);
-            }
-        }
-
-        return slot;
-    }
-
-    // ② 敵が死んだ／画面外で消す時の即時リサイクル（完全成仏処理）
-    void Despawn(SCharaInfo* charaArray, int activeListIndex) {
-        int slot = activeIndices[activeListIndex];
-
-        // ★データを完全に白紙化
-        SCharaInfo& e = charaArray[slot];
-        e.mode = NONE;
-        e.enemyHP = 0;
-        e.playtime = 0.0f;
-        e.isHit = false;
-        e.pos = VGet(-99999.0f, -99999.0f, -99999.0f); // 画面外奈落へ退避
-        if (e.model1 != -1) {
-            MV1SetVisible(e.model1, FALSE);
-            MV1SetPosition(e.model1, e.pos);
-        }
-
-        // 空き待機リストへ返却（これで次回最優先で再利用される）
-        freeIndices.push_back(slot);
-
-        // 生存リストから削除（末尾と入れ替えてpopすることで超高速削除: O(1)）
-        activeIndices[activeListIndex] = activeIndices.back();
-        activeIndices.pop_back();
-    }
-
-    // 生きている敵の数
-    int GetActiveCount() const { return (int)activeIndices.size(); }
-
-    // 生きている敵のスロット番号を取得
-    int GetActiveSlot(int index) const { return activeIndices[index]; }
-};
-
-
-
 class GameManager {
 public:
-    // --- 制限時間管理（独立） ---
-    // 1秒 = 60フレーム換算。99秒なら 99 * 60 = 5940
-    // もし描画側で / 120 などで割る場合は 99 * 120 に合わせます
-    int mainTimer = 99 * 120;
+    // --- 勝敗・キル数管理 ---
+    int killCount[2] = { 0, 0 }; // 各プレイヤーの撃破数
 
-    // --- 敵スポーン管理（独立） ---
+    // 撃破数加算メソッド
+    void AddKill(int pIdx) {
+        if (pIdx >= 0 && pIdx < 2) {
+            killCount[pIdx]++;
+        }
+    }
+
+    // --- 制限時間管理（120FPS基準: 100秒なら 100 * 120 = 12000） ---
+    int mainTimer = 100 * 120;
+
+    // --- 敵スポーン管理 ---
     int goblinSpawnTimer = 0; // 通常ゴブリン用カウンター
     int redSpawnTimer = 0;    // 赤ゴブリン用カウンター
 
@@ -138,8 +60,32 @@ public:
     int p2Score = 0;
     std::vector<ReplayFrame> replayData;
 
+    static constexpr int DeathPenalty = 3000;
+    static constexpr int SpecialPenalty = 1000;
+    int specialUseCount[2] = { 0, 0 };
     int deathCount[2] = { 0, 0 };
-    int gameState = 0;
+    int gameState = 0; // 0: 進行中, 1: 1P勝, 2: 2P勝, 3: 引き分け
+
+    // ★ スコア表示用専用フォントハンドル（黒文字用）
+    int fontScore = -1;
+
+    void Reset() {
+        gameState = 0;
+        mainTimer = 100 * 120;
+        p1Score = 0;
+        p2Score = 0;
+        deathCount[0] = 0;
+        deathCount[1] = 0;
+        killCount[0] = 0;
+        killCount[1] = 0;
+        specialUseCount[0] = 0;
+        specialUseCount[1] = 0;
+        goblinSpawnTimer = 0;
+        redSpawnTimer = 0;
+        for (int i = 0; i < 20; i++) {
+            popups[i].active = false;
+        }
+    }
 
     void AddDeath(int playerIndex) {
         if (playerIndex >= 0 && playerIndex < 2) {
@@ -147,26 +93,43 @@ public:
         }
     }
 
+    int FinalScore(int playerIndex) const {
+        if (playerIndex < 0 || playerIndex >= 2) return 0;
+        const int earned = playerIndex == 0 ? p1Score : p2Score;
+        return earned - deathCount[playerIndex] * DeathPenalty - specialUseCount[playerIndex] * SpecialPenalty;
+    }
+
+    void RecordSpecialAttack(int playerIndex) {
+        if (playerIndex < 0 || playerIndex >= 2) return;
+        ++specialUseCount[playerIndex];
+    }
+
     bool isHit = false;
     int anim_neutral = -1;
     int anim_walk = -1;
     int anim_attack = -1;
     int enemy_anim_neutral = -1;
+    int enemy_anim_walk = -1;
+
+    bool SetGameResourceDirectory();
+    void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
+
     // --- 閃光弾・アイテム管理 ---
     FlashItem flashItems[3];             // フィールド上に同時に存在できるアイテム最大数
-    Flashbang flashbangs[4];            // 投擲中の弾
-    int itemDropTimer = 0;              // アイテムが降ってくるインターバル用
-    int flashbangStock[2] = { 0, 0 };   // [0]:1Pの所持数, [1]:2Pの所持数
-    int playerStunTimer[2] = { 0, 0 };  // スタン残り時間
+    Flashbang flashbangs[4];             // 投擲中の弾
+    int itemDropTimer = 0;               // アイテムが降ってくるインターバル用
+    int flashbangStock[2] = { 0, 0 };    // [0]:1Pの所持数, [1]:2Pの所持数
+    int playerStunTimer[2] = { 0, 0 };   // スタン残り時間
 
     void SpawnFlashItem();
     void UpdateFlashItems(SCharaInfo* players);
     void DrawFlashItems();
-
+    void DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, const int* spHandles, int imageCount);
     void ThrowFlashbang(int playerIdx, VECTOR pPos, VECTOR forwardVec);
     void UpdateFlashbangs(SCharaInfo* players);
     void DrawFlashbangs();
     void DrawFlashOverlay(int pIdx, int startX, int startY, int endX, int endY);
+
     void Init();
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
     void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle);
@@ -186,3 +149,6 @@ extern int redGoblinBaseModel;
 extern int red_goblin_anim_neutral;
 extern int red_goblin_anim_attack;
 extern int weaponBaseModel;
+extern int red_goblin_anim_walk;
+
+bool PlaceEnemyOnGround(SCharaInfo& enemy);
