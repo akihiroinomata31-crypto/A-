@@ -76,24 +76,23 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
                     gameState = 2;
                 }
                 else {
-                    gameState = 3; // 完全同一なら引き分け
+                    gameState = 3; // 引き分け
                 }
             }
         }
     }
 
     // ==========================================
-    // 2. 敵スポーン処理（mainTimer とは無関係に動作）
+    // 2. 敵スポーン処理（同時生存上限22体で激重化を防止）
     // ==========================================
     int activeEnemyCount = 0;
     for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-        if (enemyList[i].mode != NONE) {
+        if (enemyList[i].mode != NONE && enemyList[i].enemyHP > 0) {
             activeEnemyCount++;
         }
     }
 
-    // 同時生存数の上限
-    const int MAX_FIELD_ENEMIES = 200;
+    const int MAX_FIELD_ENEMIES = 100; // ★ 同時生存上限
 
     if (activeEnemyCount < MAX_FIELD_ENEMIES) {
 
@@ -102,9 +101,9 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         if (goblinSpawnTimer >= 280) {
             goblinSpawnTimer = 0;
 
-            for (int k = 0; k < 15; k++) {
-                float spawnX = (float)(GetRand(4500) - 2250);
-                float spawnZ = (float)(GetRand(4500) - 2250);
+            for (int k = 0; k < 10; k++) {
+                float spawnX = (float)(GetRand(4000) - 2000);
+                float spawnZ = (float)(GetRand(4000) - 2000);
                 ActivateEnemy(enemyList, spawnX, spawnZ);
             }
         }
@@ -113,7 +112,7 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         redSpawnTimer++;
         if (redSpawnTimer >= 500) {
             redSpawnTimer = 0;
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < 2; j++) {
                 float spawnX = (float)(GetRand(3000) - 1500);
                 float spawnZ = (float)(GetRand(3000) - 1500);
                 ActivateRedGoblin(enemyList, spawnX, spawnZ);
@@ -121,25 +120,31 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
         }
     }
 
-    // 特殊ゴーレムの出現条件（残り約50秒以下）
+    // ==========================================
+    // 3. 残り75秒以下でゴーレム（ボス）を1体出現
+    // ==========================================
     int seconds = mainTimer / 120;
-    if (seconds <= 50 && gameState == 0) {
+    if (seconds <= 75 && gameState == 0) {
         if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
             enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 30.0f, -150.0f);
             enemyList[TEST_ENEMY_GOLEM].mode = STAND;
-            enemyList[TEST_ENEMY_GOLEM].enemyHP = 10;
+            enemyList[TEST_ENEMY_GOLEM].enemyHP = 20; // ボスHP
             enemyList[TEST_ENEMY_GOLEM].playtime = 0.0f;
+            enemyList[TEST_ENEMY_GOLEM].isHit = false;
 
-            MV1SetPosition(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].pos);
-            MV1SetVisible(enemyList[TEST_ENEMY_GOLEM].model1, TRUE);
+            if (enemyList[TEST_ENEMY_GOLEM].model1 != -1) {
+                MV1SetPosition(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].pos);
+                MV1SetVisible(enemyList[TEST_ENEMY_GOLEM].model1, TRUE);
 
-            if (enemyList[TEST_ENEMY_GOLEM].attachidx != -1) {
-                MV1DetachAnim(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].attachidx);
+                if (enemyList[TEST_ENEMY_GOLEM].attachidx != -1) {
+                    MV1DetachAnim(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].attachidx);
+                }
+                enemyList[TEST_ENEMY_GOLEM].attachidx = MV1AttachAnim(enemyList[TEST_ENEMY_GOLEM].model1, 0, enemyList[TEST_ENEMY_GOLEM].enemyIdleAnimation);
+                if (enemyList[TEST_ENEMY_GOLEM].attachidx != -1) {
+                    enemyList[TEST_ENEMY_GOLEM].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].attachidx);
+                }
             }
-            enemyList[TEST_ENEMY_GOLEM].attachidx = MV1AttachAnim(enemyList[TEST_ENEMY_GOLEM].model1, 0, enemy_anim_neutral);
-            if (enemyList[TEST_ENEMY_GOLEM].attachidx != -1) {
-                enemyList[TEST_ENEMY_GOLEM].anim_totaltime = MV1GetAttachAnimTotalTime(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].attachidx);
-            }
+            PlaceEnemyOnGround(enemyList[TEST_ENEMY_GOLEM]);
         }
     }
 }
@@ -163,9 +168,9 @@ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
                 baseFloorY = LineRes.HitPosition.y;
             }
 
-            enemyList[i].pos.y = baseFloorY + 600.0f;
+            enemyList[i].pos.y = baseFloorY;
             enemyList[i].mode = STAND;
-            enemyList[i].enemyHP = 5;
+            enemyList[i].enemyHP = 6;
             enemyList[i].playtime = 0.0f;
             enemyList[i].isHit = false;
 
@@ -198,7 +203,7 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
                 baseFloorY = LineRes.HitPosition.y;
             }
 
-            enemyList[i].pos.y = baseFloorY + 600.0f;
+            enemyList[i].pos.y = baseFloorY;
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 2;
             enemyList[i].playtime = 0.0f;
@@ -238,18 +243,16 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         int color = GetColor(255, 255, 0);
         if (gameState == 1)      DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
         else if (gameState == 2) DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
-        else                     DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
+      //  else                     DrawString(xOffset + 100, sh / 2 - 30, "DRAW", color);
         SetFontSize(20);
     }
 
-    // ==========================================
-    // 画面左上：プレイヤー名 ＆ HPバー（幅300に拡大）
-    // ==========================================
+    // 画面左上：プレイヤー名 ＆ HPバー
     int startY = 20;
     unsigned int pColor = (pIdx == 0) ? GetColor(100, 200, 255) : GetColor(255, 150, 100);
     DrawFormatString(xOffset + 20, startY, pColor, " PLAYER %d ", pIdx + 1);
 
-    int frameDrawW = 300; // ★ 横幅を300に拡大
+    int frameDrawW = 300;
     int frameDrawH = 24;
     int drawX = xOffset + 20;
     int drawY = startY + 30;
@@ -280,7 +283,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
 
     int currentDeaths = (pIdx == 0) ? deathCount[0] : deathCount[1];
     int infoY = drawY + 32;
-    DrawFormatString(xOffset + 20, infoY, GetColor(255, 100, 200), "DEATHS: %d", currentDeaths);
+  //  DrawFormatString(xOffset + 20, infoY, GetColor(255, 100, 200), "DEATHS: %d", currentDeaths);
 
     // 残り15秒以下のフィーバー表示
     int seconds = mainTimer / 120;
@@ -291,9 +294,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         SetFontSize(20);
     }
 
-    // ==========================================
-    // ★ スコア表示（黒色文字・1P左下／2P右下・30秒以下で「???」）
-    // ==========================================
+    // スコア表示
     int currentScore = (pIdx == 0) ? p1Score : p2Score;
     char scoreStr[32];
     if (gameState == 0 && seconds <= 30 && seconds > 0) {
@@ -312,16 +313,15 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     }
 
     int scoreX = 0;
-    int scoreY = sh - 65; // 画面底から約65px上
+    int scoreY = sh - 65;
 
     if (pIdx == 0) {
-        scoreX = xOffset + 25;                       // 1P: 左下
+        scoreX = xOffset + 25;
     }
     else {
-        scoreX = xOffset + halfW - scoreTextW - 30;  // 2P: 右下
+        scoreX = xOffset + halfW - scoreTextW - 30;
     }
 
-    // 黒色文字で描画（視認性確保のため輪郭を白に指定）
     if (fontScore != -1) {
         DrawStringToHandle(scoreX, scoreY, scoreStr, GetColor(0, 0, 0), fontScore, GetColor(255, 255, 255));
     }
@@ -331,7 +331,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         SetFontSize(20);
     }
 
-    // クラウン（1位マーク）：1Pはスコア右、2Pはスコア左
+    // クラウン
     if (p1Score >= 1000 || p2Score >= 1000) {
         int leaderIdx = (p2Score > p1Score) ? 1 : 0;
         if (pIdx == leaderIdx) {
@@ -343,9 +343,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         }
     }
 
-    // ==========================================
-    // スコア加算ポップアップ（各スコア位置の上へ浮上）
-    // ==========================================
+    // スコア加算ポップアップ
     for (int i = 0; i < 20; i++) {
         if (popups[i].active && popups[i].playerIdx == pIdx) {
             int popupBaseX = scoreX + 30;
@@ -382,9 +380,6 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     }
 }
 
-// ==========================================
-// タイマー専用描画（文字のみ・中央配置）
-// ==========================================
 void GameManager::DrawTimer(int sw, int sh) {
     int seconds = mainTimer / 120;
     if (seconds > 200) seconds = 200;
@@ -392,7 +387,7 @@ void GameManager::DrawTimer(int sw, int sh) {
 
     unsigned int timerColor;
     if (seconds <= 10 && (mainTimer / 15) % 2 == 0) {
-        timerColor = GetColor(255, 50, 50); // 10秒以下で点滅
+        timerColor = GetColor(255, 50, 50);
     }
     else if (seconds <= 30) {
         timerColor = GetColor(255, 80, 80);
@@ -442,10 +437,6 @@ void GameManager::AddScorePopup(int playerIdx, int score) {
         }
     }
 }
-
-// ============================================================================
-// メニュー・リソース管理処理（game.cpp 組み込み用）
-// ============================================================================
 
 static int MenuFont(int size) {
     static int fontSmall = -1, label = -1, heading = -1, title = -1;
@@ -553,39 +544,83 @@ void DrawGameMenu(bool results, const GameManager& game, int selected, const TCH
     ScreenFlip();
 }
 
-void GameManager::DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, const int* spHandles, int imageCount) {
-    if (!spHandles || imageCount <= 0) return;
+void GameManager::DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, int frameGraphHandle) {
+    if (maxGauge <= 0) return;
 
-    const int frameW = 210;
-    const int frameH = 22;
+    // HPバーの真下に配置
+    int drawX = startX + 20;
+    int drawY = 80;
 
-    int gaugeX = endX - frameW - 20;
-    int gaugeY = screenHeight - frameH - 25;
+    // フレームの表示サイズ（横幅260px、高さ34px）
+    const int barW = 260;
+    const int barH = 34;
 
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 85);
-    DrawBox(gaugeX + 6, gaugeY + 3, gaugeX + frameW - 6, gaugeY + frameH - 3, GetColor(5, 10, 15), TRUE);
-    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    // 1. フレーム内側の領域（両端のエッジに合わせたマージン）
+    // 左右は尖った飾りがあるため約12%、上下は約24%内側に収める
+    int innerX1 = drawX + (int)(barW * 0.125f);
+    int innerX2 = drawX + barW - (int)(barW * 0.125f);
+    int innerY1 = drawY + (int)(barH * 0.24f);
+    int innerY2 = drawY + barH - (int)(barH * 0.24f);
 
+    int innerMaxW = innerX2 - innerX1;
+    int innerH = innerY2 - innerY1;
+
+    // 割合（0.0f 〜 1.0f）の計算
     float rate = (float)currentGauge / (float)maxGauge;
     if (rate < 0.0f) rate = 0.0f;
     if (rate > 1.0f) rate = 1.0f;
 
-    int imgIdx = (int)(rate * (imageCount - 1));
-    if (imgIdx < 0) imgIdx = 0;
-    if (imgIdx >= imageCount) imgIdx = imageCount - 1;
+    int currentFillW = (int)(innerMaxW * rate);
 
-    if (spHandles[imgIdx] != -1) {
-        SetDrawBlendMode(DX_BLENDMODE_PMA_ALPHA, 240);
-        DrawExtendGraph(gaugeX, gaugeY, gaugeX + frameW, gaugeY + frameH, spHandles[imgIdx], TRUE);
+    // 2. ゲージの背景（暗いスロット底面）
+    DrawBox(innerX1, innerY1, innerX2, innerY2, GetColor(15, 20, 28), TRUE);
+
+    // 3. 青色クリスタルゲージの描画
+    if (currentFillW > 0) {
+        int fillX2 = innerX1 + currentFillW;
+
+        // ① メインの青ゲージ下地（深みのあるコバルトブルー）
+        DrawBox(innerX1, innerY1, fillX2, innerY2, GetColor(0, 110, 230), TRUE);
+
+        // ② 上半分のハイライト（明るいシアンブルーで光沢感を出す）
+        int midY = innerY1 + innerH / 2;
+        DrawBox(innerX1, innerY1, fillX2, midY, GetColor(40, 180, 255), TRUE);
+
+        // ③ 最上段のシャープな白い光筋（クリスタル感の強調）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 180);
+        DrawBox(innerX1, innerY1, fillX2, innerY1 + 2, GetColor(200, 240, 255), TRUE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        // ④ ゲージ先端の光る境界ライン
+        if (currentFillW < innerMaxW) {
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 220);
+            DrawLine(fillX2 - 1, innerY1, fillX2 - 1, innerY2, GetColor(220, 245, 255));
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
     }
 
+    // 4. 上から金属フレームを描画（中身をきれいにマスクして挟み込む）
+    if (frameGraphHandle != -1) {
+        DrawExtendGraph(drawX, drawY, drawX + barW, drawY + barH, frameGraphHandle, TRUE);
+    }
+
+    // 5. MAX（満タン）時の演出（青白くパルス発光 ＋ READY! 表示）
     if (currentGauge >= maxGauge) {
-        int alpha = 180 + (int)(sinf(GetNowCount() * 0.007f) * 75);
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        // フレーム全体にやわらかい光を重ねる
+        int pulseAlpha = 80 + (int)(sinf(GetNowCount() * 0.008f) * 40);
+        SetDrawBlendMode(DX_BLENDMODE_ADD, pulseAlpha);
+        DrawBox(innerX1, innerY1, innerX2, innerY2, GetColor(50, 150, 255), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        // 「READY!」の点滅文字表示
+        int textAlpha = 180 + (int)(sinf(GetNowCount() * 0.008f) * 75);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, textAlpha);
         SetFontSize(15);
-        DrawString(gaugeX + 80, gaugeY - 18, "READY!", GetColor(255, 210, 30));
+        DrawString(drawX + barW + 8, drawY + 9, "READY!", GetColor(100, 220, 255));
         SetFontSize(20);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 }
+
+
+

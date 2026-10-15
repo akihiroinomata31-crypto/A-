@@ -36,6 +36,8 @@ struct Flashbang {
 };
 
 class GameManager {
+private:
+  
 public:
     // --- 勝敗・キル数管理 ---
     int killCount[2] = { 0, 0 }; // 各プレイヤーの撃破数
@@ -113,7 +115,9 @@ public:
 
     bool SetGameResourceDirectory();
     void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
-
+    // ★ 敵の頭上HPバー描画関数を追加
+    void DrawEnemyHPBars(int pIdx, const SCharaInfo* charainfo);
+   // void DrawSingleEnemyHPBar(const VECTOR& enemyPos, int currentHp, int maxHp, float headOffset);
     // --- 閃光弾・アイテム管理 ---
     FlashItem flashItems[3];             // フィールド上に同時に存在できるアイテム最大数
     Flashbang flashbangs[4];             // 投擲中の弾
@@ -124,7 +128,7 @@ public:
     void SpawnFlashItem();
     void UpdateFlashItems(SCharaInfo* players);
     void DrawFlashItems();
-    void DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, const int* spHandles, int imageCount);
+    void DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, int frameGraphHandle);
     void ThrowFlashbang(int playerIdx, VECTOR pPos, VECTOR forwardVec);
     void UpdateFlashbangs(SCharaInfo* players);
     void DrawFlashbangs();
