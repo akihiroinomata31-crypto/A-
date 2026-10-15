@@ -41,6 +41,9 @@ constexpr int PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME = 165;
 constexpr float PLAYER_SPECIAL_ATTACK_MAX_RADIUS = 336.0f;
 // 現在のテスト用HPでは通常攻撃1回を1としているため、必殺技300は2ダメージに換算する。
 constexpr int PLAYER_SPECIAL_ATTACK_DAMAGE = 2;
+constexpr float PLAYER_BLOOD_LANCE_EFFECT_SCALE = 20.0f;
+constexpr float PLAYER_BLOOD_LANCE_EFFECT_SPEED = 2.0f;
+constexpr int PLAYER_BLOOD_LANCE_EFFECT_FRAMES = 195;
 
 const int MAX_HP = 6;
 // 1人分の入力設定。
@@ -64,6 +67,7 @@ struct PlayerInputConfig {
 // 1人分の操作中状態。
 // 連撃予約や攻撃ボタンの押した瞬間判定をプレイヤー別に持つ。
 struct PlayerRuntimeState {
+    bool bloodLanceSpecial = false;
 	int movementAnimation = -1;
 	int motionRootFrame = -1;
 	float motionRootX = 0.0f;
@@ -159,3 +163,5 @@ void UpdateEnemyLocomotionAnimation(SCharaInfo& enemy, bool moving);
 int ReadPlayerPadState(int padType);
 
 void CancelPlayerCombat(PlayerRuntimeState& state);
+
+void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect);

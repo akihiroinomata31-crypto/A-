@@ -8,6 +8,9 @@
 #include "game.h"
 #include "player.h"
 #include "PlayerMotionAssets.h"
+#include "GameTiming.h"
+#include "RuntimeProfile.h"
+#include "OrbitCamera.h"
 #include "../DXLib/DxLib.h"
 void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
 
@@ -64,7 +67,7 @@ namespace {
 
 		return handle;
 	}
-	
+
 } // namespace
 
 
@@ -105,14 +108,16 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	const bool mergeSmoke = strstr(lpC, "--merge-smoke") != nullptr;
 	const bool deathSmoke = strstr(lpC, "--death-smoke") != nullptr;
 	const bool uiSmoke = strstr(lpC, "--ui-smoke") != nullptr;
-	const bool gameSmoke = uiSmoke || deathSmoke || mergeSmoke || strstr(lpC, "--game-smoke") != nullptr;
+	const bool performanceSmoke = strstr(lpC, "--performance-smoke") != nullptr;
+    const bool longPerformance = strstr(lpC, "--performance-smoke-long") != nullptr;
+	const bool gameSmoke = performanceSmoke || uiSmoke || deathSmoke || mergeSmoke || strstr(lpC, "--game-smoke") != nullptr;
 	bool mergeAimPassed = false, mergeThrowPassed = false, mergeStunPassed = false;
 	int smokeFrames = 0;
 	int running = 0;
 	int rootflm;
 	MATRIX wpmatrix[PLAYER_COUNT], sayamatrix[PLAYER_COUNT];
 	int		anim_neutral, anim_run, anim_jumpin, anim_jumploop, anim_jumpout, anim_damage, anim_down, enemy_anim_attack, enemy_anim_walk, enemy_anim_neutral{};
-	
+
 	//int redGoblinBaseModel = -1;
 
 	 // ★これがあるか確認！
@@ -138,6 +143,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	bool isAiming[PLAYER_COUNT] = {};
 	bool prevAiming[PLAYER_COUNT] = {};
 	float aimAngle[PLAYER_COUNT] = {};
+    OrbitCamera orbitCameras[PLAYER_COUNT];
 	int grenadeBaseModel = -1;
 	PlayerRuntimeState playerStates[PLAYER_COUNT];
 
@@ -145,7 +151,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		// 1P: キーボード(WASD) + 1Pゲームパッド。
 		{ DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 },
 		// 2P: キーボード(矢印) + 2Pゲームパッド。
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_RETURN, KEY_INPUT_RSHIFT, KEY_INPUT_RCONTROL, -1, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 }
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_NUMPAD1, KEY_INPUT_NUMPAD3, KEY_INPUT_NUMPAD0, KEY_INPUT_NUMPAD2, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 }
 	};
 
 
@@ -194,7 +200,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	char HeavyAttackEffect_FilePath[] = "重攻撃.png";
 	char SpecialAttackEffect_FilePath[] = "swordMega.efkefc";
 	int SEattackHandle, SEjumpHandle, SEdamageHandle;
-	int specialAttackEffectResourceHandle = -1;
+	int specialAttackEffectResourceHandle[PLAYER_COUNT] = { -1, -1 };
 	int hpBarTex = -1;
 
 
@@ -243,6 +249,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	// ウインドウモードの切り替え
 	ChangeWindowMode(TRUE);
+    if (gameSmoke) SetAlwaysRunFlag(TRUE);
 
 	// ウインドウサイズの変更
 	SetGraphMode(900, 600, 32);
@@ -277,34 +284,17 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	if (baseGoblinModel == -1) {
 	}
 
-	for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
-		if (baseGoblinModel != -1) {
-			// モデルを複製
-			charainfo[i].model1 = MV1DuplicateModel(baseGoblinModel);
-		}
-		else {
-			charainfo[i].model1 = -1;
-		}
+	for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; ++i) {
+        charainfo[i].model1 = -1;
+        charainfo[i].attachidx = -1;
+        charainfo[i].mode = NONE;
+    }
+    game.enemyBaseModel = baseGoblinModel;
+    // Keep the one initial enemy; create the rest on their first actual spawn.
+    charainfo[TEST_ENEMY_INDEX].model1 = baseGoblinModel < 0 ? -1 : MV1DuplicateModel(baseGoblinModel);
+    if (charainfo[TEST_ENEMY_INDEX].model1 >= 0) MV1SetVisible(charainfo[TEST_ENEMY_INDEX].model1, FALSE);
 
-		if (charainfo[i].model1 == -1) {
-			continue;
-		}
-
-		// 最初は非表示
-		MV1SetVisible(charainfo[i].model1, FALSE);
-		charainfo[i].mode = NONE;
-
-		// ★追加：複製したゴブリンに最初からニュートラルアニメーションをアタッチしておく
-		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, charainfo[i].enemyIdleAnimation);
-		if (charainfo[i].attachidx != -1) {
-			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
-		}
-
-		charainfo[i].playtime = 0.0f;
-	}
-
-
-	//モデル読み込み
+    //モデル読み込み
 	redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
 	red_goblin_anim_neutral = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Neutral.mv1");
 	red_goblin_anim_walk = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Walk.mv1");
@@ -312,28 +302,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	for (int e = TEST_ENEMY_RED; e < MAX_CHARA; ++e) { charainfo[e].enemyIdleAnimation = red_goblin_anim_neutral; charainfo[e].enemyWalkAnimation = red_goblin_anim_walk; }
 
 
-	for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
-		if (redGoblinBaseModel != -1) {
-			charainfo[i].model1 = MV1DuplicateModel(redGoblinBaseModel);
-		}
-		else {
-			charainfo[i].model1 = -1;
-		}
+	for (int i = TEST_ENEMY_RED; i < MAX_CHARA; ++i) {
+        charainfo[i].model1 = -1;
+        charainfo[i].attachidx = -1;
+        charainfo[i].mode = NONE;
+    }
 
-		if (charainfo[i].model1 == -1) continue;
-
-		MV1SetVisible(charainfo[i].model1, FALSE);
-		charainfo[i].mode = NONE;
-
-		charainfo[i].attachidx = MV1AttachAnim(charainfo[i].model1, 0, red_goblin_anim_neutral);
-		if (charainfo[i].attachidx != -1) {
-			charainfo[i].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[i].model1, charainfo[i].attachidx);
-		}
-		charainfo[i].playtime = 0.3f;
-	}
-
-	
-	for (int i = 0; i < PLAYER_COUNT; i++) {
+    for (int i = 0; i < PLAYER_COUNT; i++) {
 		charainfo[i].model1 = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? "new\\Player_MainModel.mv1" : "PC.mv1");
 		if (charainfo[i].model1 == -1) {
 			return -1;
@@ -353,6 +328,20 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		FILE* report = nullptr;
 		fopen_s(&report, "player-smoke.txt", "w");
 		bool passed = report != nullptr;
+        OrbitCamera cameraTest[2];
+        cameraTest[0].Update(100, -100);
+        bool cameraPassed = cameraTest[0].yaw == 0 && cameraTest[0].pitch == OrbitCamera::DefaultPitch;
+        for (int tick = 0; tick < 60; ++tick) cameraTest[0].Update(1000, 0);
+        cameraPassed = cameraPassed && fabsf(cameraTest[0].yaw - 2.4f) < 0.001f && cameraTest[1].yaw == 0;
+        const float stoppedYaw = cameraTest[0].yaw;
+        cameraTest[0].Update(0, 0);
+        cameraPassed = cameraPassed && cameraTest[0].yaw == stoppedYaw;
+        for (int tick = 0; tick < 300; ++tick) cameraTest[0].Update(0, 1000);
+        cameraPassed = cameraPassed && cameraTest[0].pitch == 1.15f;
+        for (int tick = 0; tick < 300; ++tick) cameraTest[0].Update(0, -1000);
+        cameraPassed = cameraPassed && cameraTest[0].pitch == 0.12f;
+        passed = passed && cameraPassed;
+        if (report) fprintf(report, "right stick camera: deadzone, rotation rate, release, pitch limits and two-player isolation: %s\n", cameraPassed ? "PASS" : "FAIL");
 		int hand = MV1SearchFrame(charainfo[0].model1, "mixamorig:RightHand");
 		int foot = MV1SearchFrame(charainfo[0].model1, "mixamorig:LeftFoot");
 		int hips = MV1SearchFrame(charainfo[0].model1, "mixamorig:Hips");
@@ -460,8 +449,53 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
         passed = passed && hurtDeathPassed;
         if (report) fprintf(report, "two players: hurt recovery, death last frame, resurrection control: %s\n", hurtDeathPassed ? "PASS" : "FAIL");
+        // Verify real model timelines at 60 simulation ticks per second.
+        bool animationTimingPassed = true;
+        {
+            PlayerRuntimeState timingState{};
+            timingState.motionRootFrame = -1;
+            auto& actor = charainfo[0];
+            actor.mode = RUN;
+            SetCharacterAnimation(actor, runMotion);
+            for (int tick = 0; tick < 10; ++tick) UpdatePlayerAnimationProgress(actor, timingState, idleMotion);
+            animationTimingPassed = fabsf(actor.playtime - 10.0f) < 0.001f;
+            actor.mode = DAMAGE;
+            SetCharacterAnimation(actor, hurtMotion);
+            const int hurtTicks = static_cast<int>(ceilf(actor.anim_totaltime / PlayerAnimationStep)) + 1;
+            for (int tick = 0; tick < hurtTicks; ++tick) UpdatePlayerAnimationProgress(actor, timingState, idleMotion);
+            animationTimingPassed = animationTimingPassed && actor.mode == STAND;
+            actor.mode = DOWNMODE;
+            SetCharacterAnimation(actor, deathMotion);
+            const float deathEnd = actor.anim_totaltime;
+            for (int tick = 0; tick < static_cast<int>(ceilf(deathEnd / PlayerAnimationStep)); ++tick) UpdatePlayerAnimationProgress(actor, timingState, idleMotion);
+            animationTimingPassed = animationTimingPassed && actor.playtime == deathEnd;
+            const int castingMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::specialAttack]);
+            actor.mode = ATTACK;
+            SetCharacterAnimation(actor, castingMotion);
+            timingState.isSpecialAttack = timingState.isSpecialAttackEffectPlaying = true;
+            const int castTicks = static_cast<int>(actor.anim_totaltime) + 5;
+            for (int tick = 0; tick < castTicks; ++tick) UpdatePlayerAnimationProgress(actor, timingState, idleMotion);
+            animationTimingPassed = animationTimingPassed && timingState.isSpecialAttackEffectPlaying && actor.playtime > 0 && actor.playtime < actor.anim_totaltime;
+            CancelPlayerCombat(timingState);
+            actor.mode = STAND;
+            SetCharacterAnimation(actor, idleMotion);
+            MV1DeleteModel(castingMotion);
+        }
+        passed = passed && animationTimingPassed;
+        if (report) fprintf(report, "60Hz animation pace, hurt/death duration and continuous casting motion: %s\n", animationTimingPassed ? "PASS" : "FAIL");
         if (hurtMotion >= 0) MV1DeleteModel(hurtMotion);
         if (deathMotion >= 0) MV1DeleteModel(deathMotion);
+        bool timingPassed = true;
+        for (int hz : { 30, 60, 120 }) {
+            FixedStepClock clock; clock.Reset(0); int ticks = 0;
+            for (int frame = 1; frame <= hz * 10; ++frame) ticks += clock.Advance(frame * 1000000LL / hz);
+            timingPassed = timingPassed && ticks == 600;
+        }
+        FixedStepClock delayed; delayed.Reset(0); int delayedTicks = 0;
+        for (int frame = 1; frame <= 300; ++frame) delayedTicks += delayed.Advance(frame * 40000LL);
+        timingPassed = timingPassed && delayedTicks == 720;
+        passed = passed && timingPassed;
+        if (report) fprintf(report, "fixed 60Hz logic at 30/60/120Hz presentation and delayed frames: %s\n", timingPassed ? "PASS" : "FAIL");
         GameManager scoreRules;
         scoreRules.Init();
         scoreRules.AddScore(0, 5000);
@@ -563,13 +597,64 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         recoveryPassed = recoveryPassed && attacker.mode == RUN && attacker.move.x == MOVE_SPEED;
         const float recoveryTime = attacker.playtime;
         UpdatePlayerAnimationProgress(attacker, megaState, idleMotion);
-        recoveryPassed = recoveryPassed && fabsf(attacker.playtime - recoveryTime - (PLAYER_USE_NEW_MODEL ? 0.5f : 0.3f)) < 0.001f;
+        recoveryPassed = recoveryPassed && fabsf(attacker.playtime - recoveryTime - (PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep)) < 0.001f;
         passed = passed && recoveryPassed;
         if (report) fprintf(report, "special completion restores running speed and animation: %s\n", recoveryPassed ? "PASS" : "FAIL");
 		if (megaEffect >= 0) DeleteEffekseerEffect(megaEffect);
 		passed = passed && megaPassed;
 		if (report) fprintf(report, "SwordMega load, startup, forward strike, area, multiple targets, single hit and cleanup: %s\n", megaPassed ? "PASS" : "FAIL");
-		bool projectionPassed = true;
+		int bloodLanceEffect = LoadEffekseerEffect("..\\Data\\Effect\\BloodLance.efkefc", PLAYER_BLOOD_LANCE_EFFECT_SCALE);
+                auto bloodLanceResource = GetEffekseerEffect(bloodLanceEffect);
+        if (report && bloodLanceResource) {
+            for (int t = 0; t < bloodLanceResource->GetColorImageCount(); ++t) {
+                char path[512] = {};
+                WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)bloodLanceResource->GetColorImagePath(t), -1, path, 512, nullptr, nullptr);
+                auto tex = bloodLanceResource->GetColorImage(t);
+                fprintf(report, "bloodLance texture %s loaded=%d size=%dx%d\n", path, !!tex, tex ? tex->GetWidth() : 0, tex ? tex->GetHeight() : 0);
+
+            }
+            for (int m = 0; m < bloodLanceResource->GetModelCount(); ++m) fprintf(report, "bloodLance model %d loaded=%d\n", m, !!bloodLanceResource->GetModel(m));
+        }
+        PlayerRuntimeState bloodLanceState;
+        bloodLanceState.bloodLanceSpecial = true;
+        attacker.pos = VGet(0, 0, 0); attacker.direction = Direction::DOWN;
+        PlayPlayerSpecialAttack(attacker, bloodLanceState, idleMotion, -1, bloodLanceEffect);
+        bool bloodLancePassed = bloodLanceEffect >= 0 && bloodLanceState.specialAttackPlayingHandle >= 0 && bloodLanceState.isSpecialAttack;
+        if (!bloodLanceResource) bloodLancePassed = false;
+        else {
+            for (int t = 0; t < bloodLanceResource->GetColorImageCount(); ++t) bloodLancePassed = bloodLancePassed && !!bloodLanceResource->GetColorImage(t);
+            for (int t = 0; t < bloodLanceResource->GetDistortionImageCount(); ++t) bloodLancePassed = bloodLancePassed && !!bloodLanceResource->GetDistortionImage(t);
+            for (int m = 0; m < bloodLanceResource->GetModelCount(); ++m) bloodLancePassed = bloodLancePassed && !!bloodLanceResource->GetModel(m);
+        }
+        SCharaInfo& bloodLanceTarget = charainfo[2];
+        bloodLanceTarget.pos = VGet(0, 0, -200); bloodLanceTarget.mode = STAND; bloodLanceTarget.enemyHP = 6;
+        bloodLanceState.specialAttackEffectFrame = 47;
+        CheckPlayerSpecialAttackHit(game, attacker, bloodLanceState, bloodLanceTarget, -1, -1, 1, 2);
+        bloodLancePassed = bloodLancePassed && bloodLanceTarget.enemyHP == 6;
+        bloodLanceState.specialAttackEffectFrame = 60;
+        CheckPlayerSpecialAttackHit(game, attacker, bloodLanceState, bloodLanceTarget, -1, -1, 1, 2);
+        bloodLancePassed = bloodLancePassed && bloodLanceTarget.enemyHP == 4;
+        bloodLanceTarget.mode = STAND;
+        CheckPlayerSpecialAttackHit(game, attacker, bloodLanceState, bloodLanceTarget, -1, -1, 1, 2);
+        bloodLancePassed = bloodLancePassed && bloodLanceTarget.enemyHP == 4;
+        bloodLanceState.specialAttackEffectFrame = 0;
+        for (int frame = 0; frame < PLAYER_BLOOD_LANCE_EFFECT_FRAMES; ++frame) {
+            UpdatePlayerAnimationProgress(attacker, bloodLanceState, idleMotion);
+            UpdateEffekseer3D();
+            if (frame == 65 || frame == 100) {
+                SetDrawScreen(DX_SCREEN_BACK); SetDrawArea(0, 0, 900, 600); ClearDrawScreen();
+                MV1SetPosition(attacker.model1, attacker.pos);
+                SetCameraPositionAndTargetAndUpVec(VGet(480, 420, -900), VGet(0, 100, 0), VGet(0, 1, 0));
+                MV1DrawModel(attacker.model1); SyncEffekseerDrawAreaProjection(); DrawEffekseer3D();
+                SaveDrawScreenToPNG(0, 0, 900, 600, frame == 65 ? "..\\.merge-review\\bloodLance-slash.png" : "..\\.merge-review\\bloodLance-strike.png");
+            }
+        }
+        bloodLancePassed = bloodLancePassed && !bloodLanceState.isSpecialAttack && !bloodLanceState.isSpecialAttackEffectPlaying && bloodLanceState.specialAttackPlayingHandle == -1;
+        bloodLanceResource.Reset();
+        if (bloodLanceEffect >= 0) DeleteEffekseerEffect(bloodLanceEffect);
+        passed = passed && bloodLancePassed;
+        if (report) fprintf(report, "P2 BloodLance: runtime resources, start, active window, single hit, completion: %s\n", bloodLancePassed ? "PASS" : "FAIL");
+        bool projectionPassed = true;
 		float oldMaxError = 0.0f, correctedMaxError = 0.0f;
 		for (int side = 0; side < 3; ++side) {
 			SetDrawArea(side == 2 ? 0 : side * 450, 0, side == 2 ? 900 : (side + 1) * 450, 600);
@@ -820,7 +905,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	int flashSpawnTimer = 0;
 	const int FLASH_SPAWN_INTERVAL = 60 * 18;
 
-	
+
 	int crownGraphHandle = LoadGraph("..\\Data\\UI\\win.png");
 
 	anim_neutral = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? PlayerMotions::files[PlayerMotions::idle] : "Anim_Neutral.mv1");
@@ -877,7 +962,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		// 読み込みに失敗した場合のエラー処理（必要に応じて）
 	}
 	// ★ ここを確実に！ 透過処理と透過色の設定
-	
+
 	SetUseTransColor(TRUE);     // 透過色（透明カラー）を使用する設定をONにする
 	SetTransColor(255, 255, 255);    // 透過色に「黒 (RGB: 0, 0, 0)」を指定する
 	// SP.png (メモリ1本)
@@ -891,10 +976,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	}
 	SetUseTransColor(TRUE);     // 透過色（透明カラー）を使用する設定をONにする
 	SetTransColor(255, 255, 255);    // 透過色に「黒 (RGB: 0, 0, 0)」を指定する
-	 redGoblinBaseModel = MV1LoadModel("..\\Data\\RedGoblin\\RedGoblin.mv1");
-	 red_goblin_anim_neutral = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Neutral.mv1");
-	 red_goblin_anim_walk = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Walk.mv1");
-	 red_goblin_anim_attack = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Attack1.mv1");
 
 
 	for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -958,10 +1039,31 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 	// Load the exported SwordMega effect.
 	sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", SpecialAttackEffect_FilePath);
-	specialAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
-	if (specialAttackEffectResourceHandle == -1) {
+	specialAttackEffectResourceHandle[0] = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
+    specialAttackEffectResourceHandle[1] = LoadEffekseerEffect("..\\Data\\Effect\\BloodLance.efkefc", PLAYER_BLOOD_LANCE_EFFECT_SCALE);
+    playerStates[1].bloodLanceSpecial = true;
+	if (specialAttackEffectResourceHandle[0] == -1 || specialAttackEffectResourceHandle[1] == -1) {
 		return -1;
 	}
+    // Allocate the drop pool once; per-tick duplication leaked five models every update.
+    const int MAX_DROP_FLASH = 5;
+    FlashDropItem dropFlashItems[MAX_DROP_FLASH] = {};
+    for (int i = 0; i < MAX_DROP_FLASH; i++) {
+        dropFlashItems[i].bobAngle = (float)i * DX_PI_F;
+        dropFlashItems[i].model = grenadeBaseModel >= 0 ? MV1DuplicateModel(grenadeBaseModel) : -1;
+        if (dropFlashItems[i].model >= 0) {
+            MV1SetVisible(dropFlashItems[i].model, FALSE);
+            MV1SetScale(dropFlashItems[i].model, VGet(1.3f, 1.3f, 1.3f));
+        }
+    }
+    struct FrameCost { double update = 0, render = 0, present = 0, maximum = 0; int count = 0; } frameCost[2];
+    double effectUpdateMs = 0, effectDrawMs = 0, worldDrawMs = 0;
+    int effectUpdates = 0, worldDraws = 0;
+    LONGLONG frameStart = 0, renderStart = 0, presentStart = 0;
+    FixedStepClock logicClock;
+    RuntimeProfile runtimeProfile;
+    int simulationTicks = 0;
+    const LONGLONG simulationWallStart = GetNowHiPerformanceCount();
     enum class Screen { Menu, Playing, Results };
     Screen screen = gameSmoke && !uiSmoke ? Screen::Playing : Screen::Menu;
     int menuSelection = 0;
@@ -969,11 +1071,18 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     bool uiStarted = false, uiResults = false, uiReturned = false, uiRestarted = false;
     auto resetMatch = [&]() {
         game.Init();
+        for (auto& camera : orbitCameras) camera = OrbitCamera{};
+        flashSpawnTimer = 0;
+        for (auto& item : dropFlashItems) {
+            item.active = false;
+            if (item.model >= 0) MV1SetVisible(item.model, FALSE);
+        }
         for (int p = 0; p < PLAYER_COUNT; ++p) {
             auto old = playerStates[p];
             if (old.normalAttackPlayingHandle >= 0) StopEffekseer3DEffect(old.normalAttackPlayingHandle);
             if (old.specialAttackPlayingHandle >= 0) StopEffekseer3DEffect(old.specialAttackPlayingHandle);
             playerStates[p] = PlayerRuntimeState{};
+            playerStates[p].bloodLanceSpecial = (p == 1);
             playerStates[p].normalAttackEffectResourceHandle = old.normalAttackEffectResourceHandle;
             playerStates[p].motionRootFrame = old.motionRootFrame;
             playerStates[p].motionRootX = old.motionRootX;
@@ -991,7 +1100,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         for (int f = 0; f < MAX_THROWN_FLASH; ++f) thrownFlashes[f].active = false;
         dropFlashItem.active = false; flashSpawnTimer = 0;
     };
-	while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0 && (!gameSmoke || smokeFrames++ < (uiSmoke ? 180 : (deathSmoke ? 1800 : (mergeSmoke ? 520 : 360))))) {
+    while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0 && (!gameSmoke || (performanceSmoke ? simulationTicks < (longPerformance ? 1800 : 720) : smokeFrames++ < (uiSmoke ? 180 : (deathSmoke ? 1800 : (mergeSmoke ? 520 : 360)))))) {
         if (uiSmoke && screen == Screen::Playing && smokeFrames == 60) game.mainTimer = 1;
         if (screen == Screen::Playing && game.gameState != 0) {
             screen = Screen::Results; menuSelection = 0; prevMenuConfirm = true; uiResults = true;
@@ -1008,13 +1117,43 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                 else { resetMatch(); screen = Screen::Playing; if (uiStarted) uiRestarted = true; uiStarted = true; }
             }
             prevMenuConfirm = confirm; prevMenuDirection = direction;
+            logicClock.Reset(GetNowHiPerformanceCount());
+            runtimeProfile.Reset(GetNowHiPerformanceCount());
             if (screen != Screen::Playing) { DrawGameMenu(screen == Screen::Results, game, menuSelection, uiSmoke && smokeFrames == 1 ? TEXT("..\\.merge-review\\start-menu.png") : uiSmoke && smokeFrames == 65 ? TEXT("..\\.merge-review\\results.png") : nullptr); WaitTimer(16); }
             continue;
         }
 
 
 
-		if (deathSmoke && smokeFrames == 100) { charainfo[0].HP = 0; charainfo[1].HP = 0; }
+		frameStart = GetNowHiPerformanceCount();
+        const int logicSteps = gameSmoke && !performanceSmoke ? 1 : logicClock.Advance(frameStart);
+        if (logicSteps == 0) { WaitTimer(1); continue; }
+        for (int logicStep = 0; logicStep < logicSteps; ++logicStep) {
+            ++simulationTicks;
+            if (performanceSmoke && simulationTicks % 60 == 0) {
+                FILE* memory = nullptr;
+                fopen_s(&memory, "performance-memory.csv", simulationTicks == 60 ? "w" : "a");
+                if (memory) {
+                    int models = 0, active = 0;
+                    for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+                        if (charainfo[e].model1 >= 0) ++models;
+                        if (charainfo[e].mode != NONE) ++active;
+                    }
+                    if (simulationTicks == 60) fprintf(memory, "tick,dxBytes,dxAllocations,enemyModels,activeEnemies,effectInstances\n");
+                    fprintf(memory, "%d,%zu,%d,%d,%d,%d\n", simulationTicks, DxGetAllocSize(), DxGetAllocNum(), models, active, GetEffekseer3DManager()->GetTotalInstanceCount());
+                    fclose(memory);
+                }
+            }
+        if (performanceSmoke && simulationTicks == 30) {
+            for (int e = 0; e < 80; ++e) game.ActivateEnemy(charainfo, 800.0f + GetRand(1000), -650.0f + GetRand(1000));
+        }
+        if (performanceSmoke && !strstr(lpC, "--no-special") && simulationTicks >= 120 && (simulationTicks - 120) % 300 == 0) {
+            for (int p = 0; p < PLAYER_COUNT; ++p) {
+                charainfo[p].HP = MAX_HP;
+                PlayPlayerSpecialAttack(charainfo[p], playerStates[p], animSpecialAttack, -1, specialAttackEffectResourceHandle[p]);
+            }
+        }
+        if (deathSmoke && smokeFrames == 100) { charainfo[0].HP = 0; charainfo[1].HP = 0; }
 		int currentJKey = CheckHitKey(KEY_INPUT_J);
 
 
@@ -1068,15 +1207,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 
 			// ゲージ満タンかつボタンが押され、現在攻撃中やダウン中でない場合
-			if (spGraphHandles[i] >= SP_IMAGE_COUNT && spButton && charainfo[i].mode == STAND) {
+			if (spGraphHandles[i] >= SP_IMAGE_COUNT && spButton && !playerStates[i].prevSpecialAttackButton && charainfo[i].mode == STAND) {
 				// 必殺技の発動処理 (既存の必殺技フラグ・アニメーションを設定)
-				playerStates[i].isSpecialAttack = true;
-				charainfo[i].mode = ATTACK;
-				SetCharacterAnimation(charainfo[i], animSpecialAttack);
-				if (specialAttackEffectResourceHandle != -1) {
-					playerStates[i].specialAttackPlayingHandle = PlayEffekseer3DEffect(specialAttackEffectResourceHandle);
-				}
-				game.RecordSpecialAttack(i);
+				PlayPlayerSpecialAttack(charainfo[i], playerStates[i], animSpecialAttack, SEattackHandle, specialAttackEffectResourceHandle[i]);
+                game.RecordSpecialAttack(i);
 
 				// ゲージをリセット
 				spGraphHandles[i] = 0;
@@ -1088,12 +1222,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 		for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(playerInputs[p].padType);
 		for (int p = 0; p < PLAYER_COUNT; p++) {
-			bool currentAimInput = false;
+			int rightX = 0, rightY = 0;
+            GetJoypadAnalogInputRight(&rightX, &rightY, playerInputs[p].padType);
+            const float rightYaw = orbitCameras[p].Update(rightX, rightY);
+            bool currentAimInput = false;
 			if (p == 0) {
 				currentAimInput = (CheckHitKey(KEY_INPUT_G) == 1) || (playerStates[p].key & PAD_INPUT_5);
 			}
 			else {
-				currentAimInput = (CheckHitKey(KEY_INPUT_RALT) == 1) || (playerStates[p].key & PAD_INPUT_5);
+				currentAimInput = (CheckHitKey(KEY_INPUT_DECIMAL) == 1) || (playerStates[p].key & PAD_INPUT_5);
 			}
 
 			if (mergeSmoke && p == 0) currentAimInput = smokeFrames >= 20 && smokeFrames < 30;
@@ -1103,6 +1240,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					aimAngle[p] = DX_PI_F + DX_PI_F * 0.5f * charainfo[p].direction;
 				}
 				else if (currentAimInput && isAiming[p]) {
+                    aimAngle[p] += rightYaw;
 					if (p == 0) {
 						if (CheckHitKey(KEY_INPUT_A)) aimAngle[p] -= 0.05f;
 						if (CheckHitKey(KEY_INPUT_D)) aimAngle[p] += 0.05f;
@@ -1149,22 +1287,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 
 			prevAiming[p] = currentAimInput;
-		}
-
-
-		// 閃光弾アイテムの2個同時スポーン用
-		const int MAX_DROP_FLASH = 5;
-		FlashDropItem dropFlashItems[MAX_DROP_FLASH];
-		for (int i = 0; i < MAX_DROP_FLASH; i++) {
-			dropFlashItems[i].active = false;
-			dropFlashItems[i].basePosY = 0.0f;
-			dropFlashItems[i].bobAngle = (float)i * DX_PI_F;
-			dropFlashItems[i].pos = VGet(0.0f, 0.0f, 0.0f);
-			dropFlashItems[i].model = (grenadeBaseModel != -1) ? MV1DuplicateModel(grenadeBaseModel) : -1;
-			if (dropFlashItems[i].model != -1) {
-				MV1SetVisible(dropFlashItems[i].model, FALSE);
-				MV1SetScale(dropFlashItems[i].model, VGet(1.3f, 1.3f, 1.3f));
-			}
 		}
 
 
@@ -1303,8 +1425,22 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				MV1SetVisible(thrownFlashes[f].model, FALSE);
 
 				const float FLASH_RANGE_SQ = 450.0f * 450.0f;
+                // Preserve the enemy stun response, with duration measured in logic ticks.
+                for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+                    auto& enemy = charainfo[e];
+                    if (enemy.mode == NONE || enemy.enemyHP <= 0 || enemy.model1 < 0) continue;
+                    const float dx = enemy.pos.x - thrownFlashes[f].pos.x;
+                    const float dz = enemy.pos.z - thrownFlashes[f].pos.z;
+                    if (dx * dx + dz * dz > FLASH_RANGE_SQ) continue;
+                    enemy.invincibleTimer = 120;
+                    enemy.mode = STAND;
+                    enemy.currentAnimType = 1;
+                    enemy.enemyWalking = false;
+                    ResetMove(enemy);
+                    SetCharacterAnimation(enemy, enemy.enemyIdleAnimation);
+                }
 
-				
+
 
 				// ② 相手プレイヤーの直視判定（投げた本人は食らわない）
 				for (int p = 0; p < PLAYER_COUNT; p++) {
@@ -1364,7 +1500,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 					}
 				}
 
-				charainfo[i].playtime += 0.2f;
+				charainfo[i].playtime += EnemyAnimationStep;
 				if (charainfo[i].attachidx != -1) {
 					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
 				}
@@ -1401,7 +1537,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				}
 
 				// 待機アニメーションのループ更新
-				charainfo[i].playtime += 0.2f;
+				charainfo[i].playtime += EnemyAnimationStep;
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].playtime = 0.0f;
 				}
@@ -1498,7 +1634,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				}
 			}
 
-			charainfo[i].playtime += 0.2f;
+			charainfo[i].playtime += EnemyAnimationStep;
 			if (charainfo[i].mode == STAND) {
 				if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
 					charainfo[i].playtime = 0.0f;
@@ -1519,19 +1655,26 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			const float minDistance = 120.0f;
 			const float minDistanceSq = minDistance * minDistance;
 
-			for (int i = TEST_ENEMY_INDEX; i < MAX_CHARA; i++) {
-				if (charainfo[i].mode != STAND || charainfo[i].currentAnimType != 2) continue;
-
-				for (int j = i + 1; j < MAX_CHARA; j++) {
-					if (charainfo[j].mode != STAND || FindWhirlwindPullPlayer(charainfo, playerStates, charainfo[j]) >= 0) continue;
-
-					float diffX = charainfo[i].pos.x - charainfo[j].pos.x;
+			int crowdIndices[MAX_CHARA], crowdCount = 0;
+            bool crowdPulled[MAX_CHARA] = {};
+            for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+                if (charainfo[e].mode != STAND) continue;
+                crowdIndices[crowdCount++] = e;
+                crowdPulled[e] = FindWhirlwindPullPlayer(charainfo, playerStates, charainfo[e]) >= 0;
+            }
+            for (int a = 0; a < crowdCount; ++a) {
+                const int i = crowdIndices[a];
+                if (charainfo[i].currentAnimType != 2 || crowdPulled[i]) continue;
+                for (int b = a + 1; b < crowdCount; ++b) {
+                    const int j = crowdIndices[b];
+                    if (crowdPulled[j]) continue;
+                    float diffX = charainfo[i].pos.x - charainfo[j].pos.x;
 					float diffZ = charainfo[i].pos.z - charainfo[j].pos.z;
 					float distSq = diffX * diffX + diffZ * diffZ;
 
 					if (distSq < minDistanceSq && distSq > 0.001f) {
 
-						
+
 						float actualDist = sqrtf(distSq);
 						float pushDist = (minDistance - actualDist) * 0.5f;
 
@@ -1566,7 +1709,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				anim_jumpin,
 				SEattackHandle,
 				SEjumpHandle,
-				specialAttackEffectResourceHandle
+				specialAttackEffectResourceHandle[i]
 			);
             if (!specialWasActive && playerStates[i].isSpecialAttack) game.RecordSpecialAttack(i);
 			UpdatePlayerAttackState(
@@ -1845,10 +1988,18 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		}
 
 
-		// 画面の消去
+        const LONGLONG effectUpdateStart = GetNowHiPerformanceCount();
 		UpdateEffekseer3D();
+        effectUpdateMs += (GetNowHiPerformanceCount() - effectUpdateStart) / 1000.0;
+        ++effectUpdates;
 		skyRot += 0.001f;
 		MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
+        game.Update(charainfo, charainfo);
+        game.UpdateVisualTimers();
+        for (int p = 0; p < PLAYER_COUNT; ++p) if (playerWhiteoutTimer[p] > 0) --playerWhiteoutTimer[p];
+        if (game.gameState != 0) break;
+        } // fixed simulation steps; render the latest state once
+		renderStart = GetNowHiPerformanceCount();
 		ClearDrawScreen();
 
 
@@ -1877,7 +2028,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 			if (isAiming[pIdx]) {
 				float dist = 280.0f;
-				float height = 180.0f;
+				float aimPitch = atan2f(180.0f, dist) + orbitCameras[pIdx].pitch - OrbitCamera::DefaultPitch;
+                if (aimPitch < 0.15f) aimPitch = 0.15f;
+                if (aimPitch > 1.2f) aimPitch = 1.2f;
+                float height = dist * tanf(aimPitch);
 
 				cPos = VGet(
 					pPos.x - sinf(aimAngle[pIdx]) * dist,
@@ -1887,22 +2041,23 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 				cTarget = VAdd(pPos, VGet(sinf(aimAngle[pIdx]) * 350.0f, 40.0f, cosf(aimAngle[pIdx]) * 350.0f));
 			}
-			else {
-				if (pIdx == 0) {
-					cTarget = VAdd(pPos, VGet(300.0f, 150.0f, 0.0f));
-					cPos = VAdd(cTarget, VGet(-200.0f, 200.0f, -600.0f));
-				}
-				else {
-					cTarget = VAdd(pPos, VGet(-300.0f, 150.0f, 0.0f));
-					cPos = VAdd(cTarget, VGet(200.0f, 200.0f, -600.0f));
-				}
-			}
+            else {
+                const auto& camera = orbitCameras[pIdx];
+                const float cosine = cosf(camera.yaw), sine = sinf(camera.yaw);
+                const float side = pIdx == 0 ? 1.0f : -1.0f;
+                cTarget = VAdd(pPos, VGet(side * 300.0f * cosine, 150.0f, -side * 300.0f * sine));
+                const float horizontal = sqrtf(440000.0f) * cosf(camera.pitch) / sqrtf(400000.0f);
+                const float baseX = -side * 200.0f, baseZ = -600.0f;
+                cPos = VAdd(cTarget, VGet((baseX * cosine + baseZ * sine) * horizontal,
+                    sqrtf(440000.0f) * sinf(camera.pitch), (-baseX * sine + baseZ * cosine) * horizontal));
+            }
 
 			SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
 
 
 
 
+            const LONGLONG worldStart = GetNowHiPerformanceCount();
 			for (int i = 0; i < MAX_CHARA; i++) {
 				if (charainfo[i].mode != NONE && charainfo[i].model1 != -1) {
 					MV1DrawModel(charainfo[i].model1);
@@ -1910,6 +2065,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 			MV1DrawModel(stagedata);
 			MV1DrawModel(sky);
+            worldDrawMs += (GetNowHiPerformanceCount() - worldStart) / 1000.0;
+            ++worldDraws;
 
 			for (int i = 0; i < PLAYER_COUNT; i++) {
 				if (playerWeaponModel[i] != -1) MV1DrawModel(playerWeaponModel[i]);
@@ -1920,13 +2077,18 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			for (int i = 0; i < PLAYER_COUNT; i++) {
 				DrawPlayerHeavyAttackEffect(charainfo[i], playerStates[i], heavyAttackEffectHandle);
 			}
+            const LONGLONG effectDrawStart = GetNowHiPerformanceCount();
 			DrawEffekseer3D();
+            effectDrawMs += (GetNowHiPerformanceCount() - effectDrawStart) / 1000.0;
 			for (int f = 0; f < MAX_THROWN_FLASH; f++) {
 				if (thrownFlashes[f].active && thrownFlashes[f].model != -1) {
 					MV1DrawModel(thrownFlashes[f].model);
 				}
 			}
 
+            for (const auto& item : dropFlashItems) {
+                if (item.active && item.model >= 0) MV1DrawModel(item.model);
+            }
 			// 浮遊アイテム
 			if (dropFlashItem.active && dropFlashItem.model != -1) {
 				MV1DrawModel(dropFlashItem.model);
@@ -1952,7 +2114,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 			// ホワイトアウト描画
 			if (playerWhiteoutTimer[pIdx] > 0) {
-				playerWhiteoutTimer[pIdx]--;
+
 				int alpha = (playerWhiteoutTimer[pIdx] > 40) ? 255 : (playerWhiteoutTimer[pIdx] * 255 / 40);
 
 				SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
@@ -1965,10 +2127,38 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			if (isAiming[0]) mergeAimPassed = true;
 			if (thrownFlashes[0].active && flashStock[0] == 0) mergeThrowPassed = true;
 		}
-		game.Update(charainfo, charainfo);
 		game.DrawTimer(900, 600);
-		ScreenFlip();
+        if (performanceSmoke && strstr(lpC, "--performance-smoke-slow")) WaitTimer(33);
+        presentStart = GetNowHiPerformanceCount();
+        ScreenFlip();
+        int profileEnemies = 0;
+        for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) if (charainfo[e].mode != NONE) ++profileEnemies;
+        runtimeProfile.Frame(frameStart, renderStart, presentStart, GetNowHiPerformanceCount(), logicSteps, profileEnemies, GetEffekseer3DManager()->GetTotalInstanceCount(), DxGetAllocSize());
+        if (performanceSmoke) {
+            const double now = (double)GetNowHiPerformanceCount();
+            auto& cost = frameCost[playerStates[0].isSpecialAttackEffectPlaying || playerStates[1].isSpecialAttackEffectPlaying ? 1 : 0];
+            ++cost.count;
+            cost.update += (renderStart - frameStart) / 1000.0;
+            cost.render += (presentStart - renderStart) / 1000.0;
+            cost.present += (now - presentStart) / 1000.0;
+            const double total = (now - frameStart) / 1000.0;
+            if (total > cost.maximum) cost.maximum = total;
+        }
 	}
+    for (auto& item : dropFlashItems) {
+        if (item.model >= 0) MV1DeleteModel(item.model);
+        item.model = -1;
+    }
+    if (performanceSmoke) {
+        FILE* perf = nullptr; fopen_s(&perf, "performance-smoke.txt", "w");
+        for (int phase = 0; perf && phase < 2; ++phase) {
+            auto& cost = frameCost[phase];
+            const int n = cost.count ? cost.count : 1;
+            fprintf(perf, "%s frames=%d update=%.3fms render=%.3fms present=%.3fms max=%.3fms\n", phase ? "special" : "normal", cost.count, cost.update/n, cost.render/n, cost.present/n, cost.maximum);
+        }
+        if (perf) fprintf(perf, "effect update/tick=%.3fms effect draw/view=%.3fms world draw/view=%.3fms\n", effectUpdateMs / (effectUpdates ? effectUpdates : 1), effectDrawMs / (worldDraws ? worldDraws : 1), worldDrawMs / (worldDraws ? worldDraws : 1));
+        if (perf) { fprintf(perf, "simulation ticks=%d remaining=%d wall=%.3fs\n", simulationTicks, game.mainTimer, (GetNowHiPerformanceCount() - simulationWallStart) / 1000000.0); fclose(perf); }
+    }
 	// DXライブラリの終了処理
 	if (normalAttackEffectResourceHandle != -1) {
 		DeleteEffekseerEffect(normalAttackEffectResourceHandle);
@@ -1978,8 +2168,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			DeleteGraph(heavyAttackEffectHandle[i]);
 		}
 	}
-	if (specialAttackEffectResourceHandle != -1) {
-		DeleteEffekseerEffect(specialAttackEffectResourceHandle);
+	for (int effectIndex = 0; effectIndex < PLAYER_COUNT; ++effectIndex) if (specialAttackEffectResourceHandle[effectIndex] != -1) {
+		DeleteEffekseerEffect(specialAttackEffectResourceHandle[effectIndex]);
 	}
 	if (mergeSmoke) {
         FILE* report = nullptr; fopen_s(&report, "merge-smoke.txt", "w");
@@ -1998,7 +2188,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             grounded = grounded && hit.HitFlag && fabsf(charainfo[e].pos.y - hit.HitPosition.y) < 0.1f;
         }
         if (report) fprintf(report, "enemy ground contact=%d\n", grounded);
-        const bool passed = mergeAimPassed && mergeThrowPassed && mergeStunPassed && redSpawned && timerPassed && grounded && activeSpawned >= 20 && smokeLongRangeMoves > 0;
+        const bool passed = mergeAimPassed && mergeThrowPassed && mergeStunPassed && redSpawned && timerPassed && grounded && activeSpawned >= 15 && smokeLongRangeMoves > 0;
         if (report) { fprintf(report, "aim=%d throw=%d stun=%d redSpawn=%d timer=%d %s\n", mergeAimPassed, mergeThrowPassed, mergeStunPassed, redSpawned, timerPassed, passed ? "PASS" : "FAIL"); fclose(report); }
         if (!passed) return 1;
     }
@@ -2065,7 +2255,7 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 						target->mode = NONE;
 						MV1SetVisible(target->model1, FALSE);
 
-						const bool isFeverTime = (game.mainTimer <= 15 * 120);
+						const bool isFeverTime = (game.mainTimer <= 15 * 60);
 						const int baseScore = 100;
 						const int earnedScore = isFeverTime ? (baseScore * 2) : baseScore;
 

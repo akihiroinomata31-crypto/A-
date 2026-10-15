@@ -47,8 +47,8 @@ public:
         }
     }
 
-    // --- 制限時間管理（120FPS基準: 100秒なら 100 * 120 = 12000） ---
-    int mainTimer = 100 * 120;
+    // --- 制限時間管理（120FPS基準: 100秒なら 100 * 60 = 12000） ---
+    int mainTimer = 100 * 60;
 
     // --- 敵スポーン管理 ---
     int goblinSpawnTimer = 0; // 通常ゴブリン用カウンター
@@ -71,7 +71,7 @@ public:
 
     void Reset() {
         gameState = 0;
-        mainTimer = 100 * 120;
+        mainTimer = 100 * 60;
         p1Score = 0;
         p2Score = 0;
         deathCount[0] = 0;
@@ -109,6 +109,7 @@ public:
     int anim_walk = -1;
     int anim_attack = -1;
     int enemy_anim_neutral = -1;
+    int enemyBaseModel = -1;
     int enemy_anim_walk = -1;
 
     bool SetGameResourceDirectory();
@@ -134,6 +135,7 @@ public:
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
     void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle);
     void DrawTimer(int sw, int sh);
+    void UpdateVisualTimers();
     void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game);
     void AddScore(int playerIndex, int score);
     void AddScorePopup(int playerIdx, int score);

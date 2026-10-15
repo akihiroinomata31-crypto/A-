@@ -78,6 +78,8 @@ struct SCharaInfo
     int enemyIdleAnimation = -1;
     int enemyWalkAnimation = -1;
     bool enemyWalking = false;
+    bool groundCacheValid = false;
+    VECTOR groundCachePosition = {};
     int HP;
     float angle;
     bool isHit;

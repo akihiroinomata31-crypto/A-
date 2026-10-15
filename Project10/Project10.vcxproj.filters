@@ -16,6 +16,10 @@
     <ClInclude Include="map.h" />
     <ClInclude Include="player.h" />
     <ClInclude Include="PlayerMotionAssets.h" />
+    <ClInclude Include="GameTiming.h" />
+    <ClInclude Include="HudText.h" />
+    <ClInclude Include="RuntimeProfile.h" />
+    <ClInclude Include="OrbitCamera.h" />
     <ClInclude Include="senk.h" />
   </ItemGroup>
 </Project>
