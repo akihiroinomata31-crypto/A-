@@ -6,7 +6,7 @@
 #include "EffekseerForDXLib.h"
 #define PC_WIDTH 80.0f
 #define PC_HEIGHT 180.0f
-#define MAX_CHARA 1000
+#define MAX_CHARA 1200
 
 #define CHARA_ENUM_DEFAULT_SIZE     200.0f      // 周囲のポリゴン検出に使用する球の初期サイズ
 #define CHARA_MAX_HITCOLL           2048        // 処理するコリジョンポリゴンの最大数

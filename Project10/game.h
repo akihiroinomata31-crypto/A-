@@ -125,6 +125,19 @@ public:
     int flashbangStock[2] = { 0, 0 };    // [0]:1Pの所持数, [1]:2Pの所持数
     int playerStunTimer[2] = { 0, 0 };   // スタン残り時間
 
+   // ★ 1.5秒演出用（120FPS基準で180フレーム、60FPS基準なら90に調整）
+    static const int BOSS_CUTSCENE_TOTAL_FRAMES = 180;
+    int bossCutsceneTimer;
+    bool bossCutsceneDone; // ★ 1回演出したら二度と再起動しないフラグ
+    static void DrawLoadingScreen();
+    // 演出判定用ゲッター
+    bool IsBossCutsceneActive() const { return bossCutsceneTimer > 0; }
+
+    // カメラ座標計算（true: 演出中 / false: 通常カメラに戻す）
+    bool ApplyBossCamera(VECTOR& outCamPos, VECTOR& outCamTarget, const SCharaInfo* enemyList);
+
+    // ★ テロップ描画関数（DrawUI の中、または分割描画ループから呼ぶ）
+    void DrawBossCutsceneUI(int startX, int endX, int screenHeight) const;
     void SpawnFlashItem();
     void UpdateFlashItems(SCharaInfo* players);
     void DrawFlashItems();
@@ -136,7 +149,7 @@ public:
 
     void Init();
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
-    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle);
+    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle, int pvpIconHandle, bool isPvPActive, int pvpCooldown);
     void DrawTimer(int sw, int sh);
     void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game);
     void AddScore(int playerIndex, int score);
