@@ -471,6 +471,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             animationTimingPassed = animationTimingPassed && actor.playtime == deathEnd;
             const int castingMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::specialAttack]);
             actor.mode = ATTACK;
+                actor.pos = VGet(0, 0, 0);
             SetCharacterAnimation(actor, castingMotion);
             timingState.isSpecialAttack = timingState.isSpecialAttackEffectPlaying = true;
             const int castTicks = static_cast<int>(actor.anim_totaltime) + 5;
@@ -541,6 +542,60 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 			for (int i = 0; i < PLAYER_COUNT; i++) swordPassed = swordPassed &&
 				!playerStates[i].isNormalAttackEffectPlaying && playerStates[i].normalAttackPlayingHandle == -1;
+            bool areaPassed = true;
+            for (int p = 0; p < PLAYER_COUNT; ++p) {
+                auto& actor = charainfo[p];
+                actor.mode = ATTACK;
+                actor.pos = VGet(0, 0, 0);
+                actor.isHit = false;
+                const VECTOR start = VGet(0, 40, 0), end = VGet(0, 40, 90);
+                PlayPlayerNormalAttackEffect(actor, playerStates[p]);
+                for (int e = 2; e <= 4; ++e) {
+                    charainfo[e].mode = STAND;
+                    charainfo[e].enemyHP = 3;
+                    charainfo[e].charahitinfo.Height = 100;
+                    charainfo[e].charahitinfo.Width = 40;
+                    charainfo[e].pos = VGet(e == 4 ? 1000.0f : (e == 2 ? -20.0f : 20.0f), 0, 45);
+                    CheckAttackHit(game, charainfo, &actor, &charainfo[e], start, end, -1, enemy_anim_neutral, playerStates[p].normalHitTargets);
+                }
+                areaPassed = areaPassed && charainfo[2].enemyHP == 2 && charainfo[3].enemyHP == 2 && charainfo[4].enemyHP == 3;
+                for (int e = 2; e <= 3; ++e) {
+                    charainfo[e].mode = STAND;
+                    CheckAttackHit(game, charainfo, &actor, &charainfo[e], start, end, -1, enemy_anim_neutral, playerStates[p].normalHitTargets);
+                    areaPassed = areaPassed && charainfo[e].enemyHP == 2;
+                }
+                PlayPlayerNormalAttackEffect(actor, playerStates[p]);
+                for (int e = 2; e <= 3; ++e) {
+                    areaPassed = areaPassed && charainfo[e].knockbackFrames == 0;
+                    CheckAttackHit(game, charainfo, &actor, &charainfo[e], start, end, -1, enemy_anim_neutral,
+                        playerStates[p].normalHitTargets, PLAYER_COMBO_FINISHER_KNOCKBACK_SPEED);
+                    areaPassed = areaPassed && charainfo[e].enemyHP == 1 &&
+                        charainfo[e].knockbackFrames == PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES;
+                    const VECTOR before = charainfo[e].pos;
+                    for (int tick = 0; tick < PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES; ++tick)
+                        UpdateEnemyKnockback(charainfo[e]);
+                    const VECTOR after = charainfo[e].pos;
+                    areaPassed = areaPassed && after.z > before.z && after.y == before.y &&
+                        (after.x - before.x) * before.x > 0 && charainfo[e].knockbackFrames == 0;
+                    UpdateEnemyKnockback(charainfo[e]);
+                    areaPassed = areaPassed && charainfo[e].pos.x == after.x && charainfo[e].pos.z == after.z;
+                    charainfo[e].pos = before;
+                }
+                // Heavy attacks retain their existing one-target behavior.
+                actor.isHit = false;
+                for (int e = 2; e <= 3; ++e) {
+                    charainfo[e].mode = STAND;
+                    charainfo[e].enemyHP = 3;
+                    CheckAttackHit(game, charainfo, &actor, &charainfo[e], start, end, -1, enemy_anim_neutral);
+                }
+                areaPassed = areaPassed && charainfo[2].enemyHP == 2 && charainfo[3].enemyHP == 3;
+            }
+            passed = passed && areaPassed;
+            if (report) fprintf(report, "normal area attack: both players, multiple targets, range, one hit per swing, combo reset, finisher knockback and unchanged heavy attack: %s\n", areaPassed ? "PASS" : "FAIL");
+            for (int frame = 0; frame < 240; ++frame) {
+                UpdateEffekseer3D();
+                for (int p = 0; p < PLAYER_COUNT; ++p) UpdatePlayerAnimationProgress(charainfo[p], playerStates[p], idleMotion);
+            }
 			DeleteEffekseerEffect(swordEffect);
 		}
 		passed = passed && swordPassed;
@@ -583,10 +638,18 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		CheckPlayerSpecialAttackHit(game, attacker, megaState, charainfo[2], -1, enemy_anim_neutral, 0, 2);
 		megaPassed = megaPassed && charainfo[2].enemyHP == 2;
 		megaState.specialAttackEffectFrame = 0;
+        attacker.mode = ATTACK;
 		for (int frame = 0; frame < PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT; ++frame) {
 			UpdateEffekseer3D();
-			UpdatePlayerAnimationProgress(attacker, megaState, idleMotion);
-		}
+            UpdatePlayerAnimationProgress(attacker, megaState, idleMotion);
+            if (frame == PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES - 2)
+                megaPassed = megaPassed && attacker.mode == ATTACK;
+            if (frame == PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES - 1) {
+                megaPassed = megaPassed && attacker.mode == STAND && megaState.isSpecialAttackEffectPlaying;
+                UpdatePlayerMovement(attacker, megaState, MOVE_SPEED, 0, runMotion);
+                megaPassed = megaPassed && attacker.mode == RUN && attacker.move.x == MOVE_SPEED;
+            }
+        }
 		megaPassed = megaPassed && !megaState.isSpecialAttackEffectPlaying && megaState.specialAttackPlayingHandle == -1 && !megaState.isSpecialAttack;
         attacker.mode = ATTACK;
         megaState.isSpecialAttack = true;
@@ -1207,7 +1270,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 
 			// ゲージ満タンかつボタンが押され、現在攻撃中やダウン中でない場合
-			if (spGraphHandles[i] >= SP_IMAGE_COUNT && spButton && !playerStates[i].prevSpecialAttackButton && charainfo[i].mode == STAND) {
+			if (spGraphHandles[i] >= SP_IMAGE_COUNT && spButton && !playerStates[i].prevSpecialAttackButton && charainfo[i].mode == STAND && !playerStates[i].isSpecialAttack) {
 				// 必殺技の発動処理 (既存の必殺技フラグ・アニメーションを設定)
 				PlayPlayerSpecialAttack(charainfo[i], playerStates[i], animSpecialAttack, SEattackHandle, specialAttackEffectResourceHandle[i]);
                 game.RecordSpecialAttack(i);
@@ -1944,6 +2007,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			UpdateWhirlwindPull(charainfo, playerStates, charainfo[e]);
         // Update floor height after pursuit, separation and suction.
         for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
+            UpdateEnemyKnockback(charainfo[e]);
             if (charainfo[e].mode != NONE) PlaceEnemyOnGround(charainfo[e]);
         }
 
@@ -1969,7 +2033,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; e++) {
 					// 生成されていない敵（NONE）はスキップ
 					if (playerStates[i].isSpecialAttack || charainfo[e].mode == NONE) continue;
-					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[e], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage);
+					CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[e], wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage,
+                        playerStates[i].isHeavyAttack ? nullptr : playerStates[i].normalHitTargets,
+                        !playerStates[i].isHeavyAttack && playerStates[i].attackIndex == PLAYER_ATTACK_ANIM_COUNT - 1
+                            ? PLAYER_COMBO_FINISHER_KNOCKBACK_SPEED : 0.0f);
 				}
 			}
 
@@ -2213,11 +2280,16 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 	return 0;
 }
 
-void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage) {
+void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage, bool* hitTargets, float knockbackSpeed) {
+    int targetIndex = -1;
+    if (hitTargets) {
+        targetIndex = static_cast<int>(target - charainfo);
+        if (targetIndex < 0 || targetIndex >= MAX_CHARA || hitTargets[targetIndex]) return;
+    }
 	// 攻撃中かつ、ターゲットがダウン中・ダメージ硬直中・すでにHPが0以下の場合は判定しない
 	if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
 	{
-		if (attacker->isHit == true) {
+		if (!hitTargets && attacker->isHit == true) {
 			return;
 		}
 
@@ -2228,6 +2300,7 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 			target->charahitinfo.Width / 2 + 30.0f))
 		{
 			attacker->isHit = true;
+            if (hitTargets) hitTargets[targetIndex] = true;
 
 			// SE再生
 			PlaySoundMem(SEdamageHandle, DX_PLAYTYPE_BACK);
@@ -2249,6 +2322,8 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
 				// ターゲットが敵の場合
 				if (target->enemyHP > 0) {
 					target->enemyHP--;
+                    if (knockbackSpeed > 0.0f && target->enemyHP > 0)
+                        StartEnemyKnockback(*attacker, *target, knockbackSpeed);
 
 					// 敵のHPが0以下になったら消滅させる
 					if (target->enemyHP <= 0) {

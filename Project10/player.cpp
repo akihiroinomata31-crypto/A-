@@ -284,6 +284,34 @@ void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int 
     StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation);
 }
 
+void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float speed) {
+    float dx = target.pos.x - attacker.pos.x;
+    float dz = target.pos.z - attacker.pos.z;
+    const float length = sqrtf(dx * dx + dz * dz);
+    if (length > 0.001f) {
+        dx /= length;
+        dz /= length;
+    } else {
+        const float yaw = DX_PI_F * 0.5f * attacker.direction;
+        dx = -sinf(yaw);
+        dz = -cosf(yaw);
+    }
+    target.knockbackVelocity = VGet(dx * speed, 0.0f, dz * speed);
+    target.knockbackFrames = PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES;
+}
+
+void UpdateEnemyKnockback(SCharaInfo& target) {
+    if (target.mode != DAMAGE || target.enemyHP <= 0) {
+        target.knockbackFrames = 0;
+        target.knockbackVelocity = VGet(0, 0, 0);
+        return;
+    }
+    if (target.knockbackFrames <= 0) return;
+    target.pos = VAdd(target.pos, target.knockbackVelocity);
+    target.knockbackVelocity = VScale(target.knockbackVelocity, 0.85f);
+    if (--target.knockbackFrames == 0) target.knockbackVelocity = VGet(0, 0, 0);
+}
+
 void ResetMove(SCharaInfo& chara) {
 	chara.move.x = 0.0f;
 	chara.move.y = 0.0f;
@@ -321,7 +349,16 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
     UpdateNormalAttackEffect(player, state);
 	UpdateHeavyAttackEffect(state);
 	UpdateSpecialAttackEffect(player, state);
-    // Restore control and animation together when the special effect ends.
+    // Release movement after one second while preserving the effect and damage.
+    if (state.isSpecialAttack && player.mode == ATTACK &&
+        state.specialAttackEffectFrame * PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL +
+            state.specialAttackEffectWait >= PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES) {
+        ResetMove(player);
+        state.movementAnimation = -1;
+        SetCharacterAnimation(player, animNeutral);
+        player.mode = STAND;
+    }
+    // Clear combat flags when the independent special effect ends.
     if (state.isSpecialAttack && !state.isSpecialAttackEffectPlaying) {
         state.isSpecialAttack = false;
         state.isHeavyAttack = false;
@@ -359,13 +396,14 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 	}
 
     // Keep the casting motion moving until its independent effect/hit timeline ends.
-    if (state.isSpecialAttack && state.isSpecialAttackEffectPlaying && player.anim_totaltime > 0.0f) {
+    if (player.mode == ATTACK && state.isSpecialAttack && state.isSpecialAttackEffectPlaying && player.anim_totaltime > 0.0f) {
         player.playtime = fmodf(player.playtime, player.anim_totaltime);
     }
     MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
 }
 
 void PlayPlayerNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
+    for (int i = 0; i < MAX_CHARA; ++i) state.normalHitTargets[i] = false;
 	StopNormalAttackEffect(state);
 	state.normalAttackPlayingHandle = PlayEffekseer3DEffect(state.normalAttackEffectResourceHandle);
 	state.isNormalAttackEffectPlaying = state.normalAttackPlayingHandle != -1;
@@ -507,13 +545,13 @@ void UpdatePlayerInput(
 	if (player.mode == STAND || player.mode == RUN) {
 		ResetMove(player);
 
-		if (specialAttackPressed) {
+		if (specialAttackPressed && !state.isSpecialAttack) {
 			StartPlayerSpecialAttack(player, state, animAttack, seAttackHandle, specialAttackEffectResourceHandle, animSpecialAttack);
 		}
-		else if (heavyAttackPressed) {
+		else if (heavyAttackPressed && !state.isSpecialAttack) {
 			StartPlayerAttack(player, state, animAttack, seAttackHandle, true, animHeavyAttack);
 		}
-		else if (attackPressed) {
+		else if (attackPressed && !state.isSpecialAttack) {
 			StartPlayerAttack(player, state, animAttack, seAttackHandle, false, animHeavyAttack);
 		}
 		else {

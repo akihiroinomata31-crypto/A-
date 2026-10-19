@@ -29,6 +29,8 @@ constexpr float PLAYER_WHIRLWIND_PULL_STOP_DISTANCE = 60.0f;
 constexpr float PLAYER_WHIRLWIND_PULL_HEIGHT = 160.0f;
 
 // SwordMega runs at 60 Hz; the last frames are visual recovery only.
+// One second at the fixed 60 Hz simulation rate.
+constexpr int PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES = 60;
 constexpr int PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT = 240;
 constexpr int PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL = 1;
 constexpr float PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION = 32.0f;
@@ -45,6 +47,10 @@ constexpr float PLAYER_BLOOD_LANCE_EFFECT_SCALE = 20.0f;
 constexpr float PLAYER_BLOOD_LANCE_EFFECT_SPEED = 2.0f;
 constexpr int PLAYER_BLOOD_LANCE_EFFECT_FRAMES = 195;
 
+constexpr float PLAYER_COMBO_FINISHER_KNOCKBACK_SPEED = 12.0f;
+constexpr int PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES = 12;
+void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float speed);
+void UpdateEnemyKnockback(SCharaInfo& target);
 const int MAX_HP = 6;
 // 1人分の入力設定。
 // キーボードとゲームパッド入力を、同じ処理で扱うためにまとめる。
@@ -91,6 +97,7 @@ struct PlayerRuntimeState {
 	bool isNormalAttackEffectPlaying = false;
 	bool isHeavyAttackEffectPlaying = false;
 	bool isSpecialAttackEffectPlaying = false;
+	bool normalHitTargets[MAX_CHARA] = {};
 	bool specialHitTargets[MAX_CHARA] = {};
 	bool moveInput = false;
 };
