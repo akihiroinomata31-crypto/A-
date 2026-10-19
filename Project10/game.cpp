@@ -1,6 +1,7 @@
 ﻿#include "game.h"
 #include "main.h"
 #include "player.h"
+#include "HudText.h"
 #include <math.h>
 #include <string.h>
 #include "../DXLib/DxLib.h"
@@ -15,10 +16,21 @@ int weaponBaseModel = -1;
 
 bool PlaceEnemyOnGround(SCharaInfo& enemy) {
     if (stagedata < 0) return false;
+    const float dx = enemy.pos.x - enemy.groundCachePosition.x;
+    const float dz = enemy.pos.z - enemy.groundCachePosition.z;
+    if (enemy.groundCacheValid && dx * dx + dz * dz < 64.0f && fabsf(enemy.pos.y - enemy.groundCachePosition.y) < 0.1f) {
+        enemy.pos.y = enemy.groundCachePosition.y;
+        enemy.move.y = 0;
+        enemy.charahitinfo.CenterPosition = enemy.pos;
+        if (enemy.model1 >= 0) MV1SetPosition(enemy.model1, enemy.pos);
+        return true;
+    }
     const auto hit = MV1CollCheck_Line(stagedata, -1,
         VGet(enemy.pos.x, 2000.0f, enemy.pos.z), VGet(enemy.pos.x, -1000.0f, enemy.pos.z));
-    if (!hit.HitFlag) return false;
+    if (!hit.HitFlag) { enemy.groundCacheValid = false; return false; }
     enemy.pos.y = hit.HitPosition.y;
+    enemy.groundCachePosition = enemy.pos;
+    enemy.groundCacheValid = true;
     enemy.move.y = 0.0f;
     enemy.charahitinfo.CenterPosition = enemy.pos;
     if (enemy.model1 >= 0) MV1SetPosition(enemy.model1, enemy.pos);
@@ -26,10 +38,9 @@ bool PlaceEnemyOnGround(SCharaInfo& enemy) {
 }
 
 void GameManager::Init() {
-    mainTimer = 100 * 120; // 120FPS基準
-
+    mainTimer = 100 * 60; // 60 Hz simulation
     bossCutsceneTimer = 0;
-  int  bossCameraTriggered = false; // 初期化
+    bossCutsceneDone = false;
     goblinSpawnTimer = 0;
     redSpawnTimer = 0;
     p1Score = 0;
@@ -56,10 +67,10 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     }
     else if (gameState == 0) {
         // ① スコア比較
-        if (p1Score > p2Score) {
+        if (FinalScore(0) > FinalScore(1)) {
             gameState = 1;
         }
-        else if (p2Score > p1Score) {
+        else if (FinalScore(1) > FinalScore(0)) {
             gameState = 2;
         }
         else {
@@ -126,7 +137,7 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     // ==========================================
     // 3. 残り75秒以下でゴーレム（ボス）を1体出現
     // ==========================================
-    int seconds = mainTimer / 120;
+    int seconds = mainTimer / 60;
     if (seconds <= 75 && gameState == 0) {
         if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
             enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 30.0f, -150.0f);
@@ -187,10 +198,8 @@ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
                 baseFloorY = LineRes.HitPosition.y;
             }
 
-            // --------------------------------------------------------
-            // パラメータ初期化
-            // --------------------------------------------------------
             enemyList[i].pos.y = baseFloorY;
+            enemyList[i].groundCacheValid = false;
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 6;
             enemyList[i].playtime = (float)GetRand(30) * 0.1f; // 全員が完全に同じタイミングで動かないよう再生位置を少しバラす
@@ -228,6 +237,11 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
     for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
         if (i == TEST_ENEMY_GOLEM) continue;
         if (enemyList[i].mode == NONE) {
+            if (enemyList[i].model1 < 0 && enemyBaseModel >= 0) enemyList[i].model1 = MV1DuplicateModel(enemyBaseModel);
+            if (enemyList[i].model1 < 0) continue;
+            enemyList[i].currentAnimType = 1;
+            enemyList[i].enemyWalking = false;
+            enemyList[i].invincibleTimer = 0;
             enemyList[i].pos = VGet(x, 0.0f, z);
 
             VECTOR cal_pos1 = VGet(enemyList[i].pos.x, 2000.0f, enemyList[i].pos.z);
@@ -240,6 +254,7 @@ void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
             }
 
             enemyList[i].pos.y = baseFloorY;
+            enemyList[i].groundCacheValid = false;
             enemyList[i].mode = STAND;
             enemyList[i].enemyHP = 2;
             enemyList[i].playtime = 0.0f;
@@ -269,23 +284,25 @@ void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
 }
 
 void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle, int pvpIconHandle, bool isPvPActive, int pvpCooldown) {
+    HudText hud;
     int xOffset = (pIdx == 0) ? 0 : sw / 2;
     int halfW = sw / 2;
-    SetFontSize(20);
+    hud.SetSize(20);
 
     // 決着テキスト
     if (gameState != 0) {
-        SetFontSize(60);
+        hud.SetSize(60);
         int color = GetColor(255, 255, 0);
-        if (gameState == 1)      DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
-        else if (gameState == 2) DrawString(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
-        SetFontSize(20);
+        if (gameState == 1)      hud.Draw(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
+        else if (gameState == 2) hud.Draw(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
+        else                     hud.Draw(xOffset + 100, sh / 2 - 30, "DRAW", color);
+        hud.SetSize(20);
     }
 
     // 画面左上：プレイヤー名 ＆ HPバー
     int startY = 20;
     unsigned int pColor = (pIdx == 0) ? GetColor(100, 200, 255) : GetColor(255, 150, 100);
-    DrawFormatString(xOffset + 20, startY, pColor, " PLAYER %d ", pIdx + 1);
+    hud.Format(xOffset + 20, startY, pColor, " PLAYER %d ", pIdx + 1);
 
     int frameDrawW = 300;
     int frameDrawH = 24;
@@ -319,14 +336,15 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
 
     int currentDeaths = (pIdx == 0) ? deathCount[0] : deathCount[1];
     int infoY = drawY + 32;
+    hud.Format(xOffset + 20, infoY, GetColor(255, 100, 200), "DEATHS: %d", currentDeaths);
 
     // 残り15秒以下のフィーバー表示
-    int seconds = mainTimer / 120;
+    int seconds = mainTimer / 60;
     if (gameState == 0 && seconds <= 15 && seconds > 0) {
         int feverColor = ((mainTimer / 15) % 2 == 0) ? GetColor(255, 50, 50) : GetColor(255, 220, 0);
-        SetFontSize(16);
-        DrawString(xOffset + frameDrawW + 30, startY + 4, "FEVER! x2", feverColor);
-        SetFontSize(20);
+        hud.SetSize(16);
+        hud.Draw(xOffset + frameDrawW + 30, startY + 4, "FEVER! x2", feverColor);
+        hud.SetSize(20);
     }
 
     // ========================================================
@@ -335,7 +353,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     const int iconSize = 60;
     const int iconX = xOffset + 25;
     const int iconY = sh - 75;
-    const int maxCooldownFrames = 120 * 3; // 3秒間
+    const int maxCooldownFrames = 60 * 3; // 3秒間
 
     if (pvpIconHandle != -1) {
         DrawExtendGraph(iconX, iconY, iconX + iconSize, iconY + iconSize, pvpIconHandle, TRUE);
@@ -355,7 +373,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     }
     // 2. 攻撃命中後の3秒クールダウン中（暗転マスク ＋ カウントダウン数字）
     else if (pvpCooldown > 0) {
-        float remainSec = (float)pvpCooldown / 120.0f;
+        float remainSec = (float)pvpCooldown / 60.0f;
         float cdRate = (float)pvpCooldown / (float)maxCooldownFrames;
 
         // 暗い半透明マスクで暗転
@@ -398,7 +416,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         scoreTextW = GetDrawStringWidthToHandle(scoreStr, (int)strlen(scoreStr), fontScore);
     }
     else {
-        scoreTextW = GetDrawStringWidth(scoreStr, (int)strlen(scoreStr));
+        scoreTextW = hud.Width(scoreStr, (int)strlen(scoreStr));
     }
 
     // 1Pはアイコンの右隣、2Pは右端揃え
@@ -409,9 +427,9 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         DrawStringToHandle(scoreX, scoreY, scoreStr, GetColor(0, 0, 0), fontScore, GetColor(255, 255, 255));
     }
     else {
-        SetFontSize(24);
-        DrawString(scoreX, scoreY, scoreStr, GetColor(0, 0, 0));
-        SetFontSize(20);
+        hud.SetSize(24);
+        hud.Draw(scoreX, scoreY, scoreStr, GetColor(0, 0, 0));
+        hud.SetSize(20);
     }
 
     // クラウン表示
@@ -437,34 +455,31 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
                 alpha = (popups[i].timer * 255) / 20;
             }
             SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
-            SetFontSize(22);
+            hud.SetSize(22);
 
             if (gameState == 0 && seconds <= 30 && seconds > 0) {
-                DrawFormatString(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+?");
+                hud.Format(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+?");
             }
             else {
                 if (popups[i].score > 0) {
-                    DrawFormatString(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+%d", popups[i].score);
+                    hud.Format(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+%d", popups[i].score);
                 }
                 else {
-                    DrawFormatString(popupBaseX, popupBaseY, GetColor(255, 0, 0), "%d", popups[i].score);
+                    hud.Format(popupBaseX, popupBaseY, GetColor(255, 0, 0), "%d", popups[i].score);
                 }
             }
 
-            SetFontSize(20);
+            hud.SetSize(20);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-            popups[i].offsetY += 0.5f;
-            popups[i].timer--;
-            if (popups[i].timer <= 0) {
-                popups[i].active = false;
-            }
+
         }
     }
 }
 
 void GameManager::DrawTimer(int sw, int sh) {
-    int seconds = mainTimer / 120;
+    HudText hud;
+    int seconds = mainTimer / 60;
     if (seconds > 200) seconds = 200;
     if (seconds < 0)   seconds = 0;
 
@@ -479,7 +494,7 @@ void GameManager::DrawTimer(int sw, int sh) {
         timerColor = GetColor(255, 255, 0);
     }
 
-    SetFontSize(30);
+    hud.SetSize(30);
 
     char timerStr[32];
     if (seconds > 0) {
@@ -489,12 +504,12 @@ void GameManager::DrawTimer(int sw, int sh) {
         sprintf_s(timerStr, "FINISH!");
     }
 
-    int textWidth = GetDrawStringWidth(timerStr, (int)strlen(timerStr));
+    int textWidth = hud.Width(timerStr, (int)strlen(timerStr));
     int drawX = sw / 2 - textWidth / 2;
     int drawY = 15;
 
-    DrawString(drawX, drawY, timerStr, timerColor);
-    SetFontSize(20);
+    hud.Draw(drawX, drawY, timerStr, timerColor);
+    hud.SetSize(20);
 }
 
 void GameManager::AddScore(int playerIndex, int score) {
@@ -742,6 +757,7 @@ void DrawGameMenu(bool results, const GameManager& game, int selected, const TCH
 
 void GameManager::DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, int frameGraphHandle) {
     if (maxGauge <= 0) return;
+    HudText hud;
 
     // HPバーの真下に配置
     int drawX = startX + 20;
@@ -935,4 +951,12 @@ void GameManager::DrawLoadingScreen() {
     SetFontSize(20);
     ScreenFlip();
     ProcessMessage();
+}
+
+void GameManager::UpdateVisualTimers() {
+    for (auto& popup : popups) {
+        if (!popup.active) continue;
+        popup.offsetY += 0.5f;
+        if (--popup.timer <= 0) popup.active = false;
+    }
 }

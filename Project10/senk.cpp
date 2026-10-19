@@ -14,7 +14,7 @@ namespace {
     const int RESPAWN_POINT_COUNT = sizeof(RESPAWN_POINTS) / sizeof(RESPAWN_POINTS[0]);
 
     // 無敵時間のフレーム数（120FPS基準で1秒間）
-    const int INVINCIBLE_FRAMES = 120;
+    const int INVINCIBLE_FRAMES = 60;
 }
 
 // ランダムなリスポーン座標を取得

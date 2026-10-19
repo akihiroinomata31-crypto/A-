@@ -14,7 +14,7 @@ constexpr int TEST_ENEMY_RED = 700;
 // Temporary new-character trial; false restores the original asset set.
 constexpr bool PLAYER_USE_NEW_MODEL = true;
 constexpr float PLAYER_MODEL_SCALE = 1.1f;
-constexpr float PLAYER_NORMAL_ATTACK_EFFCT_MAGNIFICATION = 40.0f;
+constexpr float PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION = 40.0f;
 constexpr float PLAYER_NORMAL_ATTACK_EFFECT_PLAYBACK_SPEED = 2.0f / 3.0f;
 constexpr int PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT = 60;
 constexpr int PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT = 8;
@@ -29,6 +29,8 @@ constexpr float PLAYER_WHIRLWIND_PULL_STOP_DISTANCE = 60.0f;
 constexpr float PLAYER_WHIRLWIND_PULL_HEIGHT = 160.0f;
 
 // SwordMega runs at 60 Hz; the last frames are visual recovery only.
+// One second at the fixed 60 Hz simulation rate.
+constexpr int PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES = 60;
 constexpr int PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT = 240;
 constexpr int PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL = 1;
 constexpr float PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION = 32.0f;
@@ -41,7 +43,14 @@ constexpr int PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME = 165;
 constexpr float PLAYER_SPECIAL_ATTACK_MAX_RADIUS = 336.0f;
 // 現在のテスト用HPでは通常攻撃1回を1としているため、必殺技300は2ダメージに換算する。
 constexpr int PLAYER_SPECIAL_ATTACK_DAMAGE = 2;
+constexpr float PLAYER_BLOOD_LANCE_EFFECT_SCALE = 20.0f;
+constexpr float PLAYER_BLOOD_LANCE_EFFECT_SPEED = 2.0f;
+constexpr int PLAYER_BLOOD_LANCE_EFFECT_FRAMES = 195;
 
+constexpr float PLAYER_COMBO_FINISHER_KNOCKBACK_SPEED = 12.0f;
+constexpr int PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES = 12;
+void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float speed);
+void UpdateEnemyKnockback(SCharaInfo& target);
 const int MAX_HP = 6;
 // 1人分の入力設定。
 // キーボードとゲームパッド入力を、同じ処理で扱うためにまとめる。
@@ -64,6 +73,7 @@ struct PlayerInputConfig {
 // 1人分の操作中状態。
 // 連撃予約や攻撃ボタンの押した瞬間判定をプレイヤー別に持つ。
 struct PlayerRuntimeState {
+    bool bloodLanceSpecial = false;
 	int movementAnimation = -1;
 	int motionRootFrame = -1;
 	float motionRootX = 0.0f;
@@ -87,6 +97,7 @@ struct PlayerRuntimeState {
 	bool isNormalAttackEffectPlaying = false;
 	bool isHeavyAttackEffectPlaying = false;
 	bool isSpecialAttackEffectPlaying = false;
+	bool normalHitTargets[MAX_CHARA] = {};
 	bool specialHitTargets[MAX_CHARA] = {};
 	bool moveInput = false;
 };
@@ -159,3 +170,5 @@ void UpdateEnemyLocomotionAnimation(SCharaInfo& enemy, bool moving);
 int ReadPlayerPadState(int padType);
 
 void CancelPlayerCombat(PlayerRuntimeState& state);
+
+void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect);

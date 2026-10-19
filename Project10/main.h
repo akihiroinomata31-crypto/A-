@@ -63,6 +63,8 @@ struct SCharaInfo
 {
     SCharaInfo() : angle(0.0f), anim_time(0.0f), HP(0), isHit(false), model1(-1) {}
     int invincibleTimer = 0; // 無敵時間カウンター（フレーム数）
+    VECTOR knockbackVelocity = {};
+    int knockbackFrames = 0;
     int model1;
     int timeLimit = 1000;    // ゲーム制限時間など
     int spawnTimer = 0;      // スポーンカウント用
@@ -78,6 +80,8 @@ struct SCharaInfo
     int enemyIdleAnimation = -1;
     int enemyWalkAnimation = -1;
     bool enemyWalking = false;
+    bool groundCacheValid = false;
+    VECTOR groundCachePosition = {};
     int HP;
     float angle;
     bool isHit;
@@ -105,7 +109,9 @@ extern void CheckAttackHit(
     VECTOR start,
     VECTOR end,
     int SEdamageHandle,
-    int anim_damage
+    int anim_damage,
+    bool* hitTargets = nullptr,
+    float knockbackSpeed = 0.0f
 );
 
 extern void DrawCrownIcon(int pIdx, int xOffset, int startY, int p1Score, int p2Score, int crownGraphHandle);
