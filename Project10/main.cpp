@@ -13,6 +13,43 @@
 #include "senk.h"
 void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
 
+// Alpha fades from the center to the edge of a ground-aligned disk.
+static void DrawPlayerGroundShadow(const MV1_COLL_RESULT_POLY& ground, float height) {
+    if (!ground.HitFlag || ground.Normal.y < 0.35f || height > 600.0f) return;
+    const float fade = 1.0f - fmaxf(0.0f, height) / 600.0f;
+    const float radius = 55.0f + fmaxf(0.0f, height) * 0.035f;
+    const VECTOR center = VAdd(ground.HitPosition, VScale(ground.Normal, 0.6f));
+    const VECTOR tangent = VNorm(VCross(VGet(0, 0, 1), ground.Normal));
+    const VECTOR bitangent = VCross(ground.Normal, tangent);
+    constexpr int segments = 40;
+    VERTEX3D vertices[segments * 3] = {};
+    for (int i = 0; i < segments; ++i) {
+        vertices[i * 3].pos = center;
+        vertices[i * 3].norm = ground.Normal;
+        vertices[i * 3].dif = GetColorU8(0, 0, 0, (int)(170.0f * fade));
+        for (int edge = 0; edge < 2; ++edge) {
+            const float angle = (i + edge) * (6.283185307f / segments);
+            auto& vertex = vertices[i * 3 + edge + 1];
+            vertex.pos = VAdd(center, VAdd(VScale(tangent, cosf(angle) * radius),
+                VScale(bitangent, sinf(angle) * radius)));
+            vertex.norm = ground.Normal;
+            vertex.dif = GetColorU8(0, 0, 0, 0);
+        }
+    }
+    int blendMode, blendParam;
+    GetDrawBlendMode(&blendMode, &blendParam);
+    const int culling = GetUseBackCulling();
+    SetUseBackCulling(DX_CULLING_NONE);
+    SetUseLighting(FALSE);
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 255);
+    SetUseZBuffer3D(TRUE);
+    DrawPolygon3D(vertices, segments, DX_NONE_GRAPH, TRUE);
+    SetUseZBuffer3D(FALSE);
+    SetUseBackCulling(culling);
+    SetUseLighting(TRUE);
+    SetDrawBlendMode(blendMode, blendParam);
+}
+
 static int playerDamageAnimation = -1;
 
 struct GameRuntimeCleanup {
@@ -135,7 +172,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     const bool uiSmoke = strstr(lpC, "--ui-smoke") != nullptr;
 	const bool performanceSmoke = strstr(lpC, "--performance-smoke") != nullptr;
     const bool longPerformance = strstr(lpC, "--performance-smoke-long") != nullptr;
-	const bool gameSmoke = performanceSmoke || uiSmoke || deathSmoke || mergeSmoke || strstr(lpC, "--game-smoke") != nullptr;
+    const bool shadowSmoke = strstr(lpC, "--shadow-smoke") != nullptr;
+	const bool gameSmoke = shadowSmoke || performanceSmoke || uiSmoke || deathSmoke || mergeSmoke || strstr(lpC, "--game-smoke") != nullptr;
     bool mergeAimPassed = false, mergeThrowPassed = false, mergeStunPassed = false;
     int smokeFrames = 0;
     int rootflm;
@@ -1981,6 +2019,15 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         } // fixed simulation steps; render the latest state once
 		renderStart = GetNowHiPerformanceCount();
         ClearDrawScreen();
+        // Resolve ground once per frame, then reuse it in both viewports.
+        MV1_COLL_RESULT_POLY playerShadowGround[PLAYER_COUNT] = {};
+        for (int i = 0; i < PLAYER_COUNT; ++i) {
+            if (charainfo[i].mode == NONE || charainfo[i].model1 == -1) continue;
+            const VECTOR position = charainfo[i].pos;
+            playerShadowGround[i] = MV1CollCheck_Line(stagedata, -1,
+                VAdd(position, VGet(0, 30, 0)), VAdd(position, VGet(0, -650, 0)));
+        }
+
 
         DrawBox(0, 0, 900, 600, GetColor(255, 255, 255), true);
 
@@ -2050,6 +2097,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
             MV1DrawModel(stagedata);
             MV1DrawModel(sky);
+            for (int i = 0; i < PLAYER_COUNT; ++i) {
+                DrawPlayerGroundShadow(playerShadowGround[i],
+                    charainfo[i].pos.y - playerShadowGround[i].HitPosition.y);
+            }
             worldDrawMs += (GetNowHiPerformanceCount() - worldStart) / 1000.0;
             ++worldDraws;
 
@@ -2155,7 +2206,18 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 			if (isAiming[0]) mergeAimPassed = true;
 			if (thrownFlashes[0].active && flashStock[0] == 0) mergeThrowPassed = true;
 		}
-        game.DrawTimer(900, 600);
+		game.DrawTimer(900, 600);
+        if (shadowSmoke && smokeFrames == 60) {
+            SaveDrawScreenToPNG(0, 0, 900, 600, "..\\work\\shadow-preview.png");
+            FILE* shadowReport = nullptr;
+            fopen_s(&shadowReport, "..\\work\\shadow-report.txt", "w");
+            for (int i = 0; shadowReport && i < PLAYER_COUNT; ++i) {
+                const auto& hit = playerShadowGround[i];
+                fprintf(shadowReport, "player=%d hit=%d normalY=%f playerY=%f groundY=%f\n",
+                    i, hit.HitFlag, hit.Normal.y, charainfo[i].pos.y, hit.HitPosition.y);
+            }
+            if (shadowReport) fclose(shadowReport);
+        }
         if (performanceSmoke && strstr(lpC, "--performance-smoke-slow")) WaitTimer(33);
         presentStart = GetNowHiPerformanceCount();
         ScreenFlip();

@@ -1,4 +1,16 @@
 @echo off
+setlocal
+set "MSBUILD=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\MSBuild.exe"
+if not exist "%MSBUILD%" (
+  echo MSBuild was not found. Install Visual Studio 2019 C++ build tools.
+  pause
+  exit /b 1
+)
+"%MSBUILD%" "%~dp0Project10\Project10.vcxproj" /p:Configuration=Release /p:Platform=Win32 /p:SolutionDir="%~dp0.\\" /p:OutDir="%~dp0work\main-build\bin\" /p:IntDir="%~dp0work\main-build\obj\" /m /v:minimal /nologo
+if errorlevel 1 (
+  pause
+  exit /b 1
+)
 pushd "%~dp0Project10"
-"%LOCALAPPDATA%\Project10Build\{f9d0e728-0207-4537-98d8-8f2711cd7427}\bin\Win32\Release\Project10.exe"
+"%~dp0work\main-build\bin\Project10.exe" %*
 popd
