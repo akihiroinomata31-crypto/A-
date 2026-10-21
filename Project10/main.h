@@ -11,7 +11,7 @@
 #define CHARA_ENUM_DEFAULT_SIZE     200.0f      // 周囲のポリゴン検出に使用する球の初期サイズ
 #define CHARA_MAX_HITCOLL           2048        // 処理するコリジョンポリゴンの最大数
 
-#define MOVE_SPEED                  3.0f
+#define MOVE_SPEED                  5.0f
 #define GRAVITY                     0.5f
 
 #define SOUND_DIRECTORY_PATH "..\\Data\\Sound\\"

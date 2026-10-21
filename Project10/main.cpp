@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <vector>
 #include "main.h"
 #include "game.h"
 #include "player.h"
@@ -50,6 +51,58 @@ static void DrawPlayerGroundShadow(const MV1_COLL_RESULT_POLY& ground, float hei
     SetDrawBlendMode(blendMode, blendParam);
 }
 
+// Use the existing arena floor triangles, preserving its circular silhouette and collision.
+struct ArenaStoneFloor {
+    int texture = -1;
+    std::vector<VERTEX3D> vertices;
+    void Initialize(int stage, VECTOR origin) {
+        const auto hit = MV1CollCheck_Line(stage, -1,
+            VAdd(origin, VGet(0, 10000, 0)), VAdd(origin, VGet(0, -10000, 0)));
+        if (!hit.HitFlag) return;
+        texture = LoadGraph("..\\Data\\Stage\\PavingStones036_Color.jpg");
+        if (texture == -1) return;
+        const auto mesh = MV1GetReferenceMesh(stage, -1, TRUE);
+        // One seamless texture tile spans 600 world units, rather than the whole arena.
+        constexpr float tileSize = 600.0f;
+        for (int i = 0; i < mesh.PolygonNum; ++i) {
+            const auto& polygon = mesh.Polygons[i];
+            VECTOR p[3];
+            bool floor = true;
+            for (int j = 0; j < 3; ++j) {
+                p[j] = mesh.Vertexs[polygon.VIndex[j]].Position;
+                if (fabsf(p[j].y - hit.HitPosition.y) > 1.0f) floor = false;
+            }
+            if (!floor) continue;
+            for (int j = 0; j < 3; ++j) {
+                VERTEX3D v = {};
+                v.pos = VAdd(p[j], VGet(0, 0.15f, 0));
+                v.norm = VGet(0, 1, 0);
+                v.dif = GetColorU8(255, 255, 255, 255);
+                v.u = (p[j].x - origin.x) / tileSize;
+                v.v = (p[j].z - origin.z) / tileSize;
+                vertices.push_back(v);
+            }
+        }
+        MV1TerminateReferenceMesh(stage, -1, TRUE);
+    }
+    ~ArenaStoneFloor() { if (texture != -1) DeleteGraph(texture); }
+    void Draw() const {
+        if (texture == -1 || vertices.empty()) return;
+        const int culling = GetUseBackCulling();
+        const int drawMode = GetDrawMode();
+        SetUseBackCulling(DX_CULLING_NONE);
+        SetUseZBuffer3D(TRUE);
+        SetWriteZBuffer3D(TRUE);
+        SetTextureAddressMode(DX_TEXADDRESS_WRAP);
+        SetDrawMode(DX_DRAWMODE_BILINEAR);
+        DrawPolygon3D(vertices.data(), (int)vertices.size() / 3, texture, FALSE);
+        SetDrawMode(drawMode);
+        SetTextureAddressMode(DX_TEXADDRESS_CLAMP);
+        SetWriteZBuffer3D(FALSE);
+        SetUseZBuffer3D(FALSE);
+        SetUseBackCulling(culling);
+    }
+};
 static int playerDamageAnimation = -1;
 
 struct GameRuntimeCleanup {
@@ -889,6 +942,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     MV1SetPosition(sky, VGet(0, -1000, 0));
 
     MV1SetupCollInfo(stagedata, -1);
+    ArenaStoneFloor arenaStoneFloor;
+    arenaStoneFloor.Initialize(stagedata, stagepos);
 
     if (grenadeBaseModel == -1) {
         grenadeBaseModel = MV1LoadModel("..\\Data\\Weapon\\Senkou.mv1");
@@ -1116,6 +1171,58 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
         flashSpawnTimer = 0;
     };
+    if (strstr(lpC, "--boss-smoke")) {
+        resetMatch();
+        game.mainTimer = 75 * 60 + 1;
+        game.Update(charainfo, charainfo);
+        auto& boss = charainfo[TEST_ENEMY_GOLEM];
+        auto& attacker = charainfo[PLAYER1_INDEX];
+        const bool spawned = boss.mode == STAND && boss.enemyHP == 20;
+        const VECTOR hitStart = VAdd(boss.pos, VGet(0, 40, 0));
+        const VECTOR hitEnd = VAdd(hitStart, VGet(0, 0, 20));
+        attacker.pos = VAdd(boss.pos, VGet(0, 0, 60));
+        for (int hit = 0; hit < 20; ++hit) {
+            boss.mode = STAND; // Advance past the damage reaction between separate swings.
+            attacker.mode = ATTACK;
+            attacker.isHit = false;
+            CheckAttackHit(game, charainfo, &attacker, &boss, hitStart, hitEnd,
+                -1, boss.enemyIdleAnimation);
+        }
+        const bool killed = boss.enemyHP == 0 && boss.mode == NONE &&
+            game.killCount[0] == 1 && game.p1Score == 500;
+        for (int tick = 0; tick < 120; ++tick) game.Update(charainfo, charainfo);
+        const bool staysDead = boss.enemyHP == 0 && boss.mode == NONE &&
+            !MV1GetVisible(boss.model1);
+        resetMatch();
+        game.mainTimer = 75 * 60 + 1;
+        game.Update(charainfo, charainfo);
+        const bool nextMatch = boss.mode == STAND && boss.enemyHP == 20 &&
+            game.IsBossCutsceneActive();
+        // Also verify that a lethal special attack uses the same no-respawn rule.
+        boss.enemyHP = PLAYER_SPECIAL_ATTACK_DAMAGE;
+        attacker.pos = boss.pos;
+        attacker.direction = Direction::UP;
+        auto& state = playerStates[0];
+        state.isSpecialAttack = true;
+        state.isSpecialAttackEffectPlaying = true;
+        state.specialAttackEffectFrame = PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME;
+        CheckPlayerSpecialAttackHit(game, attacker, state, boss, -1,
+            boss.enemyIdleAnimation, 0, TEST_ENEMY_GOLEM);
+        const bool specialKilled = boss.enemyHP == 0 && boss.mode == NONE;
+        for (int tick = 0; tick < 120; ++tick) game.Update(charainfo, charainfo);
+        const bool specialStaysDead = boss.enemyHP == 0 && boss.mode == NONE;
+        const bool passed = spawned && killed && staysDead && nextMatch &&
+            specialKilled && specialStaysDead;
+        FILE* report = nullptr;
+        fopen_s(&report, "..\\work\\boss-smoke.txt", "w");
+        if (report) {
+            fprintf(report, "spawn=%d normalKill=%d staysDead=%d nextMatch=%d specialKill=%d specialStaysDead=%d %s\n",
+                spawned, killed, staysDead, nextMatch, specialKilled, specialStaysDead,
+                passed ? "PASS" : "FAIL");
+            fclose(report);
+        }
+        return passed ? 0 : 1;
+    }
     while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0 && (!gameSmoke || (performanceSmoke ? simulationTicks < (longPerformance ? 1800 : 720) : smokeFrames++ < (uiSmoke ? 180 : (deathSmoke ? 1800 : (mergeSmoke ? 520 : 360)))))) {
         if (uiSmoke && screen == Screen::Playing && smokeFrames == 60) game.mainTimer = 1;
         if (screen == Screen::Playing && game.gameState != 0) {
@@ -2096,6 +2203,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             }
 
             MV1DrawModel(stagedata);
+            arenaStoneFloor.Draw();
             MV1DrawModel(sky);
             for (int i = 0; i < PLAYER_COUNT; ++i) {
                 DrawPlayerGroundShadow(playerShadowGround[i],

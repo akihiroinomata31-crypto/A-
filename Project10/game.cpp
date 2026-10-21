@@ -41,6 +41,7 @@ void GameManager::Init() {
     mainTimer = 100 * 60; // 60 Hz simulation
     bossCutsceneTimer = 0;
     bossCutsceneDone = false;
+    bossSpawned = false;
     goblinSpawnTimer = 0;
     redSpawnTimer = 0;
     p1Score = 0;
@@ -139,7 +140,8 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     // ==========================================
     int seconds = mainTimer / 60;
     if (seconds <= 75 && gameState == 0) {
-        if (enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
+        if (!bossSpawned && enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
+            bossSpawned = true;
             enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 30.0f, -150.0f);
             enemyList[TEST_ENEMY_GOLEM].mode = STAND;
             enemyList[TEST_ENEMY_GOLEM].enemyHP = 20; // ボスHP

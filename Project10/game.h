@@ -84,6 +84,9 @@ public:
         specialUseCount[1] = 0;
         goblinSpawnTimer = 0;
         redSpawnTimer = 0;
+        bossSpawned = false;
+        bossCutsceneTimer = 0;
+        bossCutsceneDone = false;
         for (int i = 0; i < 20; i++) {
             popups[i].active = false;
         }
@@ -129,6 +132,7 @@ public:
    // ★ 1.5秒演出用（120FPS基準で180フレーム、60FPS基準なら90に調整）
     static const int BOSS_CUTSCENE_TOTAL_FRAMES = 90;
     int bossCutsceneTimer;
+    bool bossSpawned = false; // One boss per match, including after defeat.
     bool bossCutsceneDone; // ★ 1回演出したら二度と再起動しないフラグ
     static void DrawLoadingScreen();
     // 演出判定用ゲッター
