@@ -280,6 +280,25 @@ void ApplyAttackStepMove(SCharaInfo& player, PlayerRuntimeState& state, const Pl
 
 } // namespace
 
+bool CanPlayerStartSkill(const SCharaInfo& player, const PlayerRuntimeState& state) {
+    if (state.isSpecialAttack || state.isHeavyAttack || state.isSpecialAttackEffectPlaying) return false;
+    return player.mode == STAND || player.mode == RUN || player.mode == ATTACK || player.mode == ATTACKOUT;
+}
+
+bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& state,
+    bool specialPressed, bool whirlwindPressed, const int animations[],
+    int whirlwindAnimation, int specialAnimation, int sound, int effect) {
+    if ((player.mode != ATTACK && player.mode != ATTACKOUT) ||
+        !CanPlayerStartSkill(player, state) || (!specialPressed && !whirlwindPressed)) return false;
+    ResetMove(player);
+    for (int i = 0; i < MAX_CHARA; ++i) state.normalHitTargets[i] = false;
+    if (specialPressed)
+        StartPlayerSpecialAttack(player, state, animations, sound, effect, specialAnimation);
+    else
+        StartPlayerAttack(player, state, animations, sound, true, whirlwindAnimation);
+    return true;
+}
+
 void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect) {
     StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation);
 }
@@ -408,7 +427,7 @@ void PlayPlayerNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& 
 	state.normalAttackPlayingHandle = PlayEffekseer3DEffect(state.normalAttackEffectResourceHandle);
 	state.isNormalAttackEffectPlaying = state.normalAttackPlayingHandle != -1;
 	if (state.isNormalAttackEffectPlaying) {
-		SetSpeedPlayingEffekseer3DEffect(state.normalAttackPlayingHandle, PLAYER_NORMAL_ATTACK_EFFECT_PLAYBACK_SPEED);
+		SetSpeedPlayingEffekseer3DEffect(state.normalAttackPlayingHandle, state.normalAttackEffectPlaybackSpeed);
 		PositionNormalAttackEffect(player, state);
 	}
 }
@@ -483,7 +502,8 @@ void CheckPlayerSpecialAttackHit(
 	if (distanceX * distanceX + distanceZ * distanceZ > hitDistance * hitDistance) return;
 	// Each target takes damage once per cast.
 	state.specialHitTargets[targetIndex] = true;
-	SetCharacterAnimation(target, animDamage);
+	SetCharacterAnimation(target, target.enemyDamageAnimation >= 0 ? target.enemyDamageAnimation : animDamage);
+    target.hurtRecoveryTicks = 0;
 	target.mode = DAMAGE;
 	PlaySoundMem(seDamageHandle, DX_PLAYTYPE_BACK);
 
@@ -541,6 +561,9 @@ void UpdatePlayerInput(
 		state.prevSpecialAttackButton = 0;
 		state.prevJumpButton = 0;
 	}
+
+    TryInterruptPlayerNormalAttack(player, state, specialAttackPressed, heavyAttackPressed,
+        animAttack, animHeavyAttack, animSpecialAttack, seAttackHandle, specialAttackEffectResourceHandle);
 
 	if (player.mode == STAND || player.mode == RUN) {
 		ResetMove(player);
@@ -635,7 +658,10 @@ void UpdatePlayerAttackState(
 		}
 	}
 
-	if (player.playtime >= (PLAYER_USE_NEW_MODEL && state.isHeavyAttack ? player.anim_totaltime : attackEndTime[state.attackIndex])) {
+    // Allow a buffered combo to chain during the recovery portion.
+    const float endTime = PLAYER_USE_NEW_MODEL && state.isHeavyAttack ? player.anim_totaltime : attackEndTime[state.attackIndex];
+    const float chainTime = !state.isHeavyAttack && state.isAttackBuffered ? endTime * 0.78f : endTime;
+	if (player.playtime >= chainTime) {
 		if (state.isHeavyAttack) {
 			// 重攻撃は単発で終了させる。
 			state.isAttackBuffered = false;

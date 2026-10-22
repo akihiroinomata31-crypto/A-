@@ -211,6 +211,7 @@ bool SetGameResourceDirectory() {
 
 
 int normalAttackEffectResourceHandle = -1;
+static int player1MoonAttackEffectResourceHandle = -1;
 
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
@@ -291,7 +292,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     int BGMLoopStartPosition = -1;
 
     char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";
-    char NormalAttackEffect_FilePath[] = "Sword2.efkefc";
+    char NormalAttackEffect_FilePath[] = "MoonFullMoon\\SwordGlowMoonFullMoonFree.efkefc";
     char HeavyAttackEffect_FilePath[] = "重攻撃.png";
     char SpecialAttackEffect_FilePath[] = "swordMega.efkefc";
     int SEattackHandle, SEjumpHandle, SEdamageHandle;
@@ -591,10 +592,32 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             scoreRules.deathCount[0] == 0 && scoreRules.specialUseCount[0] == 0 && scoreRules.specialUseCount[1] == 0;
         passed = passed && scorePassed;
         if (report) fprintf(report, "score rules: unchanged live scores, no penalty popup, settlement deductions, net winner and reset: %s\n", scorePassed ? "PASS" : "FAIL");
-        int swordEffect = LoadEffekseerEffect("..\\Data\\Effect\\Sword2.efkefc", PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION);
-		bool swordPassed = swordEffect >= 0;
+        int swordEffect = LoadEffekseerEffect("..\\Data\\Effect\\MoonFullMoon\\SwordGlowMoonFullMoonFree.efkefc", PLAYER2_MOON_ATTACK_EFFECT_MAGNIFICATION);
+        int moonEffect = LoadEffekseerEffect("..\\Data\\Effect\\MoonLunarEclipse\\SwordGlowMoonLunarEclipseFree.efkefc", PLAYER1_MOON_ATTACK_EFFECT_MAGNIFICATION);
+        auto moonResource = GetEffekseerEffect(moonEffect);
+        bool moonPassed = moonEffect >= 0 && moonResource && moonResource->GetColorImageCount() == 4;
+        if (moonResource) {
+            for (int t = 0; t < moonResource->GetColorImageCount(); ++t) {
+                auto texture = moonResource->GetColorImage(t);
+                moonPassed = moonPassed && texture && texture->GetWidth() > 0 && texture->GetHeight() > 0;
+            }
+        }
+        if (report) fprintf(report, "P1 lunar eclipse effect: load and all four runtime textures: %s\n", moonPassed ? "PASS" : "FAIL");
+        auto fullMoonResource = GetEffekseerEffect(swordEffect);
+        bool fullMoonPassed = swordEffect >= 0 && fullMoonResource && fullMoonResource->GetColorImageCount() == 4;
+        if (fullMoonResource) {
+            for (int t = 0; t < fullMoonResource->GetColorImageCount(); ++t) {
+                auto texture = fullMoonResource->GetColorImage(t);
+                fullMoonPassed = fullMoonPassed && texture && texture->GetWidth() > 0 && texture->GetHeight() > 0;
+            }
+        }
+        if (report) fprintf(report, "P2 full moon effect: load and all four runtime textures: %s\n", fullMoonPassed ? "PASS" : "FAIL");
+		bool swordPassed = fullMoonPassed && moonPassed;
 		if (swordPassed) {
-			for (int i = 0; i < PLAYER_COUNT; i++) playerStates[i].normalAttackEffectResourceHandle = swordEffect;
+            for (int i = 0; i < PLAYER_COUNT; i++) playerStates[i].normalAttackEffectResourceHandle = swordEffect;
+            playerStates[PLAYER1_INDEX].normalAttackEffectResourceHandle = moonEffect;
+            playerStates[PLAYER1_INDEX].normalAttackEffectPlaybackSpeed = PLAYER1_MOON_ATTACK_EFFECT_PLAYBACK_SPEED;
+            playerStates[PLAYER2_INDEX].normalAttackEffectPlaybackSpeed = PLAYER2_MOON_ATTACK_EFFECT_PLAYBACK_SPEED;
 			for (int attack = 0; attack < PLAYER_ATTACK_ANIM_COUNT; attack++) {
 				for (int i = 0; i < PLAYER_COUNT; i++) {
 					playerStates[i].attackIndex = attack;
@@ -611,6 +634,70 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 			}
 			for (int i = 0; i < PLAYER_COUNT; i++) swordPassed = swordPassed &&
 				!playerStates[i].isNormalAttackEffectPlaying && playerStates[i].normalAttackPlayingHandle == -1;
+            if (strstr(lpC, "--moon-preview")) {
+                for (int p = 0; p < PLAYER_COUNT; ++p) CancelPlayerCombat(playerStates[p]);
+                auto& actor = charainfo[0];
+                actor.pos = VGet(0, 0, 0); actor.direction = UP;
+                SetCharacterAnimation(actor, idleMotion);
+                MV1SetAttachAnimTime(actor.model1, actor.attachidx, 0.0f);
+                ApplyPlayerMotionRoot(actor, playerStates[0]);
+                MV1SetPosition(actor.model1, actor.pos);
+                MV1SetRotationXYZ(actor.model1, VGet(0, DX_PI_F, 0));
+                PlayPlayerNormalAttackEffect(actor, playerStates[0]);
+                for (int frame = 0; frame < 60; ++frame) {
+                    UpdateEffekseer3D();
+                    if (frame != 5 && frame != 12 && frame != 20) continue;
+                    SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
+                    SetCameraPositionAndTargetAndUpVec(VGet(300, 260, -500), VGet(0, 90, 0), VGet(0, 1, 0));
+                    MV1DrawModel(actor.model1);
+                    SyncEffekseerDrawAreaProjection(); DrawEffekseer3D();
+                    char previewPath[128];
+                    sprintf_s(previewPath, "..\\work\\lunar-eclipse-preview-%d.png", frame);
+                    SaveDrawScreenToPNG(0, 0, 900, 600, previewPath);
+                }
+                CancelPlayerCombat(playerStates[0]);
+            }
+            bool cancelPassed = true;
+            const int cancelMotions[3] = { idleMotion, idleMotion, idleMotion };
+            for (int p = 0; p < PLAYER_COUNT; ++p) {
+                auto& actor = charainfo[p];
+                auto& state = playerStates[p];
+                for (int combo = 0; combo < PLAYER_ATTACK_ANIM_COUNT; ++combo) {
+                    for (float progress : { 0.05f, 0.4f, 0.9f }) {
+                        for (int skill = 0; skill < 2; ++skill) {
+                            CancelPlayerCombat(state);
+                            SetCharacterAnimation(actor, idleMotion);
+                            actor.mode = ATTACK;
+                            actor.playtime = actor.anim_totaltime * progress;
+                            actor.move = VGet(7, 0, 0);
+                            state.attackIndex = combo;
+                            state.isAttackBuffered = true;
+                            PlayPlayerNormalAttackEffect(actor, state);
+                            state.normalHitTargets[2] = true;
+                            cancelPassed = TryInterruptPlayerNormalAttack(actor, state,
+                                skill == 0, skill == 1, cancelMotions, idleMotion, idleMotion, -1, swordEffect) && cancelPassed;
+                            cancelPassed = cancelPassed && actor.mode == ATTACK && actor.playtime == 0 &&
+                                actor.move.x == 0 && !state.isAttackBuffered && !state.normalHitTargets[2] &&
+                                !state.isNormalAttackEffectPlaying && state.normalAttackPlayingHandle == -1 &&
+                                (skill == 0 ? state.isSpecialAttack && state.isSpecialAttackEffectPlaying :
+                                    state.isHeavyAttack && state.isHeavyAttackEffectPlaying);
+                            // Skills cannot cancel themselves or each other.
+                            cancelPassed = cancelPassed && !CanPlayerStartSkill(actor, state);
+                        }
+                    }
+                }
+                CancelPlayerCombat(state);
+                actor.mode = ATTACKOUT;
+                cancelPassed = cancelPassed && CanPlayerStartSkill(actor, state);
+                for (int mode : { DAMAGE, DOWNMODE, JUMPIN, NONE }) {
+                    actor.mode = mode;
+                    cancelPassed = cancelPassed && !CanPlayerStartSkill(actor, state);
+                }
+                actor.mode = STAND;
+                SetCharacterAnimation(actor, idleMotion);
+            }
+            passed = passed && cancelPassed;
+            if (report) fprintf(report, "normal attack skill cancel: both players, all combos, startup/strike/recovery, cleanup and blocked states: %s\n", cancelPassed ? "PASS" : "FAIL");
             bool areaPassed = true;
             for (int p = 0; p < PLAYER_COUNT; ++p) {
                 auto& actor = charainfo[p];
@@ -629,13 +716,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                 }
                 areaPassed = areaPassed && charainfo[2].enemyHP == 2 && charainfo[3].enemyHP == 2 && charainfo[4].enemyHP == 3;
                 for (int e = 2; e <= 3; ++e) {
-                    charainfo[e].mode = STAND;
+                    // Keep DAMAGE: deduplicate this swing, but allow the next combo hit.
                     CheckAttackHit(game, charainfo, &actor, &charainfo[e], start, end, -1, enemy_anim_neutral, playerStates[p].normalHitTargets);
                     areaPassed = areaPassed && charainfo[e].enemyHP == 2;
                 }
                 PlayPlayerNormalAttackEffect(actor, playerStates[p]);
                 for (int e = 2; e <= 3; ++e) {
-                    areaPassed = areaPassed && charainfo[e].knockbackFrames == 0;
+                    areaPassed = areaPassed && (e == TEST_ENEMY_GOLEM ? charainfo[e].knockbackFrames == 0 : charainfo[e].knockbackFrames > 0);
                     CheckAttackHit(game, charainfo, &actor, &charainfo[e], start, end, -1, enemy_anim_neutral,
                         playerStates[p].normalHitTargets, PLAYER_COMBO_FINISHER_KNOCKBACK_SPEED);
                     areaPassed = areaPassed && charainfo[e].enemyHP == 1 &&
@@ -667,8 +754,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             }
 			DeleteEffekseerEffect(swordEffect);
 		}
+        if (moonEffect >= 0) DeleteEffekseerEffect(moonEffect);
 		passed = passed && swordPassed;
-		if (report) fprintf(report, "Sword2 load, three combo stages, two players and completion: %s\n", swordPassed ? "PASS" : "FAIL");
+		if (report) fprintf(report, "P1 LunarEclipse / P2 FullMoon load, three combo stages, independent handles and completion: %s\n", swordPassed ? "PASS" : "FAIL");
 		int megaEffect = LoadEffekseerEffect("..\\Data\\Effect\\swordMega.efkefc", PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
 		bool megaPassed = megaEffect >= 0;
 		PlayerRuntimeState megaState;
@@ -1042,6 +1130,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     enemy_anim_neutral = MV1LoadModel("..\\Data\\Goblin\\Anim_Neutral.mv1");
     if (enemy_anim_neutral == -1) return -1;
 
+    const int goblinDamage = MV1LoadModel("..\\Data\\Goblin\\Anim_Damage.mv1");
+    const int redGoblinDamage = MV1LoadModel("..\\Data\\RedGoblin\\Anim_Damage.mv1");
+    if (goblinDamage < 0 || redGoblinDamage < 0) return -1;
+    for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e)
+        charainfo[e].enemyDamageAnimation = e >= TEST_ENEMY_RED ? redGoblinDamage : goblinDamage;
+
     game.enemy_anim_neutral = enemy_anim_neutral;
     game.enemy_anim_walk = enemy_anim_walk;
     for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
@@ -1052,6 +1146,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation = MV1LoadModel("..\\Data\\Golem\\Anim_Neutral.mv1");
     charainfo[TEST_ENEMY_GOLEM].enemyWalkAnimation = MV1LoadModel("..\\Data\\Golem\\Anim_Walk.mv1");
     if (charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation < 0 || charainfo[TEST_ENEMY_GOLEM].enemyWalkAnimation < 0) return -1;
+
+    charainfo[TEST_ENEMY_GOLEM].enemyDamageAnimation = charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation;
 
     hpBarTex = LoadGraph("..\\Data\\UI\\Hpbar023.png");
     SetTransColor(0, 0, 0);
@@ -1083,8 +1179,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     SEjumpHandle = LoadSoundMem(String);
 
     sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", NormalAttackEffect_FilePath);
-    normalAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION);
+    normalAttackEffectResourceHandle = LoadEffekseerEffect(String, PLAYER2_MOON_ATTACK_EFFECT_MAGNIFICATION);
+    player1MoonAttackEffectResourceHandle = LoadEffekseerEffect(
+        "..\\Data\\Effect\\MoonLunarEclipse\\SwordGlowMoonLunarEclipseFree.efkefc", PLAYER1_MOON_ATTACK_EFFECT_MAGNIFICATION);
+    if (normalAttackEffectResourceHandle < 0 || player1MoonAttackEffectResourceHandle < 0) return -1;
     for (int i = 0; i < PLAYER_COUNT; i++) playerStates[i].normalAttackEffectResourceHandle = normalAttackEffectResourceHandle;
+    playerStates[PLAYER1_INDEX].normalAttackEffectResourceHandle = player1MoonAttackEffectResourceHandle;
+    playerStates[PLAYER1_INDEX].normalAttackEffectPlaybackSpeed = PLAYER1_MOON_ATTACK_EFFECT_PLAYBACK_SPEED;
+    playerStates[PLAYER2_INDEX].normalAttackEffectPlaybackSpeed = PLAYER2_MOON_ATTACK_EFFECT_PLAYBACK_SPEED;
 
     sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", HeavyAttackEffect_FilePath);
     LoadDivGraph(String, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_ROW_COUNT, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_WIDTH, PLAYER_HEAVY_ATTACK_EFFECT_FRAME_HEIGHT, heavyAttackEffectHandle);
@@ -1117,6 +1219,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             playerStates[p] = PlayerRuntimeState{};
             playerStates[p].bloodLanceSpecial = (p == 1);
             playerStates[p].normalAttackEffectResourceHandle = old.normalAttackEffectResourceHandle;
+            playerStates[p].normalAttackEffectPlaybackSpeed = old.normalAttackEffectPlaybackSpeed;
             playerStates[p].motionRootFrame = old.motionRootFrame;
             playerStates[p].motionRootX = old.motionRootX;
             playerStates[p].motionRootZ = old.motionRootZ;
@@ -1539,7 +1642,12 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
             // 被ダメージ中のアニメーション再生処理
             if (charainfo[i].mode == DAMAGE) {
-                if (charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+                const float hurtStep = charainfo[i].hurtRecoveryTicks > 0
+                    ? fmaxf(0.0f, charainfo[i].anim_totaltime - charainfo[i].playtime) / charainfo[i].hurtRecoveryTicks
+                    : EnemyAnimationStep;
+                if ((charainfo[i].hurtRecoveryTicks > 0 && --charainfo[i].hurtRecoveryTicks == 0) ||
+                    charainfo[i].playtime >= charainfo[i].anim_totaltime) {
+                    charainfo[i].hurtRecoveryTicks = 0;
                     charainfo[i].mode = STAND;
                     charainfo[i].playtime = 0.0f;
                     charainfo[i].isHit = false;
@@ -1553,7 +1661,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                     }
                 }
 
-				charainfo[i].playtime += EnemyAnimationStep;
+				charainfo[i].playtime += charainfo[i].mode == DAMAGE ? hurtStep : EnemyAnimationStep;
 				if (charainfo[i].attachidx != -1) {
 					MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, charainfo[i].playtime);
 				}
@@ -1892,7 +2000,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 playerInterferenceCooldown[p]--;
             }
 
-            if (charainfo[p].mode != ATTACK) {
+            if (charainfo[p].mode != ATTACK || playerStates[p].isHeavyAttack || playerStates[p].isSpecialAttack) {
                 isPlayerInterferenceActive[p] = false;
             }
 
@@ -1940,8 +2048,9 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 }
             }
 
-            if (spGauge[i] >= MAX_SP_GAUGE && spButton && charainfo[i].mode == STAND && !playerStates[i].isSpecialAttackEffectPlaying) {
+            if (spGauge[i] >= MAX_SP_GAUGE && spButton && CanPlayerStartSkill(charainfo[i], playerStates[i])) {
                 PlayPlayerSpecialAttack(charainfo[i], playerStates[i], animSpecialAttack, SEattackHandle, specialAttackEffectResourceHandle[i]);
+                isPlayerInterferenceActive[i] = false;
                 game.RecordSpecialAttack(i);
                 spGauge[i] = 0;
             }
@@ -2073,7 +2182,11 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 if (playerWeaponModel[i] != -1) MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
 
                 // ★ 攻撃中のみ当たり判定を行う
-                if (charainfo[i].mode == ATTACK && !playerStates[i].isSpecialAttack && (!playerStates[i].isHeavyAttack || !charainfo[i].isHit)) {
+                const float swingProgress = charainfo[i].anim_totaltime > 0.0f
+                    ? charainfo[i].playtime / charainfo[i].anim_totaltime : 0.0f;
+                const bool swingActive = playerStates[i].isHeavyAttack ||
+                    (swingProgress >= 0.15f && swingProgress <= 0.65f);
+                if (charainfo[i].mode == ATTACK && swingActive && !playerStates[i].isSpecialAttack && (!playerStates[i].isHeavyAttack || !charainfo[i].isHit)) {
                     wpPosStart[i] = VTransform(VGet(0.0f, 0.0f, 0.0f), wpmatrix[i]);
                     wpPosEnd[i] = VTransform(VGet(0.0f, -90.0f, 0.0f), wpmatrix[i]);
 
@@ -2358,6 +2471,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         if (perf) { fprintf(perf, "simulation ticks=%d remaining=%d wall=%.3fs\n", simulationTicks, game.mainTimer, (GetNowHiPerformanceCount() - simulationWallStart) / 1000000.0); fclose(perf); }
     }
 
+    if (player1MoonAttackEffectResourceHandle != -1) DeleteEffekseerEffect(player1MoonAttackEffectResourceHandle);
     if (normalAttackEffectResourceHandle != -1) DeleteEffekseerEffect(normalAttackEffectResourceHandle);
     for (int i = 0; i < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT; i++) {
 		if (heavyAttackEffectHandle[i] != -1) {
@@ -2411,7 +2525,8 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage, bool* hitTargets, float knockbackSpeed) {
     const int areaTargetIndex = static_cast<int>(target - charainfo);
     if (hitTargets && (areaTargetIndex < 0 || areaTargetIndex >= MAX_CHARA || hitTargets[areaTargetIndex])) return;
-    if (attacker->mode == ATTACK && target->mode != DOWNMODE && target->mode != DAMAGE)
+    if (attacker->mode == ATTACK && target->mode != DOWNMODE &&
+        (target->mode != DAMAGE || (hitTargets && areaTargetIndex >= TEST_ENEMY_INDEX)))
     {
         if (!hitTargets && attacker->isHit == true) return;
 
@@ -2470,11 +2585,9 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
                 if (knockbackSpeed > 0.0f && target->enemyHP > 0) StartEnemyKnockback(*attacker, *target, knockbackSpeed);
 
                 int targetIndex = (int)(target - charainfo);
-                if (targetIndex != TEST_ENEMY_GOLEM) {
-                    VECTOR knockDir = VNorm(VSub(target->pos, attacker->pos));
-                    target->pos = VAdd(target->pos, VScale(knockDir, 25.0f));
-                    MV1SetPosition(target->model1, target->pos);
-                }
+                // Spread the old teleport over several simulation ticks.
+                if (targetIndex != TEST_ENEMY_GOLEM && knockbackSpeed <= 0.0f && target->enemyHP > 0)
+                    StartEnemyKnockback(*attacker, *target, 4.0f);
 
                 if (target->enemyHP <= 0) {
                     target->mode = NONE;
@@ -2496,10 +2609,9 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
                     }
                 }
                 else {
-                    MV1DetachAnim(target->model1, target->attachidx);
-                    target->attachidx = MV1AttachAnim(target->model1, 0, anim_damage);
-                    target->anim_totaltime = MV1GetAttachAnimTotalTime(target->model1, target->attachidx);
-                    target->playtime = 0.0f;
+                    SetCharacterAnimation(*target, target->enemyDamageAnimation >= 0 ? target->enemyDamageAnimation : anim_damage);
+                    target->hurtRecoveryTicks = knockbackSpeed > 0.0f ? 24 : 18;
+                    ResetMove(*target);
                     target->mode = DAMAGE;
                 }
             }

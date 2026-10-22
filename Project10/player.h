@@ -16,6 +16,10 @@ constexpr bool PLAYER_USE_NEW_MODEL = true;
 constexpr float PLAYER_MODEL_SCALE = 1.1f;
 constexpr float PLAYER_NORMAL_ATTACK_EFFECT_MAGNIFICATION = 40.0f;
 constexpr float PLAYER_NORMAL_ATTACK_EFFECT_PLAYBACK_SPEED = 2.0f / 3.0f;
+constexpr float PLAYER1_MOON_ATTACK_EFFECT_MAGNIFICATION = 20.0f;
+constexpr float PLAYER1_MOON_ATTACK_EFFECT_PLAYBACK_SPEED = 1.0f;
+constexpr float PLAYER2_MOON_ATTACK_EFFECT_MAGNIFICATION = 20.0f;
+constexpr float PLAYER2_MOON_ATTACK_EFFECT_PLAYBACK_SPEED = 1.0f;
 constexpr int PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT = 60;
 constexpr int PLAYER_HEAVY_ATTACK_EFFECT_COLUMN_COUNT = 8;
 constexpr int PLAYER_HEAVY_ATTACK_EFFECT_ROW_COUNT = 8;
@@ -86,6 +90,7 @@ struct PlayerRuntimeState {
 	int attackIndex = 0;
 	int normalAttackEffectResourceHandle = -1;
 	int normalAttackPlayingHandle = -1;
+    float normalAttackEffectPlaybackSpeed = PLAYER_NORMAL_ATTACK_EFFECT_PLAYBACK_SPEED;
 	int heavyAttackEffectFrame = 0;
 	int heavyAttackEffectWait = 0;
 	int specialAttackEffectFrame = 0;
@@ -170,5 +175,11 @@ void UpdateEnemyLocomotionAnimation(SCharaInfo& enemy, bool moving);
 int ReadPlayerPadState(int padType);
 
 void CancelPlayerCombat(PlayerRuntimeState& state);
+
+// Normal swings and their recovery can be cancelled into a skill.
+bool CanPlayerStartSkill(const SCharaInfo& player, const PlayerRuntimeState& state);
+bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& state,
+    bool specialPressed, bool whirlwindPressed, const int animations[],
+    int whirlwindAnimation, int specialAnimation, int sound, int effect);
 
 void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect);

@@ -77,6 +77,8 @@ struct SCharaInfo
     SCharaHitInfo charahitinfo;
     int mode;                // ƒLƒƒƒ‰‚Ìó‘Ô
     int enemyHP;
+    int enemyDamageAnimation = -1;
+    int hurtRecoveryTicks = 0;
     int enemyIdleAnimation = -1;
     int enemyWalkAnimation = -1;
     bool enemyWalking = false;
