@@ -57,7 +57,9 @@ void PositionNormalAttackEffect(const SCharaInfo& player, const PlayerRuntimeSta
 		player.pos.x - sinf(yaw) * 85.0f,
 		player.pos.y + player.charahitinfo.Height * 0.55f,
 		player.pos.z - cosf(yaw) * 85.0f);
-	SetRotationPlayingEffekseer3DEffect(state.normalAttackPlayingHandle, 0.0f, yaw,
+    // Moon slash assets face the opposite local direction from the old Sword2.
+    // Rotate the effect, keeping its origin in front of the player.
+	SetRotationPlayingEffekseer3DEffect(state.normalAttackPlayingHandle, 0.0f, yaw + DX_PI_F,
 		state.attackIndex == 1 ? DX_PI_F : 0.0f);
 }
 
@@ -102,7 +104,13 @@ void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
 }
 
 void PositionSpecialAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state) {
-	const float yaw = DX_PI_F * 0.5f * player.direction;
+    const VECTOR origin = state.emberSpecial ? state.specialEffectOrigin : player.pos;
+    const float yaw = DX_PI_F * 0.5f * (state.emberSpecial ? state.specialEffectDirection : player.direction);
+    if (state.emberSpecial) {
+        SetPosPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, origin.x, origin.y, origin.z);
+        SetRotationPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, 0.0f, yaw, 0.0f);
+        return;
+    }
 	SetPosPlayingEffekseer3DEffect(state.specialAttackPlayingHandle,
 		player.pos.x - sinf(yaw) * (state.bloodLanceSpecial ? 0.0f : PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET),
 		player.pos.y + (state.bloodLanceSpecial ? 0.0f : player.charahitinfo.Height * 0.55f + PLAYER_SPECIAL_ATTACK_EFFECT_HEIGHT_OFFSET),
@@ -119,10 +127,12 @@ void StartSpecialAttackEffect(
 	state.specialAttackEffectWait = 0;
 	state.isSpecialAttackEffectPlaying = true;
 	for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
+    state.specialEffectOrigin = player.pos;
+    state.specialEffectDirection = player.direction;
 	state.specialAttackPlayingHandle = PlayEffekseer3DEffect(effectResourceHandle);
 	if (state.specialAttackPlayingHandle != -1) {
 		PositionSpecialAttackEffect(player, state);
-        SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f);
+        SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.emberSpecial ? PLAYER_EMBER_EFFECT_SPEED : (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f));
 
 	}
 }
@@ -145,7 +155,7 @@ void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& sta
 	// プレイヤー座標を毎フレーム反映し、1P/2P の各エフェクトを本人に追従させる。
 	if (state.specialAttackPlayingHandle != -1) {
 		PositionSpecialAttackEffect(player, state);
-        SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f);
+        SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.emberSpecial ? PLAYER_EMBER_EFFECT_SPEED : (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f));
 
 	}
 
@@ -156,7 +166,7 @@ void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& sta
 
 	state.specialAttackEffectWait = 0;
 	state.specialAttackEffectFrame++;
-	if (state.specialAttackEffectFrame >= (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_FRAMES : PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT)) {
+	if (state.specialAttackEffectFrame >= (state.emberSpecial ? PLAYER_EMBER_EFFECT_FRAMES : (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_FRAMES : PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT))) {
 		StopSpecialAttackEffect(state);
 	}
 }
@@ -233,12 +243,13 @@ void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int 
 	PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
 }
 
-void StartPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, int effectResourceHandle, int animSpecialAttack) {
+void StartPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, int effectResourceHandle, int animSpecialAttack, bool energyAttack = false) {
 	// 専用モデルアニメーションができるまでは3段目の攻撃動作を流用する。
 	state.attackIndex = PLAYER_ATTACK_ANIM_COUNT - 1;
 	state.isAttackBuffered = false;
 	state.isHeavyAttack = false;
 	state.isSpecialAttack = true;
+    state.emberSpecial = energyAttack;
 	StopNormalAttackEffect(state);
 	StopHeavyAttackEffect(state);
 	StartSpecialAttackEffect(player, state, effectResourceHandle);
@@ -301,6 +312,19 @@ bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& stat
 
 void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect) {
     StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation);
+}
+
+bool TryPlayPlayerEnergyAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound,
+    int effect, int& energy, int requiredEnergy) {
+    if (requiredEnergy < 0 || energy < requiredEnergy || effect < 0 || !CanPlayerStartSkill(player, state)) return false;
+    StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation, true);
+    if (state.specialAttackPlayingHandle < 0) {
+        CancelPlayerCombat(state);
+        player.mode = STAND;
+        return false;
+    }
+    if (requiredEnergy > 0) energy = 0;
+    return true;
 }
 
 void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float speed) {
@@ -368,10 +392,10 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
     UpdateNormalAttackEffect(player, state);
 	UpdateHeavyAttackEffect(state);
 	UpdateSpecialAttackEffect(player, state);
-    // Release movement after one second while preserving the effect and damage.
+    // Release movement at the cast recovery point; keep the remaining visual tail.
     if (state.isSpecialAttack && player.mode == ATTACK &&
         state.specialAttackEffectFrame * PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL +
-            state.specialAttackEffectWait >= PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES) {
+            state.specialAttackEffectWait >= (state.emberSpecial ? PLAYER_EMBER_MOVE_LOCK_FRAMES : PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES)) {
         ResetMove(player);
         state.movementAnimation = -1;
         SetCharacterAnimation(player, animNeutral);
@@ -391,7 +415,11 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
             player.mode = STAND;
         }
     }
-	if (player.mode != JUMPOUT) {
+    if (player.mode == ATTACK && state.emberSpecial && state.isSpecialAttack) {
+        player.playtime = fminf(player.anim_totaltime,
+            player.playtime + player.anim_totaltime / PLAYER_EMBER_MOVE_LOCK_FRAMES);
+    }
+	else if (player.mode != JUMPOUT) {
 		player.playtime += PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep;
 	}
 	else {
@@ -415,7 +443,7 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 	}
 
     // Keep the casting motion moving until its independent effect/hit timeline ends.
-    if (player.mode == ATTACK && state.isSpecialAttack && state.isSpecialAttackEffectPlaying && player.anim_totaltime > 0.0f) {
+    if (player.mode == ATTACK && state.isSpecialAttack && !state.emberSpecial && state.isSpecialAttackEffectPlaying && player.anim_totaltime > 0.0f) {
         player.playtime = fmodf(player.playtime, player.anim_totaltime);
     }
     MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
@@ -463,8 +491,13 @@ void CheckPlayerSpecialAttackHit(
 	if (!state.isSpecialAttack || !state.isSpecialAttackEffectPlaying || targetIndex < 0 || targetIndex >= MAX_CHARA || state.specialHitTargets[targetIndex]) {
 		return;
 	}
-	if (state.specialAttackEffectFrame < (state.bloodLanceSpecial ? 48 : PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME) ||
-		state.specialAttackEffectFrame > (state.bloodLanceSpecial ? 120 : PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME)) {
+    if (state.emberSpecial) {
+        const int frame = state.specialAttackEffectFrame;
+        if (!((frame >= PLAYER_EMBER_STRIKE_START && frame <= PLAYER_EMBER_STRIKE_END) ||
+            (frame >= PLAYER_EMBER_FINISH_START && frame <= PLAYER_EMBER_FINISH_END))) return;
+    }
+	if (!state.emberSpecial && (state.specialAttackEffectFrame < (state.bloodLanceSpecial ? 48 : PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME) ||
+		state.specialAttackEffectFrame > (state.bloodLanceSpecial ? 120 : PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME))) {
 		return;
 	}
 	if (target.mode == NONE || target.mode == DOWNMODE || target.mode == DAMAGE || target.enemyHP <= 0) {
@@ -475,12 +508,16 @@ void CheckPlayerSpecialAttackHit(
 	// The first impact is a forward capsule; the sword shower expands around the effect.
 	const float yaw = DX_PI_F * 0.5f * attacker.direction;
 	const float forwardX = -sinf(yaw), forwardZ = -cosf(yaw);
-	const float dx = target.pos.x - attacker.pos.x, dz = target.pos.z - attacker.pos.z;
+    const VECTOR hitOrigin = state.emberSpecial ? state.specialEffectOrigin : attacker.pos;
+	const float dx = target.pos.x - hitOrigin.x, dz = target.pos.z - hitOrigin.z;
 	const float targetRadius = target.charahitinfo.Width * 0.5f;
-	if (target.pos.y > attacker.pos.y + attacker.charahitinfo.Height + 160.0f ||
-		target.pos.y + target.charahitinfo.Height < attacker.pos.y) return;
+	if (target.pos.y > hitOrigin.y + attacker.charahitinfo.Height + 160.0f ||
+		target.pos.y + target.charahitinfo.Height < hitOrigin.y) return;
 	float centerX, centerZ, attackRadius;
-	if (state.bloodLanceSpecial) {
+    if (state.emberSpecial) {
+        centerX = centerZ = 0.0f;
+        attackRadius = state.specialAttackEffectFrame >= PLAYER_EMBER_FINISH_START ? 300.0f : 200.0f;
+    } else if (state.bloodLanceSpecial) {
         // BloodLance emerges in a ring around the caster.
         centerX = centerZ = 0.0f;
         attackRadius = 220.0f;

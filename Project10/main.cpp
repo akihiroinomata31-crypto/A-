@@ -247,6 +247,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     VECTOR wpPosStart[PLAYER_COUNT], wpPosEnd[PLAYER_COUNT];
     int animHeavyAttack = -1;
     int animSpecialAttack = -1;
+    int animEnergyAttack = -1;
     int prevJKey = 0;
     int isBGMPlaying = 1;
     bool isAiming[PLAYER_COUNT] = {};
@@ -297,6 +298,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     char SpecialAttackEffect_FilePath[] = "swordMega.efkefc";
     int SEattackHandle, SEjumpHandle, SEdamageHandle;
 	int specialAttackEffectResourceHandle[PLAYER_COUNT] = { -1, -1 };
+    int energyAttackEffectResourceHandle[PLAYER_COUNT] = { -1, -1 };
+    bool prevEnergyAttackButton[PLAYER_COUNT] = {};
     int hpBarTex = -1;
 
     for (int i = 0; i < MAX_CHARA; i++) {
@@ -636,26 +639,36 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 				!playerStates[i].isNormalAttackEffectPlaying && playerStates[i].normalAttackPlayingHandle == -1;
             if (strstr(lpC, "--moon-preview")) {
                 for (int p = 0; p < PLAYER_COUNT; ++p) CancelPlayerCombat(playerStates[p]);
-                auto& actor = charainfo[0];
-                actor.pos = VGet(0, 0, 0); actor.direction = UP;
-                SetCharacterAnimation(actor, idleMotion);
-                MV1SetAttachAnimTime(actor.model1, actor.attachidx, 0.0f);
-                ApplyPlayerMotionRoot(actor, playerStates[0]);
-                MV1SetPosition(actor.model1, actor.pos);
-                MV1SetRotationXYZ(actor.model1, VGet(0, DX_PI_F, 0));
-                PlayPlayerNormalAttackEffect(actor, playerStates[0]);
-                for (int frame = 0; frame < 60; ++frame) {
-                    UpdateEffekseer3D();
-                    if (frame != 5 && frame != 12 && frame != 20) continue;
-                    SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
-                    SetCameraPositionAndTargetAndUpVec(VGet(300, 260, -500), VGet(0, 90, 0), VGet(0, 1, 0));
-                    MV1DrawModel(actor.model1);
-                    SyncEffekseerDrawAreaProjection(); DrawEffekseer3D();
-                    char previewPath[128];
-                    sprintf_s(previewPath, "..\\work\\lunar-eclipse-preview-%d.png", frame);
-                    SaveDrawScreenToPNG(0, 0, 900, 600, previewPath);
+                for (int p = 0; p < PLAYER_COUNT; ++p) {
+                    auto& actor = charainfo[p];
+                    for (int direction = 0; direction < 4; ++direction) {
+                        for (int combo = 0; combo < PLAYER_ATTACK_ANIM_COUNT; ++combo) {
+                            const int motion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::normalAttack[combo]]);
+                            actor.pos = VGet(0, 0, 0); actor.direction = static_cast<Direction>(direction);
+                            SetCharacterAnimation(actor, motion);
+                            MV1SetAttachAnimTime(actor.model1, actor.attachidx, actor.anim_totaltime * 0.3f);
+                            ApplyPlayerMotionRoot(actor, playerStates[p]);
+                            MV1SetPosition(actor.model1, actor.pos);
+                            MV1SetRotationXYZ(actor.model1, VGet(0, DX_PI_F * 0.5f * direction, 0));
+                            playerStates[p].attackIndex = combo;
+                            PlayPlayerNormalAttackEffect(actor, playerStates[p]);
+                            for (int frame = 0; frame < 13; ++frame) {
+                                UpdateEffekseer3D();
+                                if (frame != 5 && frame != 12) continue;
+                                SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
+                                SetCameraPositionAndTargetAndUpVec(VGet(300, 260, -500), VGet(0, 90, 0), VGet(0, 1, 0));
+                                MV1DrawModel(actor.model1);
+                                SyncEffekseerDrawAreaProjection(); DrawEffekseer3D();
+                                char previewPath[160];
+                                sprintf_s(previewPath, "..\\work\\moon-facing-p%d-dir%d-combo%d-frame%d.png", p + 1, direction, combo + 1, frame);
+                                SaveDrawScreenToPNG(0, 0, 900, 600, previewPath);
+                            }
+                            CancelPlayerCombat(playerStates[p]);
+                            SetCharacterAnimation(actor, idleMotion);
+                            if (motion >= 0) MV1DeleteModel(motion);
+                        }
+                    }
                 }
-                CancelPlayerCombat(playerStates[0]);
             }
             bool cancelPassed = true;
             const int cancelMotions[3] = { idleMotion, idleMotion, idleMotion };
@@ -820,9 +833,110 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         recoveryPassed = recoveryPassed && fabsf(attacker.playtime - recoveryTime - (PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep)) < 0.001f;
         passed = passed && recoveryPassed;
         if (report) fprintf(report, "special completion restores running speed and animation: %s\n", recoveryPassed ? "PASS" : "FAIL");
+        bool sharedSpecialPassed = true;
+        for (int p = 0; p < PLAYER_COUNT; ++p) {
+            auto& actor = charainfo[p];
+            CancelPlayerCombat(playerStates[p]);
+            actor.pos = VGet(p * 1000.0f, 0, 0);
+            actor.direction = DOWN;
+            PlayPlayerSpecialAttack(actor, playerStates[p], idleMotion, -1, megaEffect);
+            sharedSpecialPassed = sharedSpecialPassed && !playerStates[p].bloodLanceSpecial &&
+                playerStates[p].isSpecialAttackEffectPlaying;
+            auto& target = charainfo[2];
+            target.pos = VAdd(actor.pos, VGet(0, 0, -150));
+            target.mode = STAND; target.enemyHP = 6;
+            playerStates[p].specialAttackEffectFrame = PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME;
+            CheckPlayerSpecialAttackHit(game, actor, playerStates[p], target, -1, enemy_anim_neutral, p, 2);
+            sharedSpecialPassed = sharedSpecialPassed && target.enemyHP == 4;
+        }
+        sharedSpecialPassed = sharedSpecialPassed && playerStates[0].specialAttackPlayingHandle != playerStates[1].specialAttackPlayingHandle;
+        for (int p = 0; p < PLAYER_COUNT; ++p) CancelPlayerCombat(playerStates[p]);
+        passed = passed && sharedSpecialPassed;
+        if (report) fprintf(report, "both players SwordMega: matching startup hit, default rules and independent simultaneous instances: %s\n", sharedSpecialPassed ? "PASS" : "FAIL");
 		if (megaEffect >= 0) DeleteEffekseerEffect(megaEffect);
 		passed = passed && megaPassed;
 		if (report) fprintf(report, "SwordMega load, startup, forward strike, area, multiple targets, single hit and cleanup: %s\n", megaPassed ? "PASS" : "FAIL");
+        int emberEffect = LoadEffekseerEffect("..\\Data\\Effect\\Ember\\Sword_Ember.efkefc", PLAYER_EMBER_EFFECT_SCALE);
+        const int powerUpMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::energyAttack]);
+        auto emberResource = GetEffekseerEffect(emberEffect);
+        bool emberPassed = powerUpMotion >= 0 && emberEffect >= 0 && emberResource && emberResource->GetModelCount() == 2;
+        if (emberResource) {
+            for (int t = 0; t < emberResource->GetColorImageCount(); ++t) emberPassed = emberPassed && !!emberResource->GetColorImage(t);
+            for (int t = 0; t < emberResource->GetDistortionImageCount(); ++t) emberPassed = emberPassed && !!emberResource->GetDistortionImage(t);
+            for (int m = 0; m < emberResource->GetModelCount(); ++m) emberPassed = emberPassed && !!emberResource->GetModel(m);
+        }
+        for (int p = 0; p < PLAYER_COUNT; ++p) {
+            auto& actor = charainfo[p]; auto& state = playerStates[p];
+            CancelPlayerCombat(state); state.emberSpecial = true;
+            actor.pos = VGet(p * 1000.0f, 0, 0); actor.direction = DOWN;
+            int energy = MAX_SP_GAUGE;
+            emberPassed = emberPassed && !state.isSpecialAttack && energy == MAX_SP_GAUGE;
+            energy = MAX_SP_GAUGE - 1;
+            emberPassed = emberPassed && !TryPlayPlayerEnergyAttack(actor, state, idleMotion, -1, emberEffect, energy, MAX_SP_GAUGE) && energy == MAX_SP_GAUGE - 1;
+            energy = MAX_SP_GAUGE;
+            actor.mode = STAND;
+            emberPassed = TryPlayPlayerEnergyAttack(actor, state, powerUpMotion, -1, emberEffect, energy, MAX_SP_GAUGE) && energy == 0 && state.emberSpecial && emberPassed;
+            energy = 10;
+            emberPassed = emberPassed && !TryPlayPlayerEnergyAttack(actor, state, idleMotion, -1, emberEffect, energy, MAX_SP_GAUGE) && energy == 10;
+            actor.pos.x += 50; // The cast and its damage stay at the original world position.
+            auto& target = charainfo[2];
+            target.charahitinfo.Width = 40; target.charahitinfo.Height = 100;
+            target.pos = VAdd(state.specialEffectOrigin, VGet(150, 0, 0));
+            target.mode = STAND; target.enemyHP = 6;
+            state.specialAttackEffectFrame = PLAYER_EMBER_STRIKE_START - 1;
+            CheckPlayerSpecialAttackHit(game, actor, state, target, -1, -1, p, 2);
+            emberPassed = emberPassed && target.enemyHP == 6;
+            state.specialAttackEffectFrame = PLAYER_EMBER_STRIKE_START;
+            CheckPlayerSpecialAttackHit(game, actor, state, target, -1, -1, p, 2);
+            emberPassed = emberPassed && target.enemyHP == 4;
+            target.mode = STAND;
+            CheckPlayerSpecialAttackHit(game, actor, state, target, -1, -1, p, 2);
+            emberPassed = emberPassed && target.enemyHP == 4;
+            state.specialHitTargets[2] = false;
+            state.specialAttackEffectFrame = 120;
+            CheckPlayerSpecialAttackHit(game, actor, state, target, -1, -1, p, 2);
+            emberPassed = emberPassed && target.enemyHP == 4;
+            state.specialAttackEffectFrame = PLAYER_EMBER_FINISH_START;
+            target.pos = VAdd(state.specialEffectOrigin, VGet(280, 0, 0));
+            CheckPlayerSpecialAttackHit(game, actor, state, target, -1, -1, p, 2);
+            emberPassed = emberPassed && target.enemyHP == 2;
+            state.specialAttackEffectFrame = 0;
+            for (int frame = 0; frame < PLAYER_EMBER_EFFECT_FRAMES; ++frame) {
+                UpdateEffekseer3D(); UpdatePlayerAnimationProgress(actor, state, idleMotion);
+                if (frame == PLAYER_EMBER_MOVE_LOCK_FRAMES - 2) emberPassed = emberPassed && actor.mode == ATTACK && actor.playtime > actor.anim_totaltime * 0.95f;
+                if (frame == PLAYER_EMBER_MOVE_LOCK_FRAMES - 1) emberPassed = emberPassed && actor.mode == STAND;
+                if (p == 0 && strstr(lpC, "--ember-preview") && (frame == 43 || frame == 90 || frame == 150 || frame == 170)) {
+                    ApplyPlayerMotionRoot(actor, playerStates[p]);
+                    MV1SetPosition(actor.model1, VGet(0, 0, 0));
+                    SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
+                    SetCameraPositionAndTargetAndUpVec(VGet(500, 400, -700), VGet(0, 100, 0), VGet(0, 1, 0));
+                    MV1DrawModel(actor.model1); SyncEffekseerDrawAreaProjection(); DrawEffekseer3D();
+                    char path[128]; sprintf_s(path, "..\\work\\ember-preview-%d.png", frame);
+                    SaveDrawScreenToPNG(0, 0, 900, 600, path);
+                }
+            }
+            emberPassed = emberPassed && !state.isSpecialAttackEffectPlaying && state.specialAttackPlayingHandle == -1;
+            state.emberSpecial = false;
+        }
+        passed = passed && emberPassed;
+        if (report) fprintf(report, "SwordEmber: resources, both players, dedicated power-up motion, full-energy cast and gauge reset, startup, strike, charge gap, finisher, cast origin, movement unlock and cleanup: %s\n", emberPassed ? "PASS" : "FAIL");
+        const int restoredSpecial = LoadEffekseerEffect("..\\Data\\Effect\\swordMega.efkefc", PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
+        bool separateAttackPassed = restoredSpecial >= 0;
+        for (int p = 0; p < PLAYER_COUNT; ++p) {
+            auto& state = playerStates[p]; auto& actor = charainfo[p];
+            CancelPlayerCombat(state); actor.mode = STAND;
+            state.emberSpecial = true; // Starting the old special must reset the Ember profile.
+            const int savedEnergy = spGauge[p] = 37;
+            PlayPlayerSpecialAttack(actor, state, idleMotion, -1, restoredSpecial);
+            separateAttackPassed = separateAttackPassed && !state.emberSpecial && state.isSpecialAttackEffectPlaying && spGauge[p] == savedEnergy;
+            CancelPlayerCombat(state); actor.mode = STAND;
+        }
+        if (restoredSpecial >= 0) DeleteEffekseerEffect(restoredSpecial);
+        passed = passed && separateAttackPassed;
+        if (report) fprintf(report, "original SwordMega separate from new Ember energy attack: both players, original profile and energy preserved: %s\n", separateAttackPassed ? "PASS" : "FAIL");
+        for (int p = 0; p < PLAYER_COUNT; ++p) SetCharacterAnimation(charainfo[p], idleMotion);
+        if (powerUpMotion >= 0) MV1DeleteModel(powerUpMotion);
+        if (emberEffect >= 0) DeleteEffekseerEffect(emberEffect);
 		int bloodLanceEffect = LoadEffekseerEffect("..\\Data\\Effect\\BloodLance.efkefc", PLAYER_BLOOD_LANCE_EFFECT_SCALE);
                 auto bloodLanceResource = GetEffekseerEffect(bloodLanceEffect);
         if (report && bloodLanceResource) {
@@ -1109,7 +1223,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     if (anim_attack[2] == -1) return -1;
     animHeavyAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::heavyAttack]) : anim_attack[2];
     animSpecialAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::specialAttack]) : anim_attack[2];
-    if (animHeavyAttack == -1 || animSpecialAttack == -1) return -1;
+    animEnergyAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::energyAttack]) : anim_attack[2];
+    if (animHeavyAttack == -1 || animSpecialAttack == -1 || animEnergyAttack == -1) return -1;
 
     if (PLAYER_USE_NEW_MODEL) {
         for (int i = 0; i < PLAYER_ATTACK_ANIM_COUNT; ++i) {
@@ -1193,8 +1308,12 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
     sprintf_s(String, sizeof(String), "..\\Data\\Effect\\%s", SpecialAttackEffect_FilePath);
 	specialAttackEffectResourceHandle[0] = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
-    specialAttackEffectResourceHandle[1] = LoadEffekseerEffect("..\\Data\\Effect\\BloodLance.efkefc", PLAYER_BLOOD_LANCE_EFFECT_SCALE);
-    playerStates[1].bloodLanceSpecial = true;
+    specialAttackEffectResourceHandle[1] = LoadEffekseerEffect(String, PLAYER_SPECIAL_ATTACK_EFFECT_MAGNIFICATION);
+    playerStates[1].bloodLanceSpecial = false;
+    for (int p = 0; p < PLAYER_COUNT; ++p) {
+        energyAttackEffectResourceHandle[p] = LoadEffekseerEffect("..\\Data\\Effect\\Ember\\Sword_Ember.efkefc", PLAYER_EMBER_EFFECT_SCALE);
+        if (energyAttackEffectResourceHandle[p] < 0) return -1;
+    }
 	if (specialAttackEffectResourceHandle[0] == -1 || specialAttackEffectResourceHandle[1] == -1) {
 		return -1;
 	}
@@ -1217,7 +1336,10 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         for (int p = 0; p < PLAYER_COUNT; ++p) {
             auto old = playerStates[p];
             playerStates[p] = PlayerRuntimeState{};
-            playerStates[p].bloodLanceSpecial = (p == 1);
+            playerStates[p].bloodLanceSpecial = false;
+            playerStates[p].emberSpecial = false;
+            prevEnergyAttackButton[p] = false;
+            spGauge[p] = 0;
             playerStates[p].normalAttackEffectResourceHandle = old.normalAttackEffectResourceHandle;
             playerStates[p].normalAttackEffectPlaybackSpeed = old.normalAttackEffectPlaybackSpeed;
             playerStates[p].motionRootFrame = old.motionRootFrame;
@@ -1960,6 +2082,11 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 currentInput.heavyAttackPadButton = 0;
             }
 
+            // Preserve the original special controls; only respawn protection blocks them.
+            if (charainfo[i].invincibleTimer > 0) {
+                currentInput.specialAttackKey = -1;
+                currentInput.specialAttackPadButton = 0;
+            }
             const bool specialWasActive = playerStates[i].isSpecialAttack;
             UpdatePlayerInput(
                 charainfo[i],
@@ -1975,7 +2102,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 SEjumpHandle,
 				specialAttackEffectResourceHandle[i]
             );
-            if (!specialWasActive && playerStates[i].isSpecialAttack) game.RecordSpecialAttack(i);
+            if (!specialWasActive && playerStates[i].isSpecialAttack) {
+                isPlayerInterferenceActive[i] = false;
+                game.RecordSpecialAttack(i);
+            }
             UpdatePlayerAttackState(
                 charainfo[i],
                 playerStates[i],
@@ -2034,25 +2164,17 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         }
 
         for (int i = 0; i < PLAYER_COUNT; i++) {
-            if (charainfo[i].invincibleTimer > 0 || playerStunTimer[i] > 0) continue;
-
-            bool spButton = false;
-            if (i == 0) {
-                if (CheckHitKey(KEY_INPUT_R) == 1 || (ReadPlayerPadState(playerInputs[i].padType) & PAD_INPUT_4)) {
-                    spButton = true;
-                }
-            }
-            else {
-                if (CheckHitKey(KEY_INPUT_NUMPAD0) == 1 || (ReadPlayerPadState(playerInputs[i].padType) & PAD_INPUT_4)) {
-                    spButton = true;
-                }
-            }
-
-            if (spGauge[i] >= MAX_SP_GAUGE && spButton && CanPlayerStartSkill(charainfo[i], playerStates[i])) {
-                PlayPlayerSpecialAttack(charainfo[i], playerStates[i], animSpecialAttack, SEattackHandle, specialAttackEffectResourceHandle[i]);
+            XINPUT_STATE energyPad = {};
+            bool r3 = (ReadPlayerPadState(playerInputs[i].padType) & PAD_INPUT_12) != 0;
+            if (GetJoypadXInputState(playerInputs[i].padType, &energyPad) == 0)
+                r3 = energyPad.Buttons[XINPUT_BUTTON_RIGHT_THUMB] != 0;
+            const bool energyButton = r3 || CheckHitKey(i == 0 ? KEY_INPUT_R : KEY_INPUT_NUMPAD5) != 0;
+            const bool energyPressed = energyButton && !prevEnergyAttackButton[i];
+            prevEnergyAttackButton[i] = energyButton;
+            if (!energyPressed || isAiming[i] || charainfo[i].invincibleTimer > 0 || playerStunTimer[i] > 0) continue;
+            if (TryPlayPlayerEnergyAttack(charainfo[i], playerStates[i], animEnergyAttack, SEattackHandle,
+                energyAttackEffectResourceHandle[i], spGauge[i], PLAYER_EMBER_FREE_CAST_TEST ? 0 : MAX_SP_GAUGE)) {
                 isPlayerInterferenceActive[i] = false;
-                game.RecordSpecialAttack(i);
-                spGauge[i] = 0;
             }
         }
 
@@ -2478,6 +2600,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 			DeleteGraph(heavyAttackEffectHandle[i]);
 		}
 	}
+    for (int effect : energyAttackEffectResourceHandle) if (effect >= 0) DeleteEffekseerEffect(effect);
 	for (int effectIndex = 0; effectIndex < PLAYER_COUNT; ++effectIndex) if (specialAttackEffectResourceHandle[effectIndex] != -1) {
 		DeleteEffekseerEffect(specialAttackEffectResourceHandle[effectIndex]);
 	}

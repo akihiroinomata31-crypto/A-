@@ -12,7 +12,7 @@
 | 前进 / 侧向移动（W、A、D / 上、左、右） | Running.mv1 |
 | 向下移动（S / 下，转身向前跑） | Running.mv1 |
 | 普攻第 1 段（空格 / Enter） | great sword slash.mv1 |
-| 普攻第 2 段 | great sword slash (5).mv1 |
+| 普攻第 2 段 | great sword slash (4).mv1 |
 | 普攻第 3 段 | great sword slash (3).mv1 |
 | 重攻击（E / 右 Shift） | great sword attack.mv1 |
 | 必杀（F / 右 Ctrl） | great sword high spin attack.mv1 |

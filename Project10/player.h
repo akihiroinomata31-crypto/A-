@@ -47,6 +47,16 @@ constexpr int PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME = 165;
 constexpr float PLAYER_SPECIAL_ATTACK_MAX_RADIUS = 336.0f;
 // 現在のテスト用HPでは通常攻撃1回を1としているため、必殺技300は2ダメージに換算する。
 constexpr int PLAYER_SPECIAL_ATTACK_DAMAGE = 2;
+// Temporary testing switch: false restores full-energy casting.
+constexpr bool PLAYER_EMBER_FREE_CAST_TEST = false;
+constexpr float PLAYER_EMBER_EFFECT_SCALE = 20.0f;
+constexpr float PLAYER_EMBER_EFFECT_SPEED = 3.0f;
+constexpr int PLAYER_EMBER_EFFECT_FRAMES = 300;
+constexpr int PLAYER_EMBER_MOVE_LOCK_FRAMES = 165;
+constexpr int PLAYER_EMBER_STRIKE_START = 43;
+constexpr int PLAYER_EMBER_STRIKE_END = 100;
+constexpr int PLAYER_EMBER_FINISH_START = 150;
+constexpr int PLAYER_EMBER_FINISH_END = 165;
 constexpr float PLAYER_BLOOD_LANCE_EFFECT_SCALE = 20.0f;
 constexpr float PLAYER_BLOOD_LANCE_EFFECT_SPEED = 2.0f;
 constexpr int PLAYER_BLOOD_LANCE_EFFECT_FRAMES = 195;
@@ -78,6 +88,9 @@ struct PlayerInputConfig {
 // 連撃予約や攻撃ボタンの押した瞬間判定をプレイヤー別に持つ。
 struct PlayerRuntimeState {
     bool bloodLanceSpecial = false;
+    bool emberSpecial = false;
+    VECTOR specialEffectOrigin = {};
+    Direction specialEffectDirection = DOWN;
 	int movementAnimation = -1;
 	int motionRootFrame = -1;
 	float motionRootX = 0.0f;
@@ -181,5 +194,8 @@ bool CanPlayerStartSkill(const SCharaInfo& player, const PlayerRuntimeState& sta
 bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& state,
     bool specialPressed, bool whirlwindPressed, const int animations[],
     int whirlwindAnimation, int specialAnimation, int sound, int effect);
+
+bool TryPlayPlayerEnergyAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound,
+    int effect, int& energy, int requiredEnergy);
 
 void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect);
