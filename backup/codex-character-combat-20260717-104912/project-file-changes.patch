@@ -1,0 +1,39 @@
+﻿diff --git a/Project10/Project10.vcxproj b/Project10/Project10.vcxproj
+index ef42500..45dba4c 100644
+--- a/Project10/Project10.vcxproj
++++ b/Project10/Project10.vcxproj
+@@ -155,10 +155,11 @@
+     <ClCompile Include="Mapps.cpp" />
+   </ItemGroup>
+   <ItemGroup>
++    <ClInclude Include="CharacterCombat.h" />
+     <ClInclude Include="main.h" />
+     <ClInclude Include="map.h" />
+   </ItemGroup>
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+   <ImportGroup Label="ExtensionTargets">
+   </ImportGroup>
+-</Project>
+\ No newline at end of file
++</Project>
+diff --git a/Project10/Project10.vcxproj.filters b/Project10/Project10.vcxproj.filters
+index c6bd02b..3c39c50 100644
+--- a/Project10/Project10.vcxproj.filters
++++ b/Project10/Project10.vcxproj.filters
+@@ -26,6 +26,9 @@
+     </ClCompile>
+   </ItemGroup>
+   <ItemGroup>
++    <ClInclude Include="CharacterCombat.h">
++      <Filter>ヘッダー ファイル</Filter>
++    </ClInclude>
+     <ClInclude Include="main.h">
+       <Filter>ヘッダー ファイル</Filter>
+     </ClInclude>
+@@ -33,4 +36,4 @@
+       <Filter>ヘッダー ファイル</Filter>
+     </ClInclude>
+   </ItemGroup>
+-</Project>
+\ No newline at end of file
++</Project>
