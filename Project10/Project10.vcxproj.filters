@@ -9,6 +9,7 @@
     <ClCompile Include="winer.cpp" />
     <ClCompile Include="senk.cpp" />
     <ClCompile Include="boost.cpp" />
+    <ClCompile Include="golem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
@@ -23,5 +24,6 @@
     <ClInclude Include="OrbitCamera.h" />
     <ClInclude Include="senk.h" />
     <ClInclude Include="boost.h" />
+    <ClInclude Include="golem.h" />
   </ItemGroup>
 </Project>

@@ -10,7 +10,7 @@ constexpr int PLAYER1_INDEX = 0;
 constexpr int PLAYER2_INDEX = 1;
 constexpr int TEST_ENEMY_INDEX = 2;
 constexpr int TEST_ENEMY_GOLEM = 3;
-constexpr int TEST_ENEMY_RED = 700;
+constexpr int TEST_ENEMY_RED = 500;
 // Temporary new-character trial; false restores the original asset set.
 constexpr bool PLAYER_USE_NEW_MODEL = true;
 constexpr float PLAYER_MODEL_SCALE = 1.1f;
@@ -73,7 +73,7 @@ struct PlayerInputConfig {
 // 1人分の操作中状態。
 // 連撃予約や攻撃ボタンの押した瞬間判定をプレイヤー別に持つ。
 struct PlayerRuntimeState {
-    bool bloodLanceSpecial = false;
+	bool bloodLanceSpecial = false;
 	int movementAnimation = -1;
 	int motionRootFrame = -1;
 	float motionRootX = 0.0f;

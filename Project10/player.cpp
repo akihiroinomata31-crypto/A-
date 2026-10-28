@@ -6,386 +6,311 @@
 #include <DxLib.h>
 #include <EffekseerForDXLib.h>
 #include <math.h>
-#include <vector>
-// 既存のアリーナの床の三角形を使い、円形のシルエットと衝突感を保持した石畳テクスチャ描画
-struct ArenaStoneFloor {
-	int texture = -1;
-	std::vector<VERTEX3D> vertices;
-
-	void Init(int stage, VECTOR origin) {
-		// 原点直下の床高さをレイキャストで検出
-		MV1_COLL_RESULT_POLY hit = MV1CollCheck_Line(stage, -1,
-			VAdd(origin, VGet(0.0f, 10000.0f, 0.0f)),
-			VAdd(origin, VGet(0.0f, -10000.0f, 0.0f)));
-		if (!hit.HitFlag) return;
-
-		texture = LoadGraph("..\\Data\\Stage\\PavingStones036_Color.jpg");
-		if (texture == -1) return;
-
-		// ステージのリファレンスメッシュを取得
-		MV1_REF_POLYGONLIST mesh = MV1GetReferenceMesh(stage, -1, TRUE);
-		const float tileSize = 600.0f;
-
-		for (int i = 0; i < mesh.PolygonNum; ++i) {
-			const auto& polygon = mesh.Polygons[i];
-			VECTOR p[3];
-			bool isFloor = true;
-
-			for (int j = 0; j < 3; ++j) {
-				p[j] = mesh.Vertexs[polygon.VIndex[j]].Position;
-				// 床高さとほぼ一致する水平ポリゴンのみを抽出
-				if (fabsf(p[j].y - hit.HitPosition.y) > 1.0f) {
-					isFloor = false;
-				}
-			}
-			if (!isFloor) continue;
-
-			for (int j = 0; j < 3; ++j) {
-				VERTEX3D v = {};
-				// Z-fighting（チラつき）防止のため、床よりわずかに浮かす (+0.15f)
-				v.pos = VAdd(p[j], VGet(0.0f, 0.15f, 0.0f));
-				v.norm = VGet(0.0f, 1.0f, 0.0f);
-				v.dif = GetColorU8(255, 255, 255, 255);
-				v.u = (p[j].x - origin.x) / tileSize;
-				v.v = (p[j].z - origin.z) / tileSize;
-				vertices.push_back(v);
-			}
-		}
-		MV1TerminateReferenceMesh(stage, -1, TRUE);
-	}
-
-	~ArenaStoneFloor() {
-		if (texture != -1) {
-			DeleteGraph(texture);
-			texture = -1;
-		}
-	}
-
-	void Draw() const {
-		if (texture == -1 || vertices.empty()) return;
-
-		const int culling = GetUseBackCulling();
-		const int drawMode = GetDrawMode();
-
-		SetUseBackCulling(DX_CULLING_NONE);
-		SetUseZBuffer3D(TRUE);
-		SetWriteZBuffer3D(TRUE);
-		SetTextureAddressMode(DX_TEXADDRESS_WRAP);
-		SetDrawMode(DX_DRAWMODE_BILINEAR);
-
-		DrawPolygon3D(vertices.data(), (int)vertices.size() / 3, texture, FALSE);
-
-		SetDrawMode(drawMode);
-		SetTextureAddressMode(DX_TEXADDRESS_CLAMP);
-		SetWriteZBuffer3D(FALSE);
-		SetUseZBuffer3D(FALSE);
-		SetUseBackCulling(culling);
-	}
-};
 
 // Normalize Xbox face buttons to A=1, B=2, X=3, Y=4.
 int ReadPlayerPadState(int padType) {
-    int buttons = GetJoypadInputState(padType);
-    if (buttons < 0) buttons = 0;
-    XINPUT_STATE xbox = {};
-    if (GetJoypadXInputState(padType, &xbox) == 0) {
-        buttons &= ~(PAD_INPUT_1 | PAD_INPUT_2 | PAD_INPUT_3 | PAD_INPUT_4);
-        if (xbox.Buttons[XINPUT_BUTTON_A]) buttons |= PAD_INPUT_1;
-        if (xbox.Buttons[XINPUT_BUTTON_B]) buttons |= PAD_INPUT_2;
-        if (xbox.Buttons[XINPUT_BUTTON_X]) buttons |= PAD_INPUT_3;
-        if (xbox.Buttons[XINPUT_BUTTON_Y]) buttons |= PAD_INPUT_4;
-    }
-    return buttons;
+	int buttons = GetJoypadInputState(padType);
+	if (buttons < 0) buttons = 0;
+	XINPUT_STATE xbox = {};
+	if (GetJoypadXInputState(padType, &xbox) == 0) {
+		buttons &= ~(PAD_INPUT_1 | PAD_INPUT_2 | PAD_INPUT_3 | PAD_INPUT_4);
+		if (xbox.Buttons[XINPUT_BUTTON_A]) buttons |= PAD_INPUT_1;
+		if (xbox.Buttons[XINPUT_BUTTON_B]) buttons |= PAD_INPUT_2;
+		if (xbox.Buttons[XINPUT_BUTTON_X]) buttons |= PAD_INPUT_3;
+		if (xbox.Buttons[XINPUT_BUTTON_Y]) buttons |= PAD_INPUT_4;
+	}
+	return buttons;
 }
 
 namespace {
 
-bool IsKeyDown(int keyCode) {
-	return keyCode >= 0 && CheckHitKey(keyCode) != 0;
-}
-
-bool CanControlPlayerMode(int mode) {
-	return mode == STAND || mode == RUN || mode == ATTACK || mode == ATTACKOUT;
-}
-
-constexpr int PAD_ANALOG_DEAD_ZONE = 400;
-
-bool IsPadButtonDown(int padState, int padButton) {
-	return padButton != 0 && (padState & padButton) != 0;
-}
-
-bool IsPadOrKeyDown(int padState, int padButton, int keyCode) {
-	return IsPadButtonDown(padState, padButton) || IsKeyDown(keyCode);
-}
-
-
-void StopNormalAttackEffect(PlayerRuntimeState& state) {
-	if (state.normalAttackPlayingHandle != -1) {
-		StopEffekseer3DEffect(state.normalAttackPlayingHandle);
-	}
-	state.normalAttackPlayingHandle = -1;
-	state.isNormalAttackEffectPlaying = false;
-}
-
-void PositionNormalAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state) {
-	const float yaw = DX_PI_F * 0.5f * player.direction;
-	SetPosPlayingEffekseer3DEffect(state.normalAttackPlayingHandle,
-		player.pos.x - sinf(yaw) * 85.0f,
-		player.pos.y + player.charahitinfo.Height * 0.55f,
-		player.pos.z - cosf(yaw) * 85.0f);
-	SetRotationPlayingEffekseer3DEffect(state.normalAttackPlayingHandle, 0.0f, yaw,
-		state.attackIndex == 1 ? DX_PI_F : 0.0f);
-}
-
-void UpdateNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
-	if (!state.isNormalAttackEffectPlaying) return;
-	if (IsEffekseer3DEffectPlaying(state.normalAttackPlayingHandle) != 0) {
-		StopNormalAttackEffect(state);
-		return;
-	}
-	PositionNormalAttackEffect(player, state);
-}
-
-void StartHeavyAttackEffect(PlayerRuntimeState& state) {
-	// 重攻撃開始時にエフェクトの先頭フレームへ戻す。
-	state.heavyAttackEffectFrame = 0;
-	state.heavyAttackEffectWait = 0;
-	state.isHeavyAttackEffectPlaying = true;
-}
-
-void StopHeavyAttackEffect(PlayerRuntimeState& state) {
-	state.heavyAttackEffectFrame = 0;
-	state.heavyAttackEffectWait = 0;
-	state.isHeavyAttackEffectPlaying = false;
-}
-
-void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
-	// 重攻撃エフェクトのスプライトシートを1フレームずつ進める。
-	if (!state.isHeavyAttackEffectPlaying) {
-		return;
+	bool IsKeyDown(int keyCode) {
+		return keyCode >= 0 && CheckHitKey(keyCode) != 0;
 	}
 
-	state.heavyAttackEffectWait++;
-	if (state.heavyAttackEffectWait < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_INTERVAL) {
-		return;
+	bool CanControlPlayerMode(int mode) {
+		return mode == STAND || mode == RUN || mode == ATTACK || mode == ATTACKOUT;
 	}
 
-	state.heavyAttackEffectWait = 0;
-	state.heavyAttackEffectFrame++;
-	if (state.heavyAttackEffectFrame >= PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT) {
-		StopHeavyAttackEffect(state);
-	}
-}
+	constexpr int PAD_ANALOG_DEAD_ZONE = 400;
 
-void PositionSpecialAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state) {
-	const float yaw = DX_PI_F * 0.5f * player.direction;
-	SetPosPlayingEffekseer3DEffect(state.specialAttackPlayingHandle,
-		player.pos.x - sinf(yaw) * (state.bloodLanceSpecial ? 0.0f : PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET),
-		player.pos.y + (state.bloodLanceSpecial ? 0.0f : player.charahitinfo.Height * 0.55f + PLAYER_SPECIAL_ATTACK_EFFECT_HEIGHT_OFFSET),
-		player.pos.z - cosf(yaw) * (state.bloodLanceSpecial ? 0.0f : PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET));
-	SetRotationPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, 0.0f, yaw - DX_PI_F * 0.5f, 0.0f);
-}
-void StartSpecialAttackEffect(
-	const SCharaInfo& player,
-	PlayerRuntimeState& state,
-	int effectResourceHandle
-) {
-	// 必殺技ごとに判定時間、多重ヒット防止、Effekseer の再生位置を初期化する。
-	state.specialAttackEffectFrame = 0;
-	state.specialAttackEffectWait = 0;
-	state.isSpecialAttackEffectPlaying = true;
-	for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
-	state.specialAttackPlayingHandle = PlayEffekseer3DEffect(effectResourceHandle);
-	if (state.specialAttackPlayingHandle != -1) {
-		PositionSpecialAttackEffect(player, state);
-        SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f);
-
-	}
-}
-
-void StopSpecialAttackEffect(PlayerRuntimeState& state) {
-	if (state.specialAttackPlayingHandle != -1) {
-		StopEffekseer3DEffect(state.specialAttackPlayingHandle);
-		state.specialAttackPlayingHandle = -1;
-	}
-	state.specialAttackEffectFrame = 0;
-	state.specialAttackEffectWait = 0;
-	state.isSpecialAttackEffectPlaying = false;
-}
-
-void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
-	if (!state.isSpecialAttackEffectPlaying) {
-		return;
+	bool IsPadButtonDown(int padState, int padButton) {
+		return padButton != 0 && (padState & padButton) != 0;
 	}
 
-	// プレイヤー座標を毎フレーム反映し、1P/2P の各エフェクトを本人に追従させる。
-	if (state.specialAttackPlayingHandle != -1) {
-		PositionSpecialAttackEffect(player, state);
-        SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f);
-
+	bool IsPadOrKeyDown(int padState, int padButton, int keyCode) {
+		return IsPadButtonDown(padState, padButton) || IsKeyDown(keyCode);
 	}
 
-	state.specialAttackEffectWait++;
-	if (state.specialAttackEffectWait < PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL) {
-		return;
+
+	void StopNormalAttackEffect(PlayerRuntimeState& state) {
+		if (state.normalAttackPlayingHandle != -1) {
+			StopEffekseer3DEffect(state.normalAttackPlayingHandle);
+		}
+		state.normalAttackPlayingHandle = -1;
+		state.isNormalAttackEffectPlaying = false;
 	}
 
-	state.specialAttackEffectWait = 0;
-	state.specialAttackEffectFrame++;
-	if (state.specialAttackEffectFrame >= (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_FRAMES : PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT)) {
+	void PositionNormalAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state) {
+		const float yaw = DX_PI_F * 0.5f * player.direction;
+		SetPosPlayingEffekseer3DEffect(state.normalAttackPlayingHandle,
+			player.pos.x - sinf(yaw) * 85.0f,
+			player.pos.y + player.charahitinfo.Height * 0.55f,
+			player.pos.z - cosf(yaw) * 85.0f);
+		SetRotationPlayingEffekseer3DEffect(state.normalAttackPlayingHandle, 0.0f, yaw,
+			state.attackIndex == 1 ? DX_PI_F : 0.0f);
+	}
+
+	void UpdateNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
+		if (!state.isNormalAttackEffectPlaying) return;
+		if (IsEffekseer3DEffectPlaying(state.normalAttackPlayingHandle) != 0) {
+			StopNormalAttackEffect(state);
+			return;
+		}
+		PositionNormalAttackEffect(player, state);
+	}
+
+	void StartHeavyAttackEffect(PlayerRuntimeState& state) {
+		// 重攻撃開始時にエフェクトの先頭フレームへ戻す。
+		state.heavyAttackEffectFrame = 0;
+		state.heavyAttackEffectWait = 0;
+		state.isHeavyAttackEffectPlaying = true;
+	}
+
+	void StopHeavyAttackEffect(PlayerRuntimeState& state) {
+		state.heavyAttackEffectFrame = 0;
+		state.heavyAttackEffectWait = 0;
+		state.isHeavyAttackEffectPlaying = false;
+	}
+
+	void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
+		// 重攻撃エフェクトのスプライトシートを1フレームずつ進める。
+		if (!state.isHeavyAttackEffectPlaying) {
+			return;
+		}
+
+		state.heavyAttackEffectWait++;
+		if (state.heavyAttackEffectWait < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_INTERVAL) {
+			return;
+		}
+
+		state.heavyAttackEffectWait = 0;
+		state.heavyAttackEffectFrame++;
+		if (state.heavyAttackEffectFrame >= PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT) {
+			StopHeavyAttackEffect(state);
+		}
+	}
+
+	void PositionSpecialAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state) {
+		const float yaw = DX_PI_F * 0.5f * player.direction;
+		SetPosPlayingEffekseer3DEffect(state.specialAttackPlayingHandle,
+			player.pos.x - sinf(yaw) * (state.bloodLanceSpecial ? 0.0f : PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET),
+			player.pos.y + (state.bloodLanceSpecial ? 0.0f : player.charahitinfo.Height * 0.55f + PLAYER_SPECIAL_ATTACK_EFFECT_HEIGHT_OFFSET),
+			player.pos.z - cosf(yaw) * (state.bloodLanceSpecial ? 0.0f : PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET));
+		SetRotationPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, 0.0f, yaw - DX_PI_F * 0.5f, 0.0f);
+	}
+	void StartSpecialAttackEffect(
+		const SCharaInfo& player,
+		PlayerRuntimeState& state,
+		int effectResourceHandle
+	) {
+		// 必殺技ごとに判定時間、多重ヒット防止、Effekseer の再生位置を初期化する。
+		state.specialAttackEffectFrame = 0;
+		state.specialAttackEffectWait = 0;
+		state.isSpecialAttackEffectPlaying = true;
+		for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
+		state.specialAttackPlayingHandle = PlayEffekseer3DEffect(effectResourceHandle);
+		if (state.specialAttackPlayingHandle != -1) {
+			PositionSpecialAttackEffect(player, state);
+			SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f);
+
+		}
+	}
+
+	void StopSpecialAttackEffect(PlayerRuntimeState& state) {
+		if (state.specialAttackPlayingHandle != -1) {
+			StopEffekseer3DEffect(state.specialAttackPlayingHandle);
+			state.specialAttackPlayingHandle = -1;
+		}
+		state.specialAttackEffectFrame = 0;
+		state.specialAttackEffectWait = 0;
+		state.isSpecialAttackEffectPlaying = false;
+	}
+
+	void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
+		if (!state.isSpecialAttackEffectPlaying) {
+			return;
+		}
+
+		// プレイヤー座標を毎フレーム反映し、1P/2P の各エフェクトを本人に追従させる。
+		if (state.specialAttackPlayingHandle != -1) {
+			PositionSpecialAttackEffect(player, state);
+			SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f);
+
+		}
+
+		state.specialAttackEffectWait++;
+		if (state.specialAttackEffectWait < PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL) {
+			return;
+		}
+
+		state.specialAttackEffectWait = 0;
+		state.specialAttackEffectFrame++;
+		if (state.specialAttackEffectFrame >= (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_FRAMES : PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_COUNT)) {
+			StopSpecialAttackEffect(state);
+		}
+	}
+
+	void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& input, float& inputX, float& inputZ) {
+		// 方向キー、十字キー、左スティックをまとめて移動入力に変換する。
+		bool moveDown = IsPadButtonDown(state.key, PAD_INPUT_DOWN) || IsKeyDown(input.downKey);
+		bool moveUp = IsPadButtonDown(state.key, PAD_INPUT_UP) || IsKeyDown(input.upKey);
+		bool moveLeft = IsPadButtonDown(state.key, PAD_INPUT_LEFT) || IsKeyDown(input.leftKey);
+		bool moveRight = IsPadButtonDown(state.key, PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey);
+
+		int analogX = 0;
+		int analogY = 0;
+		if (GetJoypadAnalogInput(&analogX, &analogY, input.padType) == 0) {
+			if (analogX < -PAD_ANALOG_DEAD_ZONE) {
+				moveLeft = true;
+			}
+			else if (analogX > PAD_ANALOG_DEAD_ZONE) {
+				moveRight = true;
+			}
+
+			if (analogY < -PAD_ANALOG_DEAD_ZONE) {
+				moveUp = true;
+			}
+			else if (analogY > PAD_ANALOG_DEAD_ZONE) {
+				moveDown = true;
+			}
+		}
+
+		inputX = 0.0f;
+		inputZ = 0.0f;
+		if (moveDown) {
+			inputZ -= MOVE_SPEED;
+		}
+		if (moveUp) {
+			inputZ += MOVE_SPEED;
+		}
+		if (moveLeft) {
+			inputX -= MOVE_SPEED;
+		}
+		if (moveRight) {
+			inputX += MOVE_SPEED;
+		}
+	}
+
+	void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
+		// 移動方向に合わせてキャラクターの向きを変える。
+		if (fabsf(inputX) > fabsf(inputZ)) {
+			player.direction = inputX < 0.0f ? Direction::LEFT : Direction::RIGHT;
+		}
+		else {
+			player.direction = inputZ < 0.0f ? Direction::DOWN : Direction::UP;
+		}
+	}
+
+	void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, bool isHeavyAttack, int animHeavyAttack) {
+		// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃と重攻撃を区別する。
+		state.attackIndex = isHeavyAttack ? PLAYER_ATTACK_ANIM_COUNT - 1 : 0;
+		state.isAttackBuffered = false;
+		state.isHeavyAttack = isHeavyAttack;
+		state.isSpecialAttack = false;
+		for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
 		StopSpecialAttackEffect(state);
-	}
-}
-
-void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& input, float& inputX, float& inputZ) {
-	// 方向キー、十字キー、左スティックをまとめて移動入力に変換する。
-	bool moveDown = IsPadButtonDown(state.key, PAD_INPUT_DOWN) || IsKeyDown(input.downKey);
-	bool moveUp = IsPadButtonDown(state.key, PAD_INPUT_UP) || IsKeyDown(input.upKey);
-	bool moveLeft = IsPadButtonDown(state.key, PAD_INPUT_LEFT) || IsKeyDown(input.leftKey);
-	bool moveRight = IsPadButtonDown(state.key, PAD_INPUT_RIGHT) || IsKeyDown(input.rightKey);
-
-	int analogX = 0;
-	int analogY = 0;
-	if (GetJoypadAnalogInput(&analogX, &analogY, input.padType) == 0) {
-		if (analogX < -PAD_ANALOG_DEAD_ZONE) {
-			moveLeft = true;
+		if (isHeavyAttack) {
+			StopNormalAttackEffect(state);
+			StartHeavyAttackEffect(state);
 		}
-		else if (analogX > PAD_ANALOG_DEAD_ZONE) {
-			moveRight = true;
+		else {
+			PlayPlayerNormalAttackEffect(player, state);
 		}
-
-		if (analogY < -PAD_ANALOG_DEAD_ZONE) {
-			moveUp = true;
-		}
-		else if (analogY > PAD_ANALOG_DEAD_ZONE) {
-			moveDown = true;
-		}
+		player.mode = ATTACK;
+		player.isHit = false;
+		SetCharacterAnimation(player, isHeavyAttack ? animHeavyAttack : animAttack[state.attackIndex]);
+		PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
 	}
 
-	inputX = 0.0f;
-	inputZ = 0.0f;
-	if (moveDown) {
-		inputZ -= MOVE_SPEED;
-	}
-	if (moveUp) {
-		inputZ += MOVE_SPEED;
-	}
-	if (moveLeft) {
-		inputX -= MOVE_SPEED;
-	}
-	if (moveRight) {
-		inputX += MOVE_SPEED;
-	}
-}
-
-void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
-	// 移動方向に合わせてキャラクターの向きを変える。
-	if (fabsf(inputX) > fabsf(inputZ)) {
-		player.direction = inputX < 0.0f ? Direction::LEFT : Direction::RIGHT;
-	}
-	else {
-		player.direction = inputZ < 0.0f ? Direction::DOWN : Direction::UP;
-	}
-}
-
-void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, bool isHeavyAttack, int animHeavyAttack) {
-	// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃と重攻撃を区別する。
-	state.attackIndex = isHeavyAttack ? PLAYER_ATTACK_ANIM_COUNT - 1 : 0;
-	state.isAttackBuffered = false;
-	state.isHeavyAttack = isHeavyAttack;
-	state.isSpecialAttack = false;
-	for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
-	StopSpecialAttackEffect(state);
-	if (isHeavyAttack) {
+	void StartPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, int effectResourceHandle, int animSpecialAttack) {
+		// 専用モデルアニメーションができるまでは3段目の攻撃動作を流用する。
+		state.attackIndex = PLAYER_ATTACK_ANIM_COUNT - 1;
+		state.isAttackBuffered = false;
+		state.isHeavyAttack = false;
+		state.isSpecialAttack = true;
 		StopNormalAttackEffect(state);
-		StartHeavyAttackEffect(state);
-	}
-	else {
-		PlayPlayerNormalAttackEffect(player, state);
-	}
-	player.mode = ATTACK;
-	player.isHit = false;
-	SetCharacterAnimation(player, isHeavyAttack ? animHeavyAttack : animAttack[state.attackIndex]);
-	PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
-}
-
-void StartPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, int effectResourceHandle, int animSpecialAttack) {
-	// 専用モデルアニメーションができるまでは3段目の攻撃動作を流用する。
-	state.attackIndex = PLAYER_ATTACK_ANIM_COUNT - 1;
-	state.isAttackBuffered = false;
-	state.isHeavyAttack = false;
-	state.isSpecialAttack = true;
-	StopNormalAttackEffect(state);
-	StopHeavyAttackEffect(state);
-	StartSpecialAttackEffect(player, state, effectResourceHandle);
-	ResetMove(player);
-	player.mode = ATTACK;
-	player.isHit = false;
-	SetCharacterAnimation(player, animSpecialAttack);
-	PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
-}
-
-void ApplyAttackStepMove(SCharaInfo& player, PlayerRuntimeState& state, const PlayerInputConfig& input) {
-	ResetMove(player);
-
-	float inputX = 0.0f;
-	float inputZ = 0.0f;
-	GetMoveInput(state, input, inputX, inputZ);
-	if (inputX != 0.0f || inputZ != 0.0f) {
-		SetDirectionByMove(player, inputX, inputZ);
+		StopHeavyAttackEffect(state);
+		StartSpecialAttackEffect(player, state, effectResourceHandle);
+		ResetMove(player);
+		player.mode = ATTACK;
+		player.isHit = false;
+		SetCharacterAnimation(player, animSpecialAttack);
+		PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
 	}
 
-	switch (player.direction)
-	{
-	case Direction::DOWN:
-		player.move.z = -7.0f;
-		break;
-	case Direction::UP:
-		player.move.z = 7.0f;
-		break;
-	case Direction::LEFT:
-		player.move.x = -7.0f;
-		break;
-	case Direction::RIGHT:
-		player.move.x = 7.0f;
-		break;
-	default:
-		break;
+	void ApplyAttackStepMove(SCharaInfo& player, PlayerRuntimeState& state, const PlayerInputConfig& input) {
+		ResetMove(player);
+
+		float inputX = 0.0f;
+		float inputZ = 0.0f;
+		GetMoveInput(state, input, inputX, inputZ);
+		if (inputX != 0.0f || inputZ != 0.0f) {
+			SetDirectionByMove(player, inputX, inputZ);
+		}
+
+		switch (player.direction)
+		{
+		case Direction::DOWN:
+			player.move.z = -7.0f;
+			break;
+		case Direction::UP:
+			player.move.z = 7.0f;
+			break;
+		case Direction::LEFT:
+			player.move.x = -7.0f;
+			break;
+		case Direction::RIGHT:
+			player.move.x = 7.0f;
+			break;
+		default:
+			break;
+		}
 	}
-}
 
 } // namespace
 
 void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound, int effect) {
-    StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation);
+	StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation);
 }
 
 void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float speed) {
-    float dx = target.pos.x - attacker.pos.x;
-    float dz = target.pos.z - attacker.pos.z;
-    const float length = sqrtf(dx * dx + dz * dz);
-    if (length > 0.001f) {
-        dx /= length;
-        dz /= length;
-    } else {
-        const float yaw = DX_PI_F * 0.5f * attacker.direction;
-        dx = -sinf(yaw);
-        dz = -cosf(yaw);
-    }
-    target.knockbackVelocity = VGet(dx * speed, 0.0f, dz * speed);
-    target.knockbackFrames = PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES;
+	float dx = target.pos.x - attacker.pos.x;
+	float dz = target.pos.z - attacker.pos.z;
+	const float length = sqrtf(dx * dx + dz * dz);
+	if (length > 0.001f) {
+		dx /= length;
+		dz /= length;
+	}
+	else {
+		const float yaw = DX_PI_F * 0.5f * attacker.direction;
+		dx = -sinf(yaw);
+		dz = -cosf(yaw);
+	}
+	target.knockbackVelocity = VGet(dx * speed, 0.0f, dz * speed);
+	target.knockbackFrames = PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES;
 }
 
 void UpdateEnemyKnockback(SCharaInfo& target) {
-    if (target.mode != DAMAGE || target.enemyHP <= 0) {
-        target.knockbackFrames = 0;
-        target.knockbackVelocity = VGet(0, 0, 0);
-        return;
-    }
-    if (target.knockbackFrames <= 0) return;
-    target.pos = VAdd(target.pos, target.knockbackVelocity);
-    target.knockbackVelocity = VScale(target.knockbackVelocity, 0.85f);
-    if (--target.knockbackFrames == 0) target.knockbackVelocity = VGet(0, 0, 0);
+	if (target.mode != DAMAGE || target.enemyHP <= 0) {
+		target.knockbackFrames = 0;
+		target.knockbackVelocity = VGet(0, 0, 0);
+		return;
+	}
+	if (target.knockbackFrames <= 0) return;
+	target.pos = VAdd(target.pos, target.knockbackVelocity);
+	target.knockbackVelocity = VScale(target.knockbackVelocity, 0.85f);
+	if (--target.knockbackFrames == 0) target.knockbackVelocity = VGet(0, 0, 0);
 }
 
 void ResetMove(SCharaInfo& chara) {
@@ -403,51 +328,51 @@ void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 }
 
 void CancelPlayerCombat(PlayerRuntimeState& state) {
-    StopNormalAttackEffect(state);
-    StopHeavyAttackEffect(state);
-    StopSpecialAttackEffect(state);
-    state.isSpecialAttack = false;
-    state.isHeavyAttack = false;
-    state.isAttackBuffered = false;
-    state.attackIndex = 0;
-    state.movementAnimation = -1;
+	StopNormalAttackEffect(state);
+	StopHeavyAttackEffect(state);
+	StopSpecialAttackEffect(state);
+	state.isSpecialAttack = false;
+	state.isHeavyAttack = false;
+	state.isAttackBuffered = false;
+	state.attackIndex = 0;
+	state.movementAnimation = -1;
 }
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
 	if (player.mode == DAMAGE || player.mode == DOWNMODE) {
-        CancelPlayerCombat(state);
-        ResetMove(player);
-        if (player.mode == DOWNMODE) {
-            player.playtime = fminf(player.playtime + (PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep), player.anim_totaltime);
-            if (player.attachidx >= 0) MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
-            return;
-        }
-    }
-    UpdateNormalAttackEffect(player, state);
+		CancelPlayerCombat(state);
+		ResetMove(player);
+		if (player.mode == DOWNMODE) {
+			player.playtime = fminf(player.playtime + (PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep), player.anim_totaltime);
+			if (player.attachidx >= 0) MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
+			return;
+		}
+	}
+	UpdateNormalAttackEffect(player, state);
 	UpdateHeavyAttackEffect(state);
 	UpdateSpecialAttackEffect(player, state);
-    // Release movement after one second while preserving the effect and damage.
-    if (state.isSpecialAttack && player.mode == ATTACK &&
-        state.specialAttackEffectFrame * PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL +
-            state.specialAttackEffectWait >= PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES) {
-        ResetMove(player);
-        state.movementAnimation = -1;
-        SetCharacterAnimation(player, animNeutral);
-        player.mode = STAND;
-    }
-    // Clear combat flags when the independent special effect ends.
-    if (state.isSpecialAttack && !state.isSpecialAttackEffectPlaying) {
-        state.isSpecialAttack = false;
-        state.isHeavyAttack = false;
-        state.isAttackBuffered = false;
-        state.attackIndex = 0;
-        state.movementAnimation = -1;
-        player.isHit = false;
-        if (player.mode == ATTACK || player.mode == ATTACKOUT) {
-            ResetMove(player);
-            SetCharacterAnimation(player, animNeutral);
-            player.mode = STAND;
-        }
-    }
+	// Release movement after one second while preserving the effect and damage.
+	if (state.isSpecialAttack && player.mode == ATTACK &&
+		state.specialAttackEffectFrame * PLAYER_SPECIAL_ATTACK_EFFECT_FRAME_INTERVAL +
+		state.specialAttackEffectWait >= PLAYER_SPECIAL_ATTACK_MOVE_LOCK_FRAMES) {
+		ResetMove(player);
+		state.movementAnimation = -1;
+		SetCharacterAnimation(player, animNeutral);
+		player.mode = STAND;
+	}
+	// Clear combat flags when the independent special effect ends.
+	if (state.isSpecialAttack && !state.isSpecialAttackEffectPlaying) {
+		state.isSpecialAttack = false;
+		state.isHeavyAttack = false;
+		state.isAttackBuffered = false;
+		state.attackIndex = 0;
+		state.movementAnimation = -1;
+		player.isHit = false;
+		if (player.mode == ATTACK || player.mode == ATTACKOUT) {
+			ResetMove(player);
+			SetCharacterAnimation(player, animNeutral);
+			player.mode = STAND;
+		}
+	}
 	if (player.mode != JUMPOUT) {
 		player.playtime += PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep;
 	}
@@ -471,15 +396,15 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
 		}
 	}
 
-    // Keep the casting motion moving until its independent effect/hit timeline ends.
-    if (player.mode == ATTACK && state.isSpecialAttack && state.isSpecialAttackEffectPlaying && player.anim_totaltime > 0.0f) {
-        player.playtime = fmodf(player.playtime, player.anim_totaltime);
-    }
-    MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
+	// Keep the casting motion moving until its independent effect/hit timeline ends.
+	if (player.mode == ATTACK && state.isSpecialAttack && state.isSpecialAttackEffectPlaying && player.anim_totaltime > 0.0f) {
+		player.playtime = fmodf(player.playtime, player.anim_totaltime);
+	}
+	MV1SetAttachAnimTime(player.model1, player.attachidx, player.playtime);
 }
 
 void PlayPlayerNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& state) {
-    for (int i = 0; i < MAX_CHARA; ++i) state.normalHitTargets[i] = false;
+	for (int i = 0; i < MAX_CHARA; ++i) state.normalHitTargets[i] = false;
 	StopNormalAttackEffect(state);
 	state.normalAttackPlayingHandle = PlayEffekseer3DEffect(state.normalAttackEffectResourceHandle);
 	state.isNormalAttackEffectPlaying = state.normalAttackPlayingHandle != -1;
@@ -521,7 +446,7 @@ void CheckPlayerSpecialAttackHit(
 		return;
 	}
 	if (state.specialAttackEffectFrame < (state.bloodLanceSpecial ? 48 : PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME) ||
-		state.specialAttackEffectFrame > (state.bloodLanceSpecial ? 120 : PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME)) {
+		state.specialAttackEffectFrame >(state.bloodLanceSpecial ? 120 : PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME)) {
 		return;
 	}
 	if (target.mode == NONE || target.mode == DOWNMODE || target.mode == DAMAGE || target.enemyHP <= 0) {
@@ -538,23 +463,25 @@ void CheckPlayerSpecialAttackHit(
 		target.pos.y + target.charahitinfo.Height < attacker.pos.y) return;
 	float centerX, centerZ, attackRadius;
 	if (state.bloodLanceSpecial) {
-        // BloodLance emerges in a ring around the caster.
-        centerX = centerZ = 0.0f;
-        attackRadius = 220.0f;
-    } else if (state.specialAttackEffectFrame < 70) {
-        float along = dx * forwardX + dz * forwardZ;
-        if (along < 40.0f) along = 40.0f;
-        if (along > 384.0f) along = 384.0f;
-        centerX = forwardX * along; centerZ = forwardZ * along;
-        attackRadius = 104.0f;
-    } else {
-        centerX = forwardX * PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET;
-        centerZ = forwardZ * PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET;
-        float rate = static_cast<float>(state.specialAttackEffectFrame - 70 + 1) / static_cast<float>(PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME - 70 + 1);
-        if (rate > 1.0f) rate = 1.0f;
-        attackRadius = 160.0f + (PLAYER_SPECIAL_ATTACK_MAX_RADIUS - 160.0f) * rate;
-    }
-    const float hitDistance = attackRadius + targetRadius;
+		// BloodLance emerges in a ring around the caster.
+		centerX = centerZ = 0.0f;
+		attackRadius = 220.0f;
+	}
+	else if (state.specialAttackEffectFrame < 70) {
+		float along = dx * forwardX + dz * forwardZ;
+		if (along < 40.0f) along = 40.0f;
+		if (along > 384.0f) along = 384.0f;
+		centerX = forwardX * along; centerZ = forwardZ * along;
+		attackRadius = 104.0f;
+	}
+	else {
+		centerX = forwardX * PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET;
+		centerZ = forwardZ * PLAYER_SPECIAL_ATTACK_EFFECT_FORWARD_OFFSET;
+		float rate = static_cast<float>(state.specialAttackEffectFrame - 70 + 1) / static_cast<float>(PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME - 70 + 1);
+		if (rate > 1.0f) rate = 1.0f;
+		attackRadius = 160.0f + (PLAYER_SPECIAL_ATTACK_MAX_RADIUS - 160.0f) * rate;
+	}
+	const float hitDistance = attackRadius + targetRadius;
 	const float distanceX = dx - centerX, distanceZ = dz - centerZ;
 	if (distanceX * distanceX + distanceZ * distanceZ > hitDistance * hitDistance) return;
 	// Each target takes damage once per cast.
@@ -640,7 +567,7 @@ void UpdatePlayerInput(
 				UpdatePlayerMovement(player, state, inputX, inputZ, animRun);
 			}
 
-            // The former jump button is reserved for resurrection in main.cpp.
+			// The former jump button is reserved for resurrection in main.cpp.
 		}
 	}
 

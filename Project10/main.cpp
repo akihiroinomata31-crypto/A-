@@ -12,7 +12,9 @@
 #include "OrbitCamera.h"
 #include "../DXLib/DxLib.h"
 #include "senk.h"
+#include "golem.h"
 
+extern GolemManager golemManager; 
 //void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
 static int playerDamageAnimation = -1;
 float aimPitchAngle[PLAYER_COUNT] = { 0.25f, 0.25f };
@@ -163,7 +165,7 @@ const int INTERRUPT_COOLDOWN_FRAMES = 60 * 3;
 int playerInterferenceCooldown[PLAYER_COUNT] = { 0, 0 };
 bool isPlayerInterferenceActive[PLAYER_COUNT] = { false, false };
 
-const int PLAYER_STUN_DURATION_FRAMES = 45; // 約0.75秒
+const int PLAYER_STUN_DURATION_FRAMES = 180; // 約0.75秒
 int playerStunTimer[PLAYER_COUNT] = { 0, 0 };
 
 namespace {
@@ -902,12 +904,20 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
     MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
 
-    /* charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Golem.mv1");
-     if (charainfo[TEST_ENEMY_GOLEM].model1 != -1) {
-         MV1SetVisible(charainfo[TEST_ENEMY_GOLEM].model1, FALSE);
-         charainfo[TEST_ENEMY_GOLEM].mode = NONE;
-         MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f));
-     }*/
+    // ========================================================
+      // ★ ゴーレム（ボス）本体モデルの読み込みとアニメーション初期化
+      // ========================================================
+    charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Boss.mv1");
+    if (charainfo[TEST_ENEMY_GOLEM].model1 != -1) {
+        MV1SetVisible(charainfo[TEST_ENEMY_GOLEM].model1, FALSE);
+        charainfo[TEST_ENEMY_GOLEM].mode = NONE;
+        charainfo[TEST_ENEMY_GOLEM].HP = 0;
+        charainfo[TEST_ENEMY_GOLEM].enemyHP = 0;
+        MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f));
+
+        // ゴーレム各アニメーションモデルのロードとアタッチ
+        InitGolemAnimations(charainfo[TEST_ENEMY_GOLEM]);
+    }
 
     for (int i = 0; !PLAYER_USE_NEW_MODEL && i < PLAYER_COUNT; i++) {
         rootflm = MV1SearchFrame(charainfo[i].model1, "root");
@@ -1688,7 +1698,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                                 charainfo[p].attachidx = MV1AttachAnim(charainfo[p].model1, 0, playerDamageAnimation);
                                 charainfo[p].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[p].model1, charainfo[p].attachidx);
 
-                                playerWhiteoutTimer[p] = 180;
+                                playerWhiteoutTimer[p] = 500;
                                 playerStunTimer[p] = PLAYER_STUN_DURATION_FRAMES; // 180フレーム（3秒）
                             }
                             else {
@@ -1980,23 +1990,30 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                     continue;
                 }
 
+                // ==========================================
+                 // ★ スタンタイマー処理（3秒間完全拘束）
+                 // ==========================================
                 if (playerStunTimer[i] > 0) {
                     playerStunTimer[i]--;
                     ResetMove(charainfo[i]);
                     CancelPlayerCombat(playerStates[i]);
                     isAiming[i] = false;
 
+                    // スタン中の硬直姿勢（被弾モーションの前半で固定）
                     if (charainfo[i].attachidx != -1) {
-                        float freezeTime = charainfo[i].anim_totaltime * 0.15f;
+                        float freezeTime = charainfo[i].anim_totaltime * 0.2f;
                         MV1SetAttachAnimTime(charainfo[i].model1, charainfo[i].attachidx, freezeTime);
                     }
 
+                    // ガタガタ震える演出
                     float shakeX = sinf(GetNowCount() * 0.09f) * 3.5f;
                     MV1SetPosition(charainfo[i].model1, VAdd(charainfo[i].pos, VGet(shakeX, 0.0f, 0.0f)));
 
+                    // 黄色く点滅
                     int yellowPulse = 80 + (int)(sinf(GetNowCount() * 0.03f) * 60);
                     MV1SetMaterialDrawAddColorAll(charainfo[i].model1, yellowPulse, yellowPulse, 0);
 
+                    // スタン終了時のみ通常待機へ復帰
                     if (playerStunTimer[i] <= 0) {
                         charainfo[i].mode = STAND;
                         charainfo[i].playtime = 0.0f;
@@ -2006,7 +2023,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                         if (i == PLAYER2_INDEX) MV1SetMaterialDrawAddColorAll(charainfo[i].model1, 0, 0, 60);
                         else                    MV1SetMaterialDrawAddColorAll(charainfo[i].model1, 0, 0, 0);
                     }
-                    continue;
+                    continue; // ★ スタン中は以降の入力・移動・攻撃処理を完全スキップ
                 }
 
                 if (charainfo[i].mode == DAMAGE || charainfo[i].mode == DOWNMODE) {
@@ -2044,7 +2061,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                     specialAttackEffectResourceHandle[i]
                 );
 
-                if (revengeBoost[i].active) {
+                if (revengeBoost[i].active && charainfo[i].mode == RUN) {
                     charainfo[i].move.x *= speedMultiplier;
                     charainfo[i].move.z *= speedMultiplier;
                 }
@@ -2620,9 +2637,7 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
                     target->pos = VAdd(target->pos, VScale(knockDir, 25.0f));
                     MV1SetPosition(target->model1, target->pos);
                 }
-                if (playerStunTimer[targetIdx] <= 0) {
-                    playerStunTimer[targetIdx] = PLAYER_STUN_DURATION_FRAMES;
-                }
+                
                 if (target->enemyHP <= 0) {
                     target->mode = NONE;
                     MV1SetVisible(target->model1, FALSE);
@@ -2653,3 +2668,5 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
         }
     }
 }
+
+
