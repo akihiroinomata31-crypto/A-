@@ -8,6 +8,8 @@
     <ClCompile Include="player.cpp" />
     <ClCompile Include="winer.cpp" />
     <ClCompile Include="senk.cpp" />
+    <ClCompile Include="boost.cpp" />
+    <ClCompile Include="golem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
@@ -15,11 +17,17 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
     <ClInclude Include="player.h" />
+    <ClInclude Include="JustGuard.h" />
+    <ClInclude Include="PlayerSprint.h" />
+    <ClInclude Include="SprintKnockback.h" />
+    <ClInclude Include="SprintKnockbackChecks.h" />
     <ClInclude Include="PlayerMotionAssets.h" />
     <ClInclude Include="GameTiming.h" />
     <ClInclude Include="HudText.h" />
     <ClInclude Include="RuntimeProfile.h" />
     <ClInclude Include="OrbitCamera.h" />
     <ClInclude Include="senk.h" />
+    <ClInclude Include="boost.h" />
+    <ClInclude Include="golem.h" />
   </ItemGroup>
 </Project>

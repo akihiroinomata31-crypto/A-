@@ -37,7 +37,7 @@ struct Flashbang {
 
 class GameManager {
 private:
-  
+
 public:
     // --- 勝敗・キル数管理 ---
     int killCount[2] = { 0, 0 }; // 各プレイヤーの撃破数
@@ -64,6 +64,7 @@ public:
 
     static constexpr int DeathPenalty = 3000;
     static constexpr int SpecialPenalty = 1000;
+
     int specialUseCount[2] = { 0, 0 };
     int deathCount[2] = { 0, 0 };
     int gameState = 0; // 0: 進行中, 1: 1P勝, 2: 2P勝, 3: 引き分け
@@ -85,8 +86,9 @@ public:
         goblinSpawnTimer = 0;
         redSpawnTimer = 0;
         bossSpawned = false;
-        bossCutsceneTimer = 0;
         bossCutsceneDone = false;
+        bossCutsceneTimer = 0;
+        startCountdownTimer = 0;
         for (int i = 0; i < 20; i++) {
             popups[i].active = false;
         }
@@ -118,7 +120,8 @@ public:
     int enemy_anim_walk = -1;
 
     bool SetGameResourceDirectory();
-    void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
+    // game.h 内
+void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr, int rollTimer = 0);
     // ★ 敵の頭上HPバー描画関数を追加
     void DrawEnemyHPBars(int pIdx, const SCharaInfo* charainfo);
    // void DrawSingleEnemyHPBar(const VECTOR& enemyPos, int currentHp, int maxHp, float headOffset);
@@ -128,11 +131,12 @@ public:
     int itemDropTimer = 0;               // アイテムが降ってくるインターバル用
     int flashbangStock[2] = { 0, 0 };    // [0]:1Pの所持数, [1]:2Pの所持数
     int playerStunTimer[2] = { 0, 0 };   // スタン残り時間
-
+     // ★ 開幕カウントダウン変数（120FPS基準: 3秒カウント + 0.8秒START表示 = 460フレーム）
+    int startCountdownTimer = 0;
+    bool bossSpawned = false;
    // ★ 1.5秒演出用（120FPS基準で180フレーム、60FPS基準なら90に調整）
     static const int BOSS_CUTSCENE_TOTAL_FRAMES = 90;
     int bossCutsceneTimer;
-    bool bossSpawned = false; // One boss per match, including after defeat.
     bool bossCutsceneDone; // ★ 1回演出したら二度と再起動しないフラグ
     static void DrawLoadingScreen();
     // 演出判定用ゲッター
@@ -140,7 +144,7 @@ public:
 
     // カメラ座標計算（true: 演出中 / false: 通常カメラに戻す）
     bool ApplyBossCamera(VECTOR& outCamPos, VECTOR& outCamTarget, const SCharaInfo* enemyList);
-
+    void DrawStartCountdown(int sw, int sh, int img3, int img2, int img1);
     // ★ テロップ描画関数（DrawUI の中、または分割描画ループから呼ぶ）
     void DrawBossCutsceneUI(int startX, int endX, int screenHeight) const;
     void SpawnFlashItem();
@@ -154,7 +158,7 @@ public:
 
     void Init();
     void Update(SCharaInfo* enemyList, SCharaInfo* players);
-    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, int crownGraphHandle, int pvpIconHandle, bool isPvPActive, int pvpCooldown);
+    void DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex, bool isPvPActive, int pvpCooldown);
     void DrawTimer(int sw, int sh);
     void UpdateVisualTimers();
     void DrawCrownOnLeader(int pIdx, SCharaInfo* charainfo, int crownGraphHandle, GameManager& game);

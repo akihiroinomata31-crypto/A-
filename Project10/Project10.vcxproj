@@ -163,7 +163,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="boost.cpp" />
     <ClCompile Include="draw.cpp" />
+    <ClCompile Include="golem.cpp" />
     <ClCompile Include="main.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)ThirdParty\EffekseerForDXLib;$(ProjectDir)..\DXLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalUsingDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)..\DXLib;%(AdditionalUsingDirectories)</AdditionalUsingDirectories>
@@ -175,12 +177,18 @@
     <ClCompile Include="winer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="boost.h" />
     <ClInclude Include="CharacterCombat.h" />
     <ClInclude Include="game.h" />
+    <ClInclude Include="golem.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="map.h" />
     <ClInclude Include="senk.h" />
     <ClInclude Include="player.h" />
+    <ClInclude Include="JustGuard.h" />
+    <ClInclude Include="PlayerSprint.h" />
+    <ClInclude Include="SprintKnockback.h" />
+    <ClInclude Include="SprintKnockbackChecks.h" />
     <ClInclude Include="PlayerMotionAssets.h" />
     <ClInclude Include="GameTiming.h" />
     <ClInclude Include="HudText.h" />

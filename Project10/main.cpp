@@ -15,7 +15,16 @@
 #include "SprintKnockbackChecks.h"
 #include "../DXLib/DxLib.h"
 #include "senk.h"
-void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
+#include "golem.h"
+float aimPitchAngle[PLAYER_COUNT] = { 0.25f, 0.25f };
+struct RevengeBoostState {
+    bool isUsed = false;     // 1試合1回制限
+    int timer = 0;           // 残り持続フレーム（60fps * 12秒 = 720）
+    bool active = false;     // 現在発動中か
+};
+RevengeBoostState revengeBoost[PLAYER_COUNT];
+
+
 
 // Alpha fades from the center to the edge of a ground-aligned disk.
 static void DrawPlayerGroundShadow(const MV1_COLL_RESULT_POLY& ground, float height) {
@@ -173,7 +182,7 @@ int playerInterferenceCooldown[PLAYER_COUNT] = { 0, 0 };
 bool isPlayerInterferenceActive[PLAYER_COUNT] = { false, false };
 
 // ★ プレイヤーのスタン（行動不能）管理変数（グローバル定義）
-const int PLAYER_STUN_DURATION_FRAMES = 45; // 約0.75秒
+const int PLAYER_STUN_DURATION_FRAMES = 180; // 約0.75秒
 int playerStunTimer[PLAYER_COUNT] = { 0, 0 };
 JustGuardState playerJustGuard[PLAYER_COUNT];
 
@@ -1201,13 +1210,19 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
     MV1SetMaterialDrawAddColorAll(charainfo[PLAYER2_INDEX].model1, 0, 0, 60);
 
-    charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Golem.mv1");
+    charainfo[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Boss.mv1");
     if (charainfo[TEST_ENEMY_GOLEM].model1 != -1) {
         MV1SetVisible(charainfo[TEST_ENEMY_GOLEM].model1, FALSE);
         charainfo[TEST_ENEMY_GOLEM].mode = NONE;
         MV1SetScale(charainfo[TEST_ENEMY_GOLEM].model1, VGet(1.0f, 1.0f, 1.0f));
     }
 
+    if (charainfo[TEST_ENEMY_GOLEM].model1 >= 0) {
+        InitGolemAnimations(charainfo[TEST_ENEMY_GOLEM]);
+        charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation = golemManager.idleAnimModel;
+        charainfo[TEST_ENEMY_GOLEM].enemyWalkAnimation = golemManager.walkAnimModel;
+        charainfo[TEST_ENEMY_GOLEM].enemyDamageAnimation = golemManager.idleAnimModel;
+    }
     for (int i = 0; !PLAYER_USE_NEW_MODEL && i < PLAYER_COUNT; i++) {
         rootflm = MV1SearchFrame(charainfo[i].model1, "root");
         if (rootflm != -1) MV1SetFrameUserLocalMatrix(charainfo[i].model1, rootflm, MGetIdent());
@@ -1277,7 +1292,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         bool active;
     };
 
-    const int MAX_DROP_FLASH = 5;
+    const int MAX_DROP_FLASH = 7;
     FlashDropItem dropFlashItems[MAX_DROP_FLASH];
     for (int i = 0; i < MAX_DROP_FLASH; i++) {
         dropFlashItems[i].active = false;
@@ -1351,8 +1366,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         charainfo[e].enemyWalkAnimation = enemy_anim_walk;
     }
 
-    charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation = MV1LoadModel("..\\Data\\Golem\\Anim_Neutral.mv1");
-    charainfo[TEST_ENEMY_GOLEM].enemyWalkAnimation = MV1LoadModel("..\\Data\\Golem\\Anim_Walk.mv1");
+    charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation = golemManager.idleAnimModel;
+    charainfo[TEST_ENEMY_GOLEM].enemyWalkAnimation = golemManager.walkAnimModel;
     if (charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation < 0 || charainfo[TEST_ENEMY_GOLEM].enemyWalkAnimation < 0) return -1;
 
     charainfo[TEST_ENEMY_GOLEM].enemyDamageAnimation = charainfo[TEST_ENEMY_GOLEM].enemyIdleAnimation;
@@ -1418,8 +1433,14 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     RuntimeProfile runtimeProfile;
     int simulationTicks = 0;
     const LONGLONG simulationWallStart = GetNowHiPerformanceCount();
+    const int SEmenuDecideHandle = LoadSoundMem("..\\Data\\SE\\click.wav");
+    const int imgCount3 = LoadGraph("..\\Data\\UI\\3.png");
+    const int imgCount2 = LoadGraph("..\\Data\\UI\\2.png");
+    const int imgCount1 = LoadGraph("..\\Data\\UI\\1.png");
     auto resetMatch = [&]() {
+        if (SEmenuDecideHandle >= 0) PlaySoundMem(SEmenuDecideHandle, DX_PLAYTYPE_BACK);
         game.Init();
+        game.startCountdownTimer = gameSmoke ? 0 : 450;
         for (auto& camera : orbitCameras) camera = OrbitCamera{};
         flashSpawnTimer = 0;
         for (auto& item : dropFlashItems) {
@@ -1449,6 +1470,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             // ★ スタンタイマーも確実にリセット
             playerStunTimer[p] = 0;
             playerJustGuard[p] = JustGuardState{};
+            revengeBoost[p] = RevengeBoostState{};
             SprintKnockback::Clear(charainfo[p]);
             // マテリアル発光リセット
             if (p == PLAYER2_INDEX) {
@@ -1555,7 +1577,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             bool confirm = CheckHitKey(KEY_INPUT_RETURN) || (pad & PAD_INPUT_1);
             bool direction = CheckHitKey(KEY_INPUT_UP) || CheckHitKey(KEY_INPUT_DOWN) || (pad & (PAD_INPUT_UP | PAD_INPUT_DOWN));
             if (uiSmoke) confirm = smokeFrames == 10 || smokeFrames == 90 || smokeFrames == 120;
-            if (direction && !prevMenuDirection) menuSelection = 1 - menuSelection;
+            if (screen == Screen::Results && direction && !prevMenuDirection) menuSelection = 1 - menuSelection;
+            if (screen == Screen::Menu) menuSelection = 0;
 
             if (confirm && !prevMenuConfirm) {
                 if (menuSelection == 1) break; // 終了
@@ -1574,7 +1597,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             prevMenuConfirm = confirm; prevMenuDirection = direction;
             logicClock.Reset(GetNowHiPerformanceCount());
             runtimeProfile.Reset(GetNowHiPerformanceCount());
-            if (screen != Screen::Playing) { DrawGameMenu(screen == Screen::Results, game, menuSelection, uiSmoke && smokeFrames == 1 ? TEXT("..\\.merge-review\\start-menu.png") : uiSmoke && smokeFrames == 65 ? TEXT("..\\.merge-review\\results.png") : nullptr); WaitTimer(16); }
+            if (screen != Screen::Playing) { game.DrawGameMenu(screen == Screen::Results, game, menuSelection, uiSmoke && smokeFrames == 1 ? TEXT("..\\.merge-review\\start-menu.png") : uiSmoke && smokeFrames == 65 ? TEXT("..\\.merge-review\\results.png") : nullptr); WaitTimer(16); }
             continue;
         }
 
@@ -1622,6 +1645,42 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             }
         }
         if (deathSmoke && smokeFrames == 100) { charainfo[0].HP = 0; charainfo[1].HP = 0; }
+            int remainSec = game.mainTimer / 60;
+            for (int p = 0; p < PLAYER_COUNT; p++) {
+                int opp = 1 - p;
+                int myScore = (p == 0) ? game.p1Score : game.p2Score;
+                int oppScore = (p == 0) ? game.p2Score : game.p1Score;
+
+                if (!revengeBoost[p].isUsed && remainSec <= 75 && remainSec > 0 && game.gameState == 0) {
+                    if (oppScore - myScore >= 3000) {
+                        revengeBoost[p].active = true;
+                        revengeBoost[p].isUsed = true;
+                        revengeBoost[p].timer = 60 * 32; // 12秒間
+                    }
+                }
+
+                if (revengeBoost[p].active) {
+                    revengeBoost[p].timer--;
+
+                    // 逆転（相手と同点以上）または時間切れで即終了
+                    if (myScore >= oppScore || revengeBoost[p].timer <= 0) {
+                        revengeBoost[p].active = false;
+                        if (charainfo[p].model1 != -1) {
+                            if (p == PLAYER2_INDEX) MV1SetMaterialDrawAddColorAll(charainfo[p].model1, 0, 0, 60);
+                            else                    MV1SetMaterialDrawAddColorAll(charainfo[p].model1, 0, 0, 0);
+                        }
+                    }
+                    else {
+                        // ブーストオーラ点滅
+                        if (charainfo[p].model1 != -1) {
+                            int pulse = 90 + (int)(sinf(GetNowCount() * 0.025f) * 60);
+                            MV1SetMaterialDrawAddColorAll(charainfo[p].model1, pulse, pulse / 2, 0);
+                        }
+                    }
+                }
+            }
+
+
         int currentJKey = CheckHitKey(KEY_INPUT_J);
         RespawnManager::Update(charainfo);
         for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -1652,66 +1711,109 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             playerJustGuard[p].Update(guardDown, CanJustGuard(charainfo[p], p) && !isAiming[p]);
         }
 		for (int p = 0; p < PLAYER_COUNT; p++) {
-			int rightX = 0, rightY = 0;
-            GetJoypadAnalogInputRight(&rightX, &rightY, playerInputs[p].padType);
-            const float rightYaw = orbitCameras[p].Update(rightX, rightY);
-            bool currentAimInput = false;
-			if (p == 0) {
-				currentAimInput = (CheckHitKey(KEY_INPUT_G) == 1) || (playerStates[p].key & PAD_INPUT_5);
-			}
-			else {
-				currentAimInput = (CheckHitKey(KEY_INPUT_DECIMAL) == 1) || (playerStates[p].key & PAD_INPUT_5);
-			}
+                int rightX = 0, rightY = 0;
+                GetJoypadAnalogInputRight(&rightX, &rightY, playerInputs[p].padType);
+                orbitCameras[p].Update(rightX, rightY);
 
-            if (mergeSmoke && p == 0) currentAimInput = smokeFrames >= 20 && smokeFrames < 30;
-            if (flashStock[p] > 0 && charainfo[p].mode != DAMAGE && charainfo[p].mode != DOWNMODE && playerStunTimer[p] <= 0 && charainfo[p].knockbackFrames <= 0) {
-                if (currentAimInput && !prevAiming[p]) {
-                    isAiming[p] = true;
-                    aimAngle[p] = DX_PI_F + DX_PI_F * 0.5f * charainfo[p].direction;
+                bool currentAimInput = false;
+                if (p == 0) {
+                    currentAimInput = (CheckHitKey(KEY_INPUT_G) == 1) || ((playerStates[p].key & PAD_INPUT_5) != 0);
                 }
+                else {
+                    currentAimInput = (CheckHitKey(KEY_INPUT_DECIMAL) == 1) || ((playerStates[p].key & PAD_INPUT_5) != 0);
+                }
+
+                if (mergeSmoke && p == 0) currentAimInput = smokeFrames >= 20 && smokeFrames < 30;
+                bool canAim = (flashStock[p] > 0 &&
+                    charainfo[p].mode != DAMAGE &&
+                    charainfo[p].mode != DOWNMODE &&
+                    playerStunTimer[p] <= 0 && charainfo[p].knockbackFrames <= 0 &&
+                    !game.IsBossCutsceneActive());
+
+                // 構え開始
+                if (currentAimInput && !prevAiming[p] && canAim) {
+                    isAiming[p] = true;
+                    aimPitchAngle[p] = 0.25f;
+                    aimAngle[p] = orbitCameras[p].yaw;
+                }
+                // 構え中：画角ズームなしで、右スティック/キーで上下左右にマーカーを動かす
                 else if (currentAimInput && isAiming[p]) {
-                    aimAngle[p] += rightYaw;
-                    if (p == 0) {
-                        if (CheckHitKey(KEY_INPUT_A)) aimAngle[p] -= 0.05f;
-                        if (CheckHitKey(KEY_INPUT_D)) aimAngle[p] += 0.05f;
+                    if (!canAim) {
+                        isAiming[p] = false;
                     }
                     else {
-                        if (CheckHitKey(KEY_INPUT_LEFT))  aimAngle[p] -= 0.05f;
-                        if (CheckHitKey(KEY_INPUT_RIGHT)) aimAngle[p] += 0.05f;
+                        // プレイヤーの向きをカメラに同期
+                        aimAngle[p] = orbitCameras[p].yaw;
+                        charainfo[p].dir = aimAngle[p];
+                        if (charainfo[p].model1 != -1) {
+                            MV1SetRotationXYZ(charainfo[p].model1, VGet(0.0f, aimAngle[p] + DX_PI_F, 0.0f));
+                        }
+
+                        // マーカー（上下ピッチ角）の調整
+                        const float PITCH_SPEED = 0.04f;
+                        if (p == 0) {
+                            if (CheckHitKey(KEY_INPUT_I) || CheckHitKey(KEY_INPUT_UP))   aimPitchAngle[p] += PITCH_SPEED;
+                            if (CheckHitKey(KEY_INPUT_K) || CheckHitKey(KEY_INPUT_DOWN)) aimPitchAngle[p] -= PITCH_SPEED;
+                        }
+                        else {
+                            if (CheckHitKey(KEY_INPUT_NUMPAD8)) aimPitchAngle[p] += PITCH_SPEED;
+                            if (CheckHitKey(KEY_INPUT_NUMPAD2)) aimPitchAngle[p] -= PITCH_SPEED;
+                        }
+
+                        if (abs(rightY) > 300) {
+                            aimPitchAngle[p] -= (rightY / 1000.0f) * 0.04f;
+                        }
+
+                        if (aimPitchAngle[p] > 1.25f)  aimPitchAngle[p] = 1.25f;
+                        if (aimPitchAngle[p] < -0.60f) aimPitchAngle[p] = -0.60f; // 下向き叩きつけ用
                     }
-
-                    int inputX = 0, inputY = 0;
-                    GetJoypadAnalogInput(&inputX, &inputY, (p == 0) ? DX_INPUT_PAD1 : DX_INPUT_PAD2);
-                    if (abs(inputX) > 300) aimAngle[p] += (inputX / 1000.0f) * 0.05f;
-
-                    charainfo[p].dir = aimAngle[p];
-                    MV1SetRotationXYZ(charainfo[p].model1, VGet(0.0f, aimAngle[p] + DX_PI_F, 0.0f));
-                    charainfo[p].move.x = 0.0f;
-                    charainfo[p].move.z = 0.0f;
                 }
-                else if (!currentAimInput && prevAiming[p] && isAiming[p]) {
+                // 投擲（ボタンを離した瞬間）
+                else if (!currentAimInput && isAiming[p]) {
                     isAiming[p] = false;
+
                     for (int f = 0; f < MAX_THROWN_FLASH; f++) {
-                        if (!thrownFlashes[f].active && thrownFlashes[f].model != -1) {
+                        if (!thrownFlashes[f].active) {
                             thrownFlashes[f].active = true;
-                            thrownFlashes[f].timer = 75;
                             thrownFlashes[f].ownerIndex = p;
+                            thrownFlashes[f].timer = 30; // ★ 約1秒（60フレーム）後に空中起爆
                             flashStock[p]--;
-                            thrownFlashes[f].pos = VAdd(charainfo[p].pos, VGet(0.0f, 10.0f, 0.0f));
-                            float speed = 15.0f;
-                            thrownFlashes[f].move = VGet(sinf(aimAngle[p]) * speed, 3.5f, cosf(aimAngle[p]) * speed);
-                            MV1SetVisible(thrownFlashes[f].model, TRUE);
+
+                            float yaw = aimAngle[p];
+                            float pitch = aimPitchAngle[p];
+
+                            float sideOffsetX = cosf(yaw) * 12.0f;
+                            float sideOffsetZ = -sinf(yaw) * 12.0f;
+
+                            thrownFlashes[f].pos = VGet(
+                                charainfo[p].pos.x + sinf(yaw) * 45.0f + sideOffsetX,
+                                charainfo[p].pos.y + 45.0f,
+                                charainfo[p].pos.z + cosf(yaw) * 45.0f + sideOffsetZ
+                            );
+
+                            // ★ 上向きなら放物線（高初速）、下向きなら地面へ叩きつけ
+                            float cosP = cosf(pitch);
+                            float sinP = sinf(pitch);
+                            float hSpeed = 16.0f * (cosP > 0.15f ? cosP : 0.15f);
+                            float vSpeed = (pitch >= 0.0f) ? (4.0f + sinP * 14.0f) : (sinP * 18.0f); // 下向きなら負の初速で叩きつける
+
+                            thrownFlashes[f].move = VGet(
+                                sinf(yaw) * hSpeed + charainfo[p].move.x * 0.7f,
+                                vSpeed,
+                                cosf(yaw) * hSpeed + charainfo[p].move.z * 0.7f
+                            );
+
+                            if (thrownFlashes[f].model != -1) {
+                                MV1SetPosition(thrownFlashes[f].model, thrownFlashes[f].pos);
+                                MV1SetVisible(thrownFlashes[f].model, TRUE);
+                            }
                             break;
                         }
                     }
                 }
+                prevAiming[p] = currentAimInput;
+                if (isAiming[p]) { playerJustGuard[p].window = 0; ResetMove(charainfo[p]); }
             }
-            else {
-                isAiming[p] = false;
-            }
-            prevAiming[p] = currentAimInput;
-            if (isAiming[p]) playerJustGuard[p].window = 0;
-        }
 
 
 
@@ -2139,7 +2241,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         }
         for (int i = 0; i < PLAYER_COUNT; i++) {
             // BOSS演出中の静止
-            if (game.IsBossCutsceneActive()) {
+            if (game.IsBossCutsceneActive() || game.startCountdownTimer > 90) {
                 playerStates[i].sprint.Reset();
                 playerStates[i].sprintHeld = false;
                 ResetMove(charainfo[i]);
@@ -2228,6 +2330,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 SEjumpHandle,
 				specialAttackEffectResourceHandle[i]
             );
+            if (revengeBoost[i].active && charainfo[i].mode == RUN) {
+                charainfo[i].move.x *= 1.75f;
+                charainfo[i].move.z *= 1.75f;
+            }
             if (!specialWasActive && playerStates[i].isSpecialAttack) {
                 isPlayerInterferenceActive[i] = false;
                 game.RecordSpecialAttack(i);
@@ -2503,7 +2609,8 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         ++effectUpdates;
         skyRot += 0.001f;
         MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
-        game.Update(charainfo, charainfo);
+        if (game.startCountdownTimer > 0) --game.startCountdownTimer;
+        if (game.startCountdownTimer <= 90) game.Update(charainfo, charainfo);
         game.UpdateVisualTimers();
         for (int p = 0; p < PLAYER_COUNT; ++p) if (playerWhiteoutTimer[p] > 0) --playerWhiteoutTimer[p];
         if (game.gameState != 0) break;
@@ -2535,22 +2642,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
             // ★ 演出中（1.5秒間）はボスカメラ、タイマーが切れたら通常のプレイヤー追従カメラへ自動復帰
             if (!game.ApplyBossCamera(cPos, cTarget, charainfo)) {
-                if (isAiming[pIdx]) {
-                    float dist = 280.0f;
-				float aimPitch = atan2f(180.0f, dist) + orbitCameras[pIdx].pitch - OrbitCamera::DefaultPitch;
-                if (aimPitch < 0.15f) aimPitch = 0.15f;
-                if (aimPitch > 1.2f) aimPitch = 1.2f;
-                float height = dist * tanf(aimPitch);
-
-				cPos = VGet(
-					pPos.x - sinf(aimAngle[pIdx]) * dist,
-					pPos.y + height,
-					pPos.z - cosf(aimAngle[pIdx]) * dist
-				);
-
-                    cTarget = VAdd(pPos, VGet(sinf(aimAngle[pIdx]) * 350.0f, 40.0f, cosf(aimAngle[pIdx]) * 350.0f));
-                }
-                else {
+                {
                 const auto& camera = orbitCameras[pIdx];
                 const float cosine = cosf(camera.yaw), sine = sinf(camera.yaw);
                 const float side = pIdx == 0 ? 1.0f : -1.0f;
@@ -2664,8 +2756,6 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 600,
                 charainfo,
                 hpBarTex,
-                crownGraphHandle,
-                pvpIconHandle,
                 isPlayerInterferenceActive[pIdx],
                 playerInterferenceCooldown[pIdx]
             );
@@ -2680,17 +2770,68 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 DrawString(startX + 20, 120, TEXT("GUARD"), GetColor(120, 210, 255));
             }
             game.DrawBossCutsceneUI(startX, endX, 600);
+            if (revengeBoost[pIdx].active) {
+                int centerX = startX + (endX - startX) / 2;
+                int barY = 115;
+                int barW = 180;
+                int barH = 8;
+                float rate = (float)revengeBoost[pIdx].timer / (float)(60 * 12);
+                int fillW = (int)(barW * rate);
+
+                SetFontSize(16);
+                const char* bText = "REVENGE BOOST!";
+                int tw = GetDrawStringWidth(bText, 14);
+                int alpha = 180 + (int)(sinf(GetNowCount() * 0.02f) * 75);
+
+                SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+                DrawString(centerX - tw / 2 + 1, barY - 22 + 1, bText, GetColor(0, 0, 0));
+                DrawString(centerX - tw / 2, barY - 22, bText, GetColor(255, 120, 40));
+
+                SetDrawBlendMode(DX_BLENDMODE_ALPHA, 160);
+                DrawBox(centerX - barW / 2, barY, centerX + barW / 2, barY + barH, GetColor(20, 20, 20), TRUE);
+
+                SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+                if (fillW > 0) {
+                    DrawBox(centerX - barW / 2, barY, centerX - barW / 2 + fillW, barY + barH, GetColor(255, 140, 20), TRUE);
+                }
+                DrawBox(centerX - barW / 2, barY, centerX + barW / 2, barY + barH, GetColor(255, 220, 100), FALSE);
+                SetFontSize(20);
+            }
 
             if (isAiming[pIdx]) {
-                int centerX = (startX + endX) / 2;
-                int centerY = 300;
-                DrawCircle(centerX, centerY, 18, GetColor(0, 255, 200), FALSE);
-                DrawCircle(centerX, centerY, 19, GetColor(0, 255, 200), FALSE);
-                DrawCircle(centerX, centerY, 3, GetColor(255, 255, 255), TRUE);
-                DrawLine(centerX - 26, centerY, centerX - 12, centerY, GetColor(0, 255, 200), 2);
-                DrawLine(centerX + 12, centerY, centerX + 26, centerY, GetColor(0, 255, 200), 2);
-                DrawLine(centerX, centerY - 26, centerX, centerY - 12, GetColor(0, 255, 200), 2);
-                DrawLine(centerX, centerY + 12, centerX, centerY + 26, GetColor(0, 255, 200), 2);
+                float yaw = aimAngle[pIdx];
+                float swordFwd = 48.0f;
+                float swordSide = 14.0f;
+                float swordY = 45.0f;
+
+                VECTOR swordTipPos = VGet(
+                    pPos.x + sinf(yaw) * swordFwd + cosf(yaw) * swordSide,
+                    pPos.y + swordY,
+                    pPos.z + cosf(yaw) * swordFwd - sinf(yaw) * swordSide
+                );
+
+                SetUseZBuffer3D(TRUE);
+                SetWriteZBuffer3D(FALSE);
+
+                // 剣先のマーキング発光球
+                SetDrawBlendMode(DX_BLENDMODE_ADD, 230);
+                DrawSphere3D(swordTipPos, 4.0f, 12, GetColor(255, 255, 255), GetColor(255, 255, 220), TRUE);
+                float pulse = sinf(GetNowCount() * 0.015f) * 1.5f;
+                DrawSphere3D(swordTipPos, 8.5f + pulse, 16, GetColor(180, 240, 255), GetColor(255, 220, 80), TRUE);
+                SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+                SetWriteZBuffer3D(TRUE);
+
+                // 画面中央付近の照準レティクル表示
+                int screenMidX = (startX + endX) / 2;
+                int markerY = 300 - (int)(aimPitchAngle[pIdx] * 200.0f);
+
+                DrawCircle(screenMidX, markerY, 16, GetColor(255, 255, 255), FALSE);
+                DrawCircle(screenMidX, markerY, 3, GetColor(255, 220, 50), TRUE);
+                DrawLine(screenMidX - 22, markerY, screenMidX - 6, markerY, GetColor(255, 255, 255));
+                DrawLine(screenMidX + 6, markerY, screenMidX + 22, markerY, GetColor(255, 255, 255));
+                DrawLine(screenMidX, markerY - 22, screenMidX, markerY - 6, GetColor(255, 255, 255));
+                DrawLine(screenMidX, markerY + 6, screenMidX, markerY + 22, GetColor(255, 255, 255));
             }
 
             if (playerWhiteoutTimer[pIdx] > 0) {
@@ -2707,7 +2848,8 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 			if (isAiming[0]) mergeAimPassed = true;
 			if (thrownFlashes[0].active && flashStock[0] == 0) mergeThrowPassed = true;
 		}
-		game.DrawTimer(900, 600);
+		game.DrawStartCountdown(900, 600, imgCount3, imgCount2, imgCount1);
+        game.DrawTimer(900, 600);
         if (shadowSmoke && smokeFrames == 60) {
             SaveDrawScreenToPNG(0, 0, 900, 600, "..\\work\\shadow-preview.png");
             FILE* shadowReport = nullptr;
