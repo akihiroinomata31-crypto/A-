@@ -13,11 +13,12 @@ int ReadPlayerPadState(int padType) {
     if (buttons < 0) buttons = 0;
     XINPUT_STATE xbox = {};
     if (GetJoypadXInputState(padType, &xbox) == 0) {
-        buttons &= ~(PAD_INPUT_1 | PAD_INPUT_2 | PAD_INPUT_3 | PAD_INPUT_4);
+        buttons &= ~(PAD_INPUT_1 | PAD_INPUT_2 | PAD_INPUT_3 | PAD_INPUT_4 | PAD_INPUT_6);
         if (xbox.Buttons[XINPUT_BUTTON_A]) buttons |= PAD_INPUT_1;
         if (xbox.Buttons[XINPUT_BUTTON_B]) buttons |= PAD_INPUT_2;
         if (xbox.Buttons[XINPUT_BUTTON_X]) buttons |= PAD_INPUT_3;
         if (xbox.Buttons[XINPUT_BUTTON_Y]) buttons |= PAD_INPUT_4;
+        if (xbox.Buttons[XINPUT_BUTTON_RIGHT_SHOULDER]) buttons |= PAD_INPUT_6;
     }
     return buttons;
 }
@@ -370,6 +371,8 @@ void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 }
 
 void CancelPlayerCombat(PlayerRuntimeState& state) {
+    state.sprint.Reset();
+    state.sprintHeld = false;
     StopNormalAttackEffect(state);
     StopHeavyAttackEffect(state);
     StopSpecialAttackEffect(state);
@@ -379,6 +382,33 @@ void CancelPlayerCombat(PlayerRuntimeState& state) {
     state.attackIndex = 0;
     state.movementAnimation = -1;
 }
+void UpdatePlayerGuardAnimation(SCharaInfo& player, PlayerRuntimeState& state,
+    int animation, bool active) {
+    if (player.model1 < 0) return;
+    const bool locomotion = player.mode == STAND || player.mode == RUN;
+    active = active && locomotion && animation >= 0;
+    if (active && state.guardAnimationAttachment < 0) {
+        state.guardAnimationAttachment = MV1AttachAnim(player.model1, 0, animation);
+        state.guardAnimationTime = 0.0f;
+        state.guardAnimationBlend = 0.0f;
+    }
+    if (state.guardAnimationAttachment < 0) return;
+    state.guardAnimationBlend = active ? fminf(1.0f, state.guardAnimationBlend + 0.5f)
+        : (locomotion ? fmaxf(0.0f, state.guardAnimationBlend - 0.34f) : 0.0f);
+    if (state.guardAnimationBlend <= 0.0f) {
+        MV1DetachAnim(player.model1, state.guardAnimationAttachment);
+        state.guardAnimationAttachment = -1;
+        if (player.attachidx >= 0) MV1SetAttachAnimBlendRate(player.model1, player.attachidx, 1.0f);
+        return;
+    }
+    const float duration = MV1GetAttachAnimTotalTime(player.model1, state.guardAnimationAttachment);
+    state.guardAnimationTime = fminf(duration, state.guardAnimationTime + PlayerAnimationStep);
+    MV1SetAttachAnimTime(player.model1, state.guardAnimationAttachment, state.guardAnimationTime);
+    MV1SetAttachAnimBlendRate(player.model1, state.guardAnimationAttachment, state.guardAnimationBlend);
+    if (player.attachidx >= 0)
+        MV1SetAttachAnimBlendRate(player.model1, player.attachidx, 1.0f - state.guardAnimationBlend);
+}
+
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
 	if (player.mode == DAMAGE || player.mode == DOWNMODE) {
         CancelPlayerCombat(state);
@@ -420,7 +450,7 @@ void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state
             player.playtime + player.anim_totaltime / PLAYER_EMBER_MOVE_LOCK_FRAMES);
     }
 	else if (player.mode != JUMPOUT) {
-		player.playtime += PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep;
+		player.playtime += (PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : LegacyPlayerAnimationStep) * (player.mode == RUN ? state.sprint.Multiplier() : 1.0f);
 	}
 	else {
 		player.playtime += PLAYER_USE_NEW_MODEL ? PlayerAnimationStep : AnimationStep(12.0f);
@@ -569,12 +599,14 @@ void UpdatePlayerInput(
 ) {
 	// プレイヤーを操作できる状態か確認する。
 	state.moveInput = false;
+    state.sprintHeld = false;
 	bool attackPressed = false;
 	bool heavyAttackPressed = false;
 	bool specialAttackPressed = false;
 
 	if (CanControlPlayerMode(player.mode)) {
 		state.key = ReadPlayerPadState(input.padType);
+        state.sprintHeld = IsPadOrKeyDown(state.key, input.sprintPadButton, input.sprintKey);
 		if (state.key < 0) {
 			// パッド未接続時は入力なしとして扱う。
 			state.key = 0;
@@ -637,6 +669,7 @@ void UpdatePlayerInput(
 
 	// 入力の有無で待機/走りアニメを切り替える。
 	if (!state.moveInput) {
+        state.sprint.Reset();
 		if (player.mode == RUN) {
 			ResetMove(player);
 			player.mode = STAND;
@@ -733,10 +766,14 @@ void ApplyPlayerMotionRoot(SCharaInfo& player, const PlayerRuntimeState& state) 
 
 void UpdatePlayerMovement(SCharaInfo& player, PlayerRuntimeState& state,
 	float inputX, float inputZ, int animRun) {
-	if ((player.mode != STAND && player.mode != RUN) || (inputX == 0.0f && inputZ == 0.0f)) return;
+	if ((player.mode != STAND && player.mode != RUN) || (inputX == 0.0f && inputZ == 0.0f)) {
+        state.sprint.Reset();
+        return;
+    }
 	state.moveInput = true;
-	player.move.x = inputX;
-	player.move.z = inputZ;
+	const float sprintMultiplier = state.sprint.Update(state.sprintHeld, true);
+    player.move.x = inputX * sprintMultiplier;
+	player.move.z = inputZ * sprintMultiplier;
 	SetDirectionByMove(player, inputX, inputZ);
 	const int animation = animRun;
 	if (player.mode == STAND || state.movementAnimation != animation) {

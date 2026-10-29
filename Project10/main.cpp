@@ -10,6 +10,9 @@
 #include "GameTiming.h"
 #include "RuntimeProfile.h"
 #include "OrbitCamera.h"
+#include "JustGuard.h"
+#include "SprintKnockback.h"
+#include "SprintKnockbackChecks.h"
 #include "../DXLib/DxLib.h"
 #include "senk.h"
 void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr);
@@ -172,6 +175,12 @@ bool isPlayerInterferenceActive[PLAYER_COUNT] = { false, false };
 // ★ プレイヤーのスタン（行動不能）管理変数（グローバル定義）
 const int PLAYER_STUN_DURATION_FRAMES = 45; // 約0.75秒
 int playerStunTimer[PLAYER_COUNT] = { 0, 0 };
+JustGuardState playerJustGuard[PLAYER_COUNT];
+
+static bool CanJustGuard(const SCharaInfo& player, int index) {
+    return (player.mode == STAND || player.mode == RUN) &&
+        playerStunTimer[index] <= 0 && player.knockbackFrames <= 0;
+}
 
 namespace {
     int LoadPlayerAssetModel(const char* fileName) {
@@ -248,6 +257,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     int animHeavyAttack = -1;
     int animSpecialAttack = -1;
     int animEnergyAttack = -1;
+    int animGuard = -1;
     int prevJKey = 0;
     int isBGMPlaying = 1;
     bool isAiming[PLAYER_COUNT] = {};
@@ -266,9 +276,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     PlayerRuntimeState playerStates[PLAYER_COUNT];
 
     PlayerInputConfig playerInputs[PLAYER_COUNT] = {
-        { DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 },
+        { DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2, KEY_INPUT_LSHIFT },
 		// 2P: キーボード(矢印) + 2Pゲームパッド。
-		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_NUMPAD1, KEY_INPUT_NUMPAD3, KEY_INPUT_NUMPAD0, KEY_INPUT_NUMPAD2, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2 }
+		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_NUMPAD1, KEY_INPUT_NUMPAD3, KEY_INPUT_NUMPAD0, KEY_INPUT_NUMPAD2, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2, KEY_INPUT_RSHIFT }
     };
 
     float attackInEndTime[PLAYER_ATTACK_ANIM_COUNT] = { ATTACK_FIRST_ENDTIME, ATTACK_SECOND_ENDTIME, ATTACK_THIERD_ENDTIME };
@@ -397,6 +407,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
 
 	}
+    if (strstr(lpC, "--knockback-smoke") != nullptr) {
+        FILE* report = nullptr;
+        fopen_s(&report, "..\\work\\knockback-smoke.txt", "w");
+        const bool passed = CheckSprintKnockback(report);
+        if (report) fclose(report);
+        return passed ? 0 : 1;
+    }
 	if (strstr(lpC, "--player-smoke") != nullptr) {
 		FILE* report = nullptr;
 		fopen_s(&report, "player-smoke.txt", "w");
@@ -471,6 +488,42 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		if (report) fprintf(report, "movement facing and uninterrupted playback: %s\n", movementSwitchPassed ? "PASS" : "FAIL");
 		int idleMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::idle]);
 		bool idlePassed = idleMotion >= 0;
+        bool sprintPassed = runMotion >= 0;
+        for (int p = 0; p < PLAYER_COUNT && sprintPassed; ++p) {
+            auto& actor = charainfo[p];
+            auto& state = playerStates[p];
+            CancelPlayerCombat(state);
+            actor.mode = STAND;
+            state.sprintHeld = true;
+            float distance = 0.0f;
+            for (int tick = 0; tick < 60; ++tick) {
+                UpdatePlayerMovement(actor, state, 0, MOVE_SPEED, runMotion);
+                distance += actor.move.z;
+            }
+            sprintPassed = sprintPassed && distance > MOVE_SPEED * 60.0f &&
+                fabsf(actor.move.z - MOVE_SPEED * PlayerSprintState::MaxMultiplier) < 0.001f &&
+                state.sprint.ticks == PlayerSprintState::AccelerationTicks;
+            actor.playtime = 0;
+            UpdatePlayerAnimationProgress(actor, state, idleMotion);
+            sprintPassed = sprintPassed && fabsf(actor.playtime - PlayerAnimationStep * PlayerSprintState::MaxMultiplier) < 0.001f;
+            state.sprintHeld = false;
+            UpdatePlayerMovement(actor, state, 0, MOVE_SPEED, runMotion);
+            sprintPassed = sprintPassed && actor.move.z == MOVE_SPEED && state.sprint.ticks == 0;
+            state.sprintHeld = true;
+            UpdatePlayerMovement(actor, state, MOVE_SPEED, 0, runMotion);
+            UpdatePlayerMovement(actor, state, 0, 0, runMotion);
+            sprintPassed = sprintPassed && state.sprint.ticks == 0;
+            actor.mode = ATTACK;
+            UpdatePlayerMovement(actor, state, MOVE_SPEED, 0, runMotion);
+            sprintPassed = sprintPassed && actor.mode == ATTACK && state.sprint.ticks == 0;
+            CancelPlayerCombat(state);
+            sprintPassed = sprintPassed && !state.sprintHeld && state.sprint.ticks == 0 &&
+                playerStates[1 - p].sprint.ticks == 0;
+            actor.mode = STAND;
+            ResetMove(actor);
+        }
+        passed = passed && sprintPassed;
+        if (report) fprintf(report, "sprint: both players, accelerated travel, speed cap, animation rate, release, stop, attack exclusion and isolation: %s\n", sprintPassed ? "PASS" : "FAIL");
 		if (idlePassed) {
 			charainfo[0].mode = STAND;
 			SetCharacterAnimation(charainfo[0], idleMotion);
@@ -487,6 +540,44 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		passed = passed && idlePassed;
 		if (report) fprintf(report, "idle loop and return after attack: %s\n", idlePassed ? "PASS" : "FAIL");
 		int hurtMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::damage]);
+        const int guardMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::guard]);
+        bool guardPassed = guardMotion >= 0;
+        for (int p = 0; p < PLAYER_COUNT && guardPassed; ++p) {
+            auto& actor = charainfo[p];
+            auto& state = playerStates[p];
+            actor.mode = STAND;
+            SetCharacterAnimation(actor, idleMotion);
+            for (int tick = 0; tick < JustGuardState::WindowTicks; ++tick) {
+                UpdatePlayerAnimationProgress(actor, state, idleMotion);
+                UpdatePlayerGuardAnimation(actor, state, guardMotion, true);
+            }
+            guardPassed = guardPassed && state.guardAnimationAttachment >= 0 &&
+                state.guardAnimationBlend == 1.0f && actor.mode == STAND && actor.playtime > 0;
+            if (p == 0) {
+                actor.pos = VGet(0, 0, 0);
+                MV1SetPosition(actor.model1, actor.pos);
+                ApplyPlayerMotionRoot(actor, state);
+                SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
+                SetCameraPositionAndTargetAndUpVec(VGet(180, 190, -400), VGet(0, 65, 0), VGet(0, 1, 0));
+                MV1DrawModel(actor.model1);
+                SaveDrawScreenToPNG(0, 0, 900, 600, "..\\work\\just-guard-pose.png");
+            }
+            const float savedTime = actor.playtime;
+            for (int tick = 0; tick < 3; ++tick) UpdatePlayerGuardAnimation(actor, state, guardMotion, false);
+            guardPassed = guardPassed && state.guardAnimationAttachment == -1 && actor.playtime == savedTime &&
+                MV1GetAttachAnimBlendRate(actor.model1, actor.attachidx) == 1.0f;
+            UpdatePlayerMovement(actor, state, MOVE_SPEED, 0, runMotion);
+            UpdatePlayerGuardAnimation(actor, state, guardMotion, true);
+            guardPassed = guardPassed && actor.mode == RUN && actor.move.x == MOVE_SPEED;
+            actor.mode = DAMAGE;
+            UpdatePlayerGuardAnimation(actor, state, guardMotion, true);
+            guardPassed = guardPassed && state.guardAnimationAttachment == -1;
+            actor.mode = STAND;
+            ResetMove(actor);
+        }
+        if (guardMotion >= 0) MV1DeleteModel(guardMotion);
+        passed = passed && guardPassed;
+        if (report) fprintf(report, "guard animation: both players, pose layer, locomotion, blend-out and damage interruption: %s\n", guardPassed ? "PASS" : "FAIL");
         int deathMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::death]);
         bool hurtDeathPassed = hurtMotion >= 0 && deathMotion >= 0;
         for (int p = 0; p < PLAYER_COUNT && hurtDeathPassed; ++p) {
@@ -1224,6 +1315,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     animHeavyAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::heavyAttack]) : anim_attack[2];
     animSpecialAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::specialAttack]) : anim_attack[2];
     animEnergyAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::energyAttack]) : anim_attack[2];
+    animGuard = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? PlayerMotions::files[PlayerMotions::guard] : "Anim_Guard_In.mv1");
+    if (animGuard == -1) return -1;
     if (animHeavyAttack == -1 || animSpecialAttack == -1 || animEnergyAttack == -1) return -1;
 
     if (PLAYER_USE_NEW_MODEL) {
@@ -1335,6 +1428,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
         for (int p = 0; p < PLAYER_COUNT; ++p) {
             auto old = playerStates[p];
+            if (old.guardAnimationAttachment >= 0)
+                MV1DetachAnim(charainfo[p].model1, old.guardAnimationAttachment);
             playerStates[p] = PlayerRuntimeState{};
             playerStates[p].bloodLanceSpecial = false;
             playerStates[p].emberSpecial = false;
@@ -1353,6 +1448,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
             // ★ スタンタイマーも確実にリセット
             playerStunTimer[p] = 0;
+            playerJustGuard[p] = JustGuardState{};
+            SprintKnockback::Clear(charainfo[p]);
             // マテリアル発光リセット
             if (p == PLAYER2_INDEX) {
                 MV1SetMaterialDrawAddColorAll(charainfo[p].model1, 0, 0, 60);
@@ -1533,6 +1630,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         for (int i = 0; i < PLAYER_COUNT; i++) {
             if (charainfo[i].HP <= 0 && charainfo[i].mode != DOWNMODE) {
                 charainfo[i].mode = DOWNMODE;
+                SprintKnockback::Clear(charainfo[i]);
                 CancelPlayerCombat(playerStates[i]);
                 ResetMove(charainfo[i]);
                 SetCharacterAnimation(charainfo[i], anim_down);
@@ -1546,6 +1644,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 			// ゲージ満タンかつボタンが押され、現在攻撃中やダウン中でない場合
 for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(playerInputs[p].padType);
+        for (int p = 0; p < PLAYER_COUNT; ++p) {
+            XINPUT_STATE guardPad = {};
+            const bool rt = GetJoypadXInputState(playerInputs[p].padType, &guardPad) == 0 &&
+                guardPad.RightTrigger >= 30;
+            const bool guardDown = rt || CheckHitKey(p == 0 ? KEY_INPUT_T : KEY_INPUT_NUMPAD6) != 0;
+            playerJustGuard[p].Update(guardDown, CanJustGuard(charainfo[p], p) && !isAiming[p]);
+        }
 		for (int p = 0; p < PLAYER_COUNT; p++) {
 			int rightX = 0, rightY = 0;
             GetJoypadAnalogInputRight(&rightX, &rightY, playerInputs[p].padType);
@@ -1559,7 +1664,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 			}
 
             if (mergeSmoke && p == 0) currentAimInput = smokeFrames >= 20 && smokeFrames < 30;
-            if (flashStock[p] > 0 && charainfo[p].mode != DAMAGE && charainfo[p].mode != DOWNMODE && playerStunTimer[p] <= 0) {
+            if (flashStock[p] > 0 && charainfo[p].mode != DAMAGE && charainfo[p].mode != DOWNMODE && playerStunTimer[p] <= 0 && charainfo[p].knockbackFrames <= 0) {
                 if (currentAimInput && !prevAiming[p]) {
                     isAiming[p] = true;
                     aimAngle[p] = DX_PI_F + DX_PI_F * 0.5f * charainfo[p].direction;
@@ -1605,6 +1710,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 isAiming[p] = false;
             }
             prevAiming[p] = currentAimInput;
+            if (isAiming[p]) playerJustGuard[p].window = 0;
         }
 
 
@@ -1928,6 +2034,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                                 charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, 50, 0)), 60.0f,
                                 charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
                             {
+                                if (playerJustGuard[p].TryBlock(CanJustGuard(charainfo[p], p) && !isAiming[p])) {
+                                    charainfo[i].isHit = true;
+                                    break;
+                                }
                                 charainfo[p].HP -= 1;
                                 if (charainfo[p].mode != DAMAGE) {
                                     CancelPlayerCombat(playerStates[p]);
@@ -2019,9 +2129,19 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         // ==========================================
         // プレイヤー更新
         // ==========================================
+        SprintKnockback::Release sprintReleases[PLAYER_COUNT];
+        for (int i = 0; i < PLAYER_COUNT; ++i) {
+            const bool held = (playerStates[i].key & playerInputs[i].sprintPadButton) != 0 ||
+                CheckHitKey(playerInputs[i].sprintKey) != 0;
+            sprintReleases[i] = SprintKnockback::Capture(charainfo[i], playerStates[i], held,
+                !game.IsBossCutsceneActive() && !isAiming[i] && playerStunTimer[i] <= 0 &&
+                charainfo[i].knockbackFrames <= 0 && !playerJustGuard[i].PoseActive());
+        }
         for (int i = 0; i < PLAYER_COUNT; i++) {
             // BOSS演出中の静止
             if (game.IsBossCutsceneActive()) {
+                playerStates[i].sprint.Reset();
+                playerStates[i].sprintHeld = false;
                 ResetMove(charainfo[i]);
                 continue;
             }
@@ -2067,13 +2187,19 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 continue; // スタン中はこのターンの入力・攻撃更新をすべてスキップ
             }
 
-            if (isAiming[i] || charainfo[i].mode == DAMAGE || charainfo[i].mode == DOWNMODE) {
+            if (isAiming[i] || charainfo[i].mode == DAMAGE || charainfo[i].mode == DOWNMODE || charainfo[i].knockbackFrames > 0) {
+                playerStates[i].sprint.Reset();
+                playerStates[i].sprintHeld = false;
                 ResetMove(charainfo[i]);
                 continue;
             }
 
             // ★ 復活後1秒間（無敵中）は攻撃ボタン入力を無効化して渡す（移動とジャンプのみ許可）
             PlayerInputConfig currentInput = playerInputs[i];
+            if (playerJustGuard[i].PoseActive()) {
+                currentInput.sprintKey = -1;
+                currentInput.sprintPadButton = 0;
+            }
             if (mergeSmoke && charainfo[TEST_ENEMY_INDEX].invincibleTimer > 0) mergeStunPassed = true;
             if (charainfo[i].invincibleTimer > 0) {
                 currentInput.attackKey = -1;
@@ -2136,16 +2262,17 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
             int currentVKey = 0;
             if (p == 0) {
-                currentVKey = (CheckHitKey(KEY_INPUT_V) == 1 || (playerStates[p].key & PAD_INPUT_6)) ? 1 : 0;
+                currentVKey = CheckHitKey(KEY_INPUT_V) == 1 ? 1 : 0;
             }
             else {
-                currentVKey = (CheckHitKey(KEY_INPUT_NUMPAD1) == 1 || CheckHitKey(KEY_INPUT_B) == 1 || (playerStates[p].key & PAD_INPUT_6)) ? 1 : 0;
+                currentVKey = (CheckHitKey(KEY_INPUT_NUMPAD1) == 1 || CheckHitKey(KEY_INPUT_B) == 1) ? 1 : 0;
             }
 
             int& prevKey = (p == 0) ? prevVKeyP1 : prevVKeyP2;
             if (currentVKey == 1 && prevKey == 0) {
                 if (playerInterferenceCooldown[p] <= 0 &&
                     playerStunTimer[p] <= 0 &&
+                    charainfo[p].knockbackFrames <= 0 &&
                     charainfo[p].mode != ATTACK &&
                     charainfo[p].mode != DAMAGE &&
                     charainfo[p].mode != DOWNMODE &&
@@ -2171,10 +2298,26 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             const bool energyButton = r3 || CheckHitKey(i == 0 ? KEY_INPUT_R : KEY_INPUT_NUMPAD5) != 0;
             const bool energyPressed = energyButton && !prevEnergyAttackButton[i];
             prevEnergyAttackButton[i] = energyButton;
-            if (!energyPressed || isAiming[i] || charainfo[i].invincibleTimer > 0 || playerStunTimer[i] > 0) continue;
+            if (!energyPressed || isAiming[i] || charainfo[i].invincibleTimer > 0 || playerStunTimer[i] > 0 || charainfo[i].knockbackFrames > 0) continue;
             if (TryPlayPlayerEnergyAttack(charainfo[i], playerStates[i], animEnergyAttack, SEattackHandle,
                 energyAttackEffectResourceHandle[i], spGauge[i], PLAYER_EMBER_FREE_CAST_TEST ? 0 : MAX_SP_GAUGE)) {
                 isPlayerInterferenceActive[i] = false;
+            }
+        }
+
+        // Commit both releases before resolving hits, avoiding a player-index advantage.
+        for (int i = 0; i < PLAYER_COUNT; ++i) {
+            sprintReleases[i].active = sprintReleases[i].active && !isAiming[i] &&
+                (charainfo[i].mode == STAND || charainfo[i].mode == RUN) &&
+                charainfo[i].knockbackFrames <= 0;
+        }
+        for (int i = 0; i < PLAYER_COUNT; ++i) {
+            const int other = 1 - i;
+            const auto hit = SprintKnockback::Resolve(sprintReleases[i], i, charainfo, playerStates,
+                playerJustGuard, CanJustGuard(charainfo[other], other) && !isAiming[other], playerDamageAnimation);
+            if (hit == SprintKnockback::Result::Hit) {
+                isAiming[other] = false;
+                isPlayerInterferenceActive[other] = false;
             }
         }
 
@@ -2199,6 +2342,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             }
 
             RespawnManager::RespawnFallenPlayer(i, charainfo, playerStates[i], game, anim_neutral);
+            if (!game.IsBossCutsceneActive()) SprintKnockback::Step(charainfo[i]);
         }
 
         // プレイヤー床コリジョン
@@ -2349,6 +2493,11 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
 
         const LONGLONG effectUpdateStart = GetNowHiPerformanceCount();
+        for (int p = 0; p < PLAYER_COUNT; ++p) {
+            const bool guardPose = CanJustGuard(charainfo[p], p) && !isAiming[p] &&
+                playerJustGuard[p].PoseActive();
+            UpdatePlayerGuardAnimation(charainfo[p], playerStates[p], animGuard, guardPose);
+        }
         UpdateEffekseer3D();
         effectUpdateMs += (GetNowHiPerformanceCount() - effectUpdateStart) / 1000.0;
         ++effectUpdates;
@@ -2521,6 +2670,15 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 playerInterferenceCooldown[pIdx]
             );
             game.DrawSpecialGauge(pIdx, startX, endX, 600, spGauge[pIdx], MAX_SP_GAUGE, spFrameHandle);
+            if (charainfo[pIdx].mode == RUN && playerStates[pIdx].sprint.ticks > 0)
+                DrawString(startX + 20, 145, TEXT("SPRINT"), GetColor(255, 220, 100));
+            if (charainfo[pIdx].knockbackFrames > 0)
+                DrawString(startX + 20, 145, TEXT("KNOCKBACK"), GetColor(255, 160, 80));
+            if (playerJustGuard[pIdx].feedback > 0) {
+                DrawString(startX + 20, 120, TEXT("JUST GUARD!"), GetColor(80, 255, 255));
+            } else if (playerJustGuard[pIdx].window > 0 && CanJustGuard(charainfo[pIdx], pIdx)) {
+                DrawString(startX + 20, 120, TEXT("GUARD"), GetColor(120, 210, 255));
+            }
             game.DrawBossCutsceneUI(startX, endX, 600);
 
             if (isAiming[pIdx]) {
@@ -2684,6 +2842,8 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
             if (attackerIdx != -1 && targetIdx != -1) {
                 isPlayerInterferenceActive[attackerIdx] = false;
                 playerInterferenceCooldown[attackerIdx] = INTERRUPT_COOLDOWN_FRAMES;
+
+                if (playerJustGuard[targetIdx].TryBlock(CanJustGuard(*target, targetIdx))) return;
 
                 if (target->HP > 0) target->HP--;
 

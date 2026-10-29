@@ -1,6 +1,7 @@
 #pragma once
 
 #include "main.h"
+#include "PlayerSprint.h"
 
 // プレイヤー関連の固定値。
 // 1P/2P のインデックスを明示して、敵と混ざらないようにする。
@@ -82,11 +83,18 @@ struct PlayerInputConfig {
 	int heavyAttackPadButton;
 	int specialAttackPadButton;
 	int jumpPadButton;
+    int sprintKey = -1;
+    int sprintPadButton = PAD_INPUT_6;
 };
 
 // 1人分の操作中状態。
 // 連撃予約や攻撃ボタンの押した瞬間判定をプレイヤー別に持つ。
 struct PlayerRuntimeState {
+    PlayerSprintState sprint;
+    bool sprintHeld = false;
+    int guardAnimationAttachment = -1;
+    float guardAnimationTime = 0.0f;
+    float guardAnimationBlend = 0.0f;
     bool bloodLanceSpecial = false;
     bool emberSpecial = false;
     VECTOR specialEffectOrigin = {};
@@ -122,6 +130,9 @@ struct PlayerRuntimeState {
 
 // 移動量をゼロに戻す。
 void ResetMove(SCharaInfo& chara);
+// Independent pose layer; preserves locomotion playback and combat timing.
+void UpdatePlayerGuardAnimation(SCharaInfo& player, PlayerRuntimeState& state,
+    int animation, bool active);
 
 // 指定したアニメーションへ切り替える。
 void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime = 0.0f);

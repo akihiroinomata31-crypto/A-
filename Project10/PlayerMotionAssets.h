@@ -19,6 +19,7 @@ inline constexpr const char* files[] = {
     "new\\Great Sword Pack\\great sword impact.mv1",
     "new\\Great Sword Pack\\two handed sword death.mv1",
     "new\\Great Sword Pack\\great sword power up.mv1",
+    "new\\Great Sword Pack\\great sword blocking.mv1",
 };
 inline constexpr int count = sizeof(files) / sizeof(files[0]);
 inline constexpr int run = 11;
@@ -29,4 +30,5 @@ inline constexpr int normalAttack[3] = { 5, 8, 7 };
 inline constexpr int heavyAttack = 0;
 inline constexpr int specialAttack = 1;
 inline constexpr int energyAttack = 15;
+inline constexpr int guard = 16;
 }
