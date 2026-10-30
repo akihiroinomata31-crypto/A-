@@ -1,6 +1,6 @@
 # 新玩家动作导入版
 
-双击项目根目录的 TryNewPlayer.cmd，或在 Visual Studio 中运行 Debug。
+双击 build/bin/Win32/Release/Project10.exe 启动，或打开 Ateam.sln 在 Visual Studio 中运行。本文为动作导入记录，当前玩法以主工程源码为准。
 
 已加入 Running.fbx 对应的新跑步动作，并从 Great Sword Pack 转换了 2 个跑步动作和 11 个攻击类动作，生成的 MV1 保留在原 FBX 旁边。已接入默认 great sword idle 待机动作；已接入 great sword impact 被击动作和 two handed sword death 死亡动作；防御等其他动作暂未接入。
 

@@ -1,8 +1,8 @@
 #pragma once
 
-// Fixed 60 Hz simulation. A fresh press opens a short, single-hit window.
+// Fixed 60 Hz simulation. One press grants five seconds of automatic blocking.
 struct JustGuardState {
-    static constexpr int WindowTicks = 24;
+    static constexpr int WindowTicks = 5 * 60;
     static constexpr int CooldownTicks = 30;
     static constexpr int FeedbackTicks = 30;
     static constexpr int SuccessPoseTicks = 18;
@@ -19,8 +19,7 @@ struct JustGuardState {
         if (window > 0) --window;
         if (cooldown > 0) --cooldown;
         if (feedback > 0) --feedback;
-        if (!available || !down) window = 0;
-        if (available && down && !held && cooldown == 0) {
+        if (available && down && !held && window == 0 && cooldown == 0) {
             window = WindowTicks;
             cooldown = CooldownTicks;
         }
@@ -29,7 +28,6 @@ struct JustGuardState {
 
     bool TryBlock(bool available) {
         if (!available || window <= 0) return false;
-        window = 0;
         feedback = FeedbackTicks;
         return true;
     }

@@ -1,0 +1,50 @@
+right stick camera: deadzone, rotation rate, release, pitch limits and two-player isolation: PASS
+new\Great Sword Pack\great sword attack.mv1 frames=36.0 boneMotion=69.456 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword high spin attack.mv1 frames=56.0 boneMotion=144.332 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword jump attack.mv1 frames=65.0 boneMotion=160.634 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword kick.mv1 frames=45.0 boneMotion=89.742 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword kick (2).mv1 frames=51.0 boneMotion=184.998 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash.mv1 frames=38.0 boneMotion=79.839 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (2).mv1 frames=106.0 boneMotion=128.393 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (3).mv1 frames=55.0 boneMotion=134.445 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (4).mv1 frames=54.0 boneMotion=137.828 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slash (5).mv1 frames=43.0 boneMotion=141.360 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword slide attack.mv1 frames=64.0 boneMotion=127.876 rootTravel=0.000 PASS
+new\Running.mv1 frames=21.0 boneMotion=88.122 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword idle.mv1 frames=60.0 boneMotion=3.655 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword impact.mv1 frames=26.0 boneMotion=20.293 rootTravel=0.000 PASS
+new\Great Sword Pack\two handed sword death.mv1 frames=72.0 boneMotion=182.014 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword power up.mv1 frames=93.0 boneMotion=39.149 rootTravel=0.000 PASS
+new\Great Sword Pack\great sword blocking.mv1 frames=15.0 boneMotion=74.485 rootTravel=0.000 PASS
+movement facing and uninterrupted playback: PASS
+sprint: both players, accelerated travel, speed cap, animation rate, release, stop, attack exclusion and isolation: PASS
+idle loop and return after attack: PASS
+guard animation: both players, pose layer, locomotion, blend-out and damage interruption: PASS
+two players: hurt recovery, death last frame, resurrection control: PASS
+60Hz animation pace, hurt/death duration and continuous casting motion: PASS
+fixed 60Hz logic at 30/60/120Hz presentation and delayed frames: PASS
+score rules: unchanged live scores, no penalty popup, settlement deductions, net winner and reset: PASS
+P1 lunar eclipse effect: load and all four runtime textures: PASS
+P2 full moon effect: load and all four runtime textures: PASS
+normal attack skill cancel: both players, all combos, startup/strike/recovery, cleanup and blocked states: PASS
+normal area attack: both players, multiple targets, range, one hit per swing, combo reset, finisher knockback and unchanged heavy attack: PASS
+P1 LunarEclipse / P2 FullMoon load, three combo stages, independent handles and completion: PASS
+special completion restores running speed and animation: PASS
+both players SwordMega: matching startup hit, default rules and independent simultaneous instances: PASS
+SwordMega load, startup, forward strike, area, multiple targets, single hit and cleanup: PASS
+SwordEmber: resources, both players, dedicated power-up motion, full-energy cast and gauge reset, startup, strike, charge gap, finisher, cast origin, movement unlock and cleanup: PASS
+original SwordMega separate from new Ember energy attack: both players, original profile and energy preserved: PASS
+bloodLance texture Texture/Fire_Single.png loaded=1 size=256x256
+bloodLance texture Texture/Fire.png loaded=1 size=512x512
+bloodLance texture Texture/Particle_Soft.png loaded=1 size=128x128
+bloodLance texture Texture/Shockwave.png loaded=1 size=256x256
+bloodLance texture Texture/Splash.png loaded=1 size=512x512
+bloodLance texture Texture/Star.png loaded=1 size=256x256
+bloodLance texture Texture/Wind.png loaded=1 size=128x128
+bloodLance model 0 loaded=1
+P2 BloodLance: runtime resources, start, active window, single hit, completion: PASS
+left/right/full viewport projection: oldError=263.170px correctedError=0.000092px PASS
+whirlwind pull: inactive, range, convergence, height, dead target, damaged target, expiry and nearest player: PASS
+Goblin walk/idle switching, continuous playback and damage recovery: PASS
+RedGoblin walk/idle switching, continuous playback and damage recovery: PASS
+Golem walk/idle switching, continuous playback and damage recovery: PASS

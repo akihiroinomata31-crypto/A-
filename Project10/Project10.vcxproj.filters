@@ -18,6 +18,7 @@
     <ClInclude Include="map.h" />
     <ClInclude Include="player.h" />
     <ClInclude Include="JustGuard.h" />
+    <ClInclude Include="AutoGuardChecks.h" />
     <ClInclude Include="PlayerSprint.h" />
     <ClInclude Include="SprintKnockback.h" />
     <ClInclude Include="SprintKnockbackChecks.h" />

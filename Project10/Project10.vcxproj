@@ -70,10 +70,10 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <!-- Keep generated files outside OneDrive and imported build artifacts. -->
+  <!-- Keep all generated files in the single ignored build directory. -->
   <PropertyGroup>
-    <IntDir>$(LocalAppData)\Project10Build\$(ProjectGuid)\obj\$(Platform)\$(Configuration)\</IntDir>
-    <OutDir>$(LocalAppData)\Project10Build\$(ProjectGuid)\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\build\obj\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</OutDir>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -186,6 +186,7 @@
     <ClInclude Include="senk.h" />
     <ClInclude Include="player.h" />
     <ClInclude Include="JustGuard.h" />
+    <ClInclude Include="AutoGuardChecks.h" />
     <ClInclude Include="PlayerSprint.h" />
     <ClInclude Include="SprintKnockback.h" />
     <ClInclude Include="SprintKnockbackChecks.h" />

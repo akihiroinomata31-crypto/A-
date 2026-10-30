@@ -13,6 +13,7 @@
 #include "JustGuard.h"
 #include "SprintKnockback.h"
 #include "SprintKnockbackChecks.h"
+#include "AutoGuardChecks.h"
 #include "../DXLib/DxLib.h"
 #include "senk.h"
 #include "golem.h"
@@ -187,7 +188,7 @@ int playerStunTimer[PLAYER_COUNT] = { 0, 0 };
 JustGuardState playerJustGuard[PLAYER_COUNT];
 
 static bool CanJustGuard(const SCharaInfo& player, int index) {
-    return (player.mode == STAND || player.mode == RUN) &&
+    return (player.mode == STAND || player.mode == RUN || player.mode == ATTACK || player.mode == ATTACKOUT) &&
         playerStunTimer[index] <= 0 && player.knockbackFrames <= 0;
 }
 
@@ -235,7 +236,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
     GameRuntimeCleanup runtimeCleanup;
     if (!SetGameResourceDirectory()) {
-        MessageBoxW(nullptr, L"Game resources could not be found. Rebuild the project or launch with TryNewPlayer.cmd.", L"Project10", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"Game resources could not be found. Rebuild Ateam.sln and launch Project10.exe.", L"Project10", MB_OK | MB_ICONERROR);
         return -1;
     }
     int smokeLongRangeMoves = 0;
@@ -361,6 +362,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     SetUseDirect3DVersion(DX_DIRECT3D_11);
 
     if (DxLib_Init() == -1) return -1;
+    SetWindowTextW(GetMainWindowHandle(), L"\u9650\u754c\u30e9\u30c3\u30b7\u30e5");
 
     runtimeCleanup.dxReady = true;
     if (Effekseer_Init(2000) == -1) {
@@ -416,6 +418,13 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
 
 	}
+    if (strstr(lpC, "--auto-guard-smoke") != nullptr) {
+        FILE* report = nullptr;
+        fopen_s(&report, "..\\work\\auto-guard-smoke.txt", "w");
+        const bool passed = CheckAutoGuard(report);
+        if (report) fclose(report);
+        return passed ? 0 : 1;
+    }
     if (strstr(lpC, "--knockback-smoke") != nullptr) {
         FILE* report = nullptr;
         fopen_s(&report, "..\\work\\knockback-smoke.txt", "w");
@@ -1708,7 +1717,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             const bool rt = GetJoypadXInputState(playerInputs[p].padType, &guardPad) == 0 &&
                 guardPad.RightTrigger >= 30;
             const bool guardDown = rt || CheckHitKey(p == 0 ? KEY_INPUT_T : KEY_INPUT_NUMPAD6) != 0;
-            playerJustGuard[p].Update(guardDown, CanJustGuard(charainfo[p], p) && !isAiming[p]);
+            playerJustGuard[p].Update(guardDown, CanJustGuard(charainfo[p], p));
         }
 		for (int p = 0; p < PLAYER_COUNT; p++) {
                 int rightX = 0, rightY = 0;
@@ -1812,7 +1821,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                     }
                 }
                 prevAiming[p] = currentAimInput;
-                if (isAiming[p]) { playerJustGuard[p].window = 0; ResetMove(charainfo[p]); }
+                if (isAiming[p]) ResetMove(charainfo[p]);
             }
 
 
@@ -2136,7 +2145,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                                 charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, 50, 0)), 60.0f,
                                 charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
                             {
-                                if (playerJustGuard[p].TryBlock(CanJustGuard(charainfo[p], p) && !isAiming[p])) {
+                                if (playerJustGuard[p].TryBlock(CanJustGuard(charainfo[p], p))) {
                                     charainfo[i].isHit = true;
                                     break;
                                 }
@@ -2420,7 +2429,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         for (int i = 0; i < PLAYER_COUNT; ++i) {
             const int other = 1 - i;
             const auto hit = SprintKnockback::Resolve(sprintReleases[i], i, charainfo, playerStates,
-                playerJustGuard, CanJustGuard(charainfo[other], other) && !isAiming[other], playerDamageAnimation);
+                playerJustGuard, CanJustGuard(charainfo[other], other), playerDamageAnimation);
             if (hit == SprintKnockback::Result::Hit) {
                 isAiming[other] = false;
                 isPlayerInterferenceActive[other] = false;
@@ -2764,11 +2773,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 DrawString(startX + 20, 145, TEXT("SPRINT"), GetColor(255, 220, 100));
             if (charainfo[pIdx].knockbackFrames > 0)
                 DrawString(startX + 20, 145, TEXT("KNOCKBACK"), GetColor(255, 160, 80));
-            if (playerJustGuard[pIdx].feedback > 0) {
-                DrawString(startX + 20, 120, TEXT("JUST GUARD!"), GetColor(80, 255, 255));
-            } else if (playerJustGuard[pIdx].window > 0 && CanJustGuard(charainfo[pIdx], pIdx)) {
-                DrawString(startX + 20, 120, TEXT("GUARD"), GetColor(120, 210, 255));
-            }
+            if (playerJustGuard[pIdx].window > 0)
+                DrawFormatString(startX + 20, 120, GetColor(120, 210, 255), TEXT("AUTO GUARD %.1fs"), playerJustGuard[pIdx].window / 60.0f);
+            if (playerJustGuard[pIdx].feedback > 0)
+                DrawString(startX + 20, 165, TEXT("AUTO BLOCK!"), GetColor(80, 255, 255));
             game.DrawBossCutsceneUI(startX, endX, 600);
             if (revengeBoost[pIdx].active) {
                 int centerX = startX + (endX - startX) / 2;

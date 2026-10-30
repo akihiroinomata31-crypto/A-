@@ -56,7 +56,6 @@ inline Result Resolve(const Release& release, int source, SCharaInfo* players,
     target.mode = DAMAGE;
     target.knockbackVelocity = VScale(release.direction, release.speed);
     target.knockbackFrames = DurationTicks;
-    guards[targetIndex].window = 0;
     return Result::Hit;
 }
 
