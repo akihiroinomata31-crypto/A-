@@ -10,10 +10,8 @@
 #include "GameTiming.h"
 #include "RuntimeProfile.h"
 #include "OrbitCamera.h"
-#include "JustGuard.h"
 #include "SprintKnockback.h"
 #include "SprintKnockbackChecks.h"
-#include "AutoGuardChecks.h"
 #include "../DXLib/DxLib.h"
 #include "senk.h"
 #include "golem.h"
@@ -175,22 +173,21 @@ void DrawCircle3DFill(VECTOR center, float radius, unsigned int color, int divNu
 const int SP_IMAGE_COUNT = 10;
 int spGraphHandles[SP_IMAGE_COUNT];
 
+// 必殺技エネルギーの上限
 const int MAX_SP_GAUGE = 100;
+// 各プレイヤーにたまっている必殺技エネルギー
 int spGauge[PLAYER_COUNT] = { 0, 0 };
 
 const int INTERRUPT_COOLDOWN_FRAMES = 60 * 3;
+// また対人攻撃を使えるようになるまでの時間
 int playerInterferenceCooldown[PLAYER_COUNT] = { 0, 0 };
+// 今、相手プレイヤーを攻撃できるか
 bool isPlayerInterferenceActive[PLAYER_COUNT] = { false, false };
 
-// ★ プレイヤーのスタン（行動不能）管理変数（グローバル定義）
+// プレイヤーのスタン（行動不能）管理変数（グローバル定義）
 const int PLAYER_STUN_DURATION_FRAMES = 180; // 約0.75秒
+// あと何回の更新で動けるようになるか
 int playerStunTimer[PLAYER_COUNT] = { 0, 0 };
-JustGuardState playerJustGuard[PLAYER_COUNT];
-
-static bool CanJustGuard(const SCharaInfo& player, int index) {
-    return (player.mode == STAND || player.mode == RUN || player.mode == ATTACK || player.mode == ATTACKOUT) &&
-        playerStunTimer[index] <= 0 && player.knockbackFrames <= 0;
-}
 
 namespace {
     int LoadPlayerAssetModel(const char* fileName) {
@@ -204,6 +201,7 @@ namespace {
     }
 }
 
+// 素材をどのフォルダーから読むか決める
 bool SetGameResourceDirectory() {
     wchar_t executable[MAX_PATH];
     if (!GetModuleFileNameW(nullptr, executable, MAX_PATH)) return false;
@@ -232,6 +230,7 @@ bool SetGameResourceDirectory() {
 int normalAttackEffectResourceHandle = -1;
 static int player1MoonAttackEffectResourceHandle = -1;
 
+// ゲームの準備から更新、描画、終了まで
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
     GameRuntimeCleanup runtimeCleanup;
@@ -267,7 +266,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     int animHeavyAttack = -1;
     int animSpecialAttack = -1;
     int animEnergyAttack = -1;
-    int animGuard = -1;
     int prevJKey = 0;
     int isBGMPlaying = 1;
     bool isAiming[PLAYER_COUNT] = {};
@@ -276,7 +274,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     OrbitCamera orbitCameras[PLAYER_COUNT];
     int grenadeBaseModel = -1;
 
-    // ★ Loading を追加し、タイマー変数を用意
+    // Loading を追加し、タイマー変数を用意
     enum class Screen { Menu, Loading, Playing, Results };
     Screen screen = gameSmoke && !uiSmoke ? Screen::Playing : Screen::Menu;
     int menuSelection = 0;
@@ -287,7 +285,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
     PlayerInputConfig playerInputs[PLAYER_COUNT] = {
         { DX_INPUT_PAD1, KEY_INPUT_W, KEY_INPUT_S, KEY_INPUT_A, KEY_INPUT_D, KEY_INPUT_SPACE, KEY_INPUT_E, KEY_INPUT_F, KEY_INPUT_Q, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2, KEY_INPUT_LSHIFT },
-		// 2P: キーボード(矢印) + 2Pゲームパッド。
+		// 2P: キーボード(矢印) + 2Pゲームパッド
 		{ DX_INPUT_PAD2, KEY_INPUT_UP, KEY_INPUT_DOWN, KEY_INPUT_LEFT, KEY_INPUT_RIGHT, KEY_INPUT_NUMPAD1, KEY_INPUT_NUMPAD3, KEY_INPUT_NUMPAD0, KEY_INPUT_NUMPAD2, PAD_INPUT_1, PAD_INPUT_3, PAD_INPUT_4, PAD_INPUT_2, KEY_INPUT_RSHIFT }
     };
 
@@ -418,13 +416,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
 
 	}
-    if (strstr(lpC, "--auto-guard-smoke") != nullptr) {
-        FILE* report = nullptr;
-        fopen_s(&report, "..\\work\\auto-guard-smoke.txt", "w");
-        const bool passed = CheckAutoGuard(report);
-        if (report) fclose(report);
-        return passed ? 0 : 1;
-    }
     if (strstr(lpC, "--knockback-smoke") != nullptr) {
         FILE* report = nullptr;
         fopen_s(&report, "..\\work\\knockback-smoke.txt", "w");
@@ -558,44 +549,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 		passed = passed && idlePassed;
 		if (report) fprintf(report, "idle loop and return after attack: %s\n", idlePassed ? "PASS" : "FAIL");
 		int hurtMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::damage]);
-        const int guardMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::guard]);
-        bool guardPassed = guardMotion >= 0;
-        for (int p = 0; p < PLAYER_COUNT && guardPassed; ++p) {
-            auto& actor = charainfo[p];
-            auto& state = playerStates[p];
-            actor.mode = STAND;
-            SetCharacterAnimation(actor, idleMotion);
-            for (int tick = 0; tick < JustGuardState::WindowTicks; ++tick) {
-                UpdatePlayerAnimationProgress(actor, state, idleMotion);
-                UpdatePlayerGuardAnimation(actor, state, guardMotion, true);
-            }
-            guardPassed = guardPassed && state.guardAnimationAttachment >= 0 &&
-                state.guardAnimationBlend == 1.0f && actor.mode == STAND && actor.playtime > 0;
-            if (p == 0) {
-                actor.pos = VGet(0, 0, 0);
-                MV1SetPosition(actor.model1, actor.pos);
-                ApplyPlayerMotionRoot(actor, state);
-                SetDrawScreen(DX_SCREEN_BACK); ClearDrawScreen();
-                SetCameraPositionAndTargetAndUpVec(VGet(180, 190, -400), VGet(0, 65, 0), VGet(0, 1, 0));
-                MV1DrawModel(actor.model1);
-                SaveDrawScreenToPNG(0, 0, 900, 600, "..\\work\\just-guard-pose.png");
-            }
-            const float savedTime = actor.playtime;
-            for (int tick = 0; tick < 3; ++tick) UpdatePlayerGuardAnimation(actor, state, guardMotion, false);
-            guardPassed = guardPassed && state.guardAnimationAttachment == -1 && actor.playtime == savedTime &&
-                MV1GetAttachAnimBlendRate(actor.model1, actor.attachidx) == 1.0f;
-            UpdatePlayerMovement(actor, state, MOVE_SPEED, 0, runMotion);
-            UpdatePlayerGuardAnimation(actor, state, guardMotion, true);
-            guardPassed = guardPassed && actor.mode == RUN && actor.move.x == MOVE_SPEED;
-            actor.mode = DAMAGE;
-            UpdatePlayerGuardAnimation(actor, state, guardMotion, true);
-            guardPassed = guardPassed && state.guardAnimationAttachment == -1;
-            actor.mode = STAND;
-            ResetMove(actor);
-        }
-        if (guardMotion >= 0) MV1DeleteModel(guardMotion);
-        passed = passed && guardPassed;
-        if (report) fprintf(report, "guard animation: both players, pose layer, locomotion, blend-out and damage interruption: %s\n", guardPassed ? "PASS" : "FAIL");
         int deathMotion = LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::death]);
         bool hurtDeathPassed = hurtMotion >= 0 && deathMotion >= 0;
         for (int p = 0; p < PLAYER_COUNT && hurtDeathPassed; ++p) {
@@ -1339,8 +1292,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     animHeavyAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::heavyAttack]) : anim_attack[2];
     animSpecialAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::specialAttack]) : anim_attack[2];
     animEnergyAttack = PLAYER_USE_NEW_MODEL ? LoadPlayerAssetModel(PlayerMotions::files[PlayerMotions::energyAttack]) : anim_attack[2];
-    animGuard = LoadPlayerAssetModel(PLAYER_USE_NEW_MODEL ? PlayerMotions::files[PlayerMotions::guard] : "Anim_Guard_In.mv1");
-    if (animGuard == -1) return -1;
     if (animHeavyAttack == -1 || animSpecialAttack == -1 || animEnergyAttack == -1) return -1;
 
     if (PLAYER_USE_NEW_MODEL) {
@@ -1458,8 +1409,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
         for (int p = 0; p < PLAYER_COUNT; ++p) {
             auto old = playerStates[p];
-            if (old.guardAnimationAttachment >= 0)
-                MV1DetachAnim(charainfo[p].model1, old.guardAnimationAttachment);
             playerStates[p] = PlayerRuntimeState{};
             playerStates[p].bloodLanceSpecial = false;
             playerStates[p].emberSpecial = false;
@@ -1476,9 +1425,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             MV1SetPosition(charainfo[p].model1, charainfo[p].pos);
             isAiming[p] = false; prevAiming[p] = false; playerWhiteoutTimer[p] = 0; flashStock[p] = 1;
 
-            // ★ スタンタイマーも確実にリセット
+            // スタンタイマーも確実にリセット
             playerStunTimer[p] = 0;
-            playerJustGuard[p] = JustGuardState{};
             revengeBoost[p] = RevengeBoostState{};
             SprintKnockback::Clear(charainfo[p]);
             // マテリアル発光リセット
@@ -1595,7 +1543,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                     screen = Screen::Menu; uiReturned = true;
                 }
                 else {
-                    // ★ 「ゲーム開始」を押したらロード画面へ移行！
+                    // 「ゲーム開始」を押したらロード画面へ移行！
                     resetMatch();
                     if (uiStarted) uiRestarted = true;
                     uiStarted = true;
@@ -1712,13 +1660,6 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 			// ゲージ満タンかつボタンが押され、現在攻撃中やダウン中でない場合
 for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(playerInputs[p].padType);
-        for (int p = 0; p < PLAYER_COUNT; ++p) {
-            XINPUT_STATE guardPad = {};
-            const bool rt = GetJoypadXInputState(playerInputs[p].padType, &guardPad) == 0 &&
-                guardPad.RightTrigger >= 30;
-            const bool guardDown = rt || CheckHitKey(p == 0 ? KEY_INPUT_T : KEY_INPUT_NUMPAD6) != 0;
-            playerJustGuard[p].Update(guardDown, CanJustGuard(charainfo[p], p));
-        }
 		for (int p = 0; p < PLAYER_COUNT; p++) {
                 int rightX = 0, rightY = 0;
                 GetJoypadAnalogInputRight(&rightX, &rightY, playerInputs[p].padType);
@@ -1800,7 +1741,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                                 charainfo[p].pos.z + cosf(yaw) * 45.0f + sideOffsetZ
                             );
 
-                            // ★ 上向きなら放物線（高初速）、下向きなら地面へ叩きつけ
+                            // 上向きなら放物線（高初速）、下向きなら地面へ叩きつけ
                             float cosP = cosf(pitch);
                             float sinP = sinf(pitch);
                             float hSpeed = 16.0f * (cosP > 0.15f ? cosP : 0.15f);
@@ -2145,10 +2086,6 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                                 charainfo[i].pos, VAdd(charainfo[i].pos, VGet(0, 50, 0)), 60.0f,
                                 charainfo[p].pos, VAdd(charainfo[p].pos, VGet(0, charainfo[p].charahitinfo.Height, 0)), charainfo[p].charahitinfo.Width / 2))
                             {
-                                if (playerJustGuard[p].TryBlock(CanJustGuard(charainfo[p], p))) {
-                                    charainfo[i].isHit = true;
-                                    break;
-                                }
                                 charainfo[p].HP -= 1;
                                 if (charainfo[p].mode != DAMAGE) {
                                     CancelPlayerCombat(playerStates[p]);
@@ -2246,7 +2183,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 CheckHitKey(playerInputs[i].sprintKey) != 0;
             sprintReleases[i] = SprintKnockback::Capture(charainfo[i], playerStates[i], held,
                 !game.IsBossCutsceneActive() && !isAiming[i] && playerStunTimer[i] <= 0 &&
-                charainfo[i].knockbackFrames <= 0 && !playerJustGuard[i].PoseActive());
+                charainfo[i].knockbackFrames <= 0);
         }
         for (int i = 0; i < PLAYER_COUNT; i++) {
             // BOSS演出中の静止
@@ -2258,7 +2195,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             }
 
             // ========================================================
-            // ★ スタン中の処理（専用モーション不要版：痺れ・ブルブル震え・黄色発光）
+            // スタン中の処理（専用モーション不要版：痺れ・ブルブル震え・黄色発光）
             // ========================================================
             if (playerStunTimer[i] > 0) {
                 playerStunTimer[i]--;
@@ -2280,7 +2217,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 int yellowPulse = 80 + (int)(sinf(GetNowCount() * 0.03f) * 60);
                 MV1SetMaterialDrawAddColorAll(charainfo[i].model1, yellowPulse, yellowPulse, 0);
 
-                // ★ スタン終了時の復帰処理
+                // スタン終了時の復帰処理
                 if (playerStunTimer[i] <= 0) {
                     charainfo[i].mode = STAND;
                     charainfo[i].playtime = 0.0f;
@@ -2305,12 +2242,8 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 continue;
             }
 
-            // ★ 復活後1秒間（無敵中）は攻撃ボタン入力を無効化して渡す（移動とジャンプのみ許可）
+            // 復活後1秒間（無敵中）は攻撃ボタン入力を無効化して渡す（移動とジャンプのみ許可）
             PlayerInputConfig currentInput = playerInputs[i];
-            if (playerJustGuard[i].PoseActive()) {
-                currentInput.sprintKey = -1;
-                currentInput.sprintPadButton = 0;
-            }
             if (mergeSmoke && charainfo[TEST_ENEMY_INDEX].invincibleTimer > 0) mergeStunPassed = true;
             if (charainfo[i].invincibleTimer > 0) {
                 currentInput.attackKey = -1;
@@ -2429,7 +2362,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         for (int i = 0; i < PLAYER_COUNT; ++i) {
             const int other = 1 - i;
             const auto hit = SprintKnockback::Resolve(sprintReleases[i], i, charainfo, playerStates,
-                playerJustGuard, CanJustGuard(charainfo[other], other), playerDamageAnimation);
+                playerDamageAnimation);
             if (hit == SprintKnockback::Result::Hit) {
                 isAiming[other] = false;
                 isPlayerInterferenceActive[other] = false;
@@ -2541,7 +2474,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
         for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) UpdateWhirlwindPull(charainfo, playerStates, charainfo[e]);
 
-        // ★ 敵の床接地判定（8フレームに1回分散チェック）
+        // 敵の床接地判定（8フレームに1回分散チェック）
 
         for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
             UpdateEnemyKnockback(charainfo[e]);
@@ -2562,7 +2495,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 wpmatrix[i] = MV1GetFrameLocalWorldMatrix(charainfo[i].model1, playerWeaponFrame[i]);
                 if (playerWeaponModel[i] != -1) MV1SetMatrix(playerWeaponModel[i], wpmatrix[i]);
 
-                // ★ 攻撃中のみ当たり判定を行う
+                // 攻撃中のみ当たり判定を行う
                 const float swingProgress = charainfo[i].anim_totaltime > 0.0f
                     ? charainfo[i].playtime / charainfo[i].anim_totaltime : 0.0f;
                 const bool swingActive = playerStates[i].isHeavyAttack ||
@@ -2608,11 +2541,6 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 
 
         const LONGLONG effectUpdateStart = GetNowHiPerformanceCount();
-        for (int p = 0; p < PLAYER_COUNT; ++p) {
-            const bool guardPose = CanJustGuard(charainfo[p], p) && !isAiming[p] &&
-                playerJustGuard[p].PoseActive();
-            UpdatePlayerGuardAnimation(charainfo[p], playerStates[p], animGuard, guardPose);
-        }
         UpdateEffekseer3D();
         effectUpdateMs += (GetNowHiPerformanceCount() - effectUpdateStart) / 1000.0;
         ++effectUpdates;
@@ -2649,7 +2577,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             VECTOR pPos = charainfo[pIdx].pos;
             VECTOR cPos, cTarget;
 
-            // ★ 演出中（1.5秒間）はボスカメラ、タイマーが切れたら通常のプレイヤー追従カメラへ自動復帰
+            // 演出中（1.5秒間）はボスカメラ、タイマーが切れたら通常のプレイヤー追従カメラへ自動復帰
             if (!game.ApplyBossCamera(cPos, cTarget, charainfo)) {
                 {
                 const auto& camera = orbitCameras[pIdx];
@@ -2664,7 +2592,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             }
             SetCameraPositionAndTargetAndUpVec(cPos, cTarget, VGet(0.0f, 1.0f, 0.0f));
 
-            // ★ 高速視界外カリング付き敵描画
+            // 高速視界外カリング付き敵描画
             VECTOR camFwd = VNorm(VSub(cTarget, cPos));
             const float MAX_DRAW_DIST_SQ = 2400.0f * 2400.0f;
 
@@ -2727,7 +2655,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             }
 
             // ========================================================
-            // ★ スタン中の頭上ピヨり星（★）＆ STUN 表示（2画面両対応）
+            // スタン中の頭上ピヨり星（）＆ STUN 表示（2画面両対応）
             // ========================================================
             for (int targetP = 0; targetP < PLAYER_COUNT; targetP++) {
                 if (playerStunTimer[targetP] > 0) {
@@ -2773,10 +2701,6 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 DrawString(startX + 20, 145, TEXT("SPRINT"), GetColor(255, 220, 100));
             if (charainfo[pIdx].knockbackFrames > 0)
                 DrawString(startX + 20, 145, TEXT("KNOCKBACK"), GetColor(255, 160, 80));
-            if (playerJustGuard[pIdx].window > 0)
-                DrawFormatString(startX + 20, 120, GetColor(120, 210, 255), TEXT("AUTO GUARD %.1fs"), playerJustGuard[pIdx].window / 60.0f);
-            if (playerJustGuard[pIdx].feedback > 0)
-                DrawString(startX + 20, 165, TEXT("AUTO BLOCK!"), GetColor(80, 255, 255));
             game.DrawBossCutsceneUI(startX, endX, 600);
             if (revengeBoost[pIdx].active) {
                 int centerX = startX + (endX - startX) / 2;
@@ -2953,6 +2877,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
     return 0;
 }
 
+// 攻撃が当たったらHPを減らし、倒したときの点数を入れる
 void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attacker, SCharaInfo* target, VECTOR start, VECTOR end, int SEdamageHandle, int anim_damage, bool* hitTargets, float knockbackSpeed) {
     const int areaTargetIndex = static_cast<int>(target - charainfo);
     if (hitTargets && (areaTargetIndex < 0 || areaTargetIndex >= MAX_CHARA || hitTargets[areaTargetIndex])) return;
@@ -2964,7 +2889,7 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
         int attackerIdx = (attacker == &charainfo[0]) ? 0 : ((attacker == &charainfo[1]) ? 1 : -1);
         int targetIdx = (target == &charainfo[0]) ? 0 : ((target == &charainfo[1]) ? 1 : -1);
 
-        // ★★★ プレイヤー同士の判定 ★★★
+        // プレイヤー同士の判定
         if (attackerIdx != -1 && targetIdx != -1) {
             // Vキーによる妨害攻撃中でない、または相手が無敵時間中はすり抜ける
             if (!isPlayerInterferenceActive[attackerIdx] || target->invincibleTimer > 0) {
@@ -2988,16 +2913,15 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
             if (hitTargets) hitTargets[areaTargetIndex] = true;
             PlaySoundMem(SEdamageHandle, DX_PLAYTYPE_BACK);
 
-            // ★★★ プレイヤー同士で妨害攻撃が命中した瞬間 ★★★
+            // プレイヤー同士で妨害攻撃が命中した瞬間
             if (attackerIdx != -1 && targetIdx != -1) {
                 isPlayerInterferenceActive[attackerIdx] = false;
                 playerInterferenceCooldown[attackerIdx] = INTERRUPT_COOLDOWN_FRAMES;
 
-                if (playerJustGuard[targetIdx].TryBlock(CanJustGuard(*target, targetIdx))) return;
 
                 if (target->HP > 0) target->HP--;
 
-                // ★ ノックバックを完全撤廃し、スタンタイマーをセット
+                // ノックバックを完全撤廃し、スタンタイマーをセット
                 playerStunTimer[targetIdx] = PLAYER_STUN_DURATION_FRAMES;
 
                 // 被弾モーションに切り替えて移動速度を完全ゼロ化

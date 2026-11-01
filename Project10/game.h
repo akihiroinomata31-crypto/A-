@@ -9,6 +9,7 @@ struct ReplayFrame {
     int action;
 };
 
+// 点数が入ったときに出す文字
 struct ScorePopup {
     int score;
     int playerIdx;
@@ -35,6 +36,7 @@ struct Flashbang {
     bool active;
 };
 
+// 試合時間や得点、敵の出現、画面表示をまとめて扱う
 class GameManager {
 private:
 
@@ -50,6 +52,7 @@ public:
     }
 
     // --- 制限時間管理（120FPS基準: 100秒なら 100 * 60 = 12000） ---
+    // 試合時間の残り 60回の更新で1秒
     int mainTimer = 100 * 60;
 
     // --- 敵スポーン管理 ---
@@ -58,20 +61,27 @@ public:
 
     ScorePopup popups[20];
 
+    // 1Pと2Pが稼いだ点数
     int p1Score = 0;
     int p2Score = 0;
     std::vector<ReplayFrame> replayData;
 
+    // 1回倒れるごとに引く点数
     static constexpr int DeathPenalty = 3000;
+    // 必殺技を1回使うごとに引く点数
     static constexpr int SpecialPenalty = 1000;
 
+    // 各プレイヤーが必殺技を使った回数
     int specialUseCount[2] = { 0, 0 };
+    // 各プレイヤーが倒れた回数
     int deathCount[2] = { 0, 0 };
+    // 0:試合中、1:1P勝利、2:2P勝利、3:引き分け
     int gameState = 0; // 0: 進行中, 1: 1P勝, 2: 2P勝, 3: 引き分け
 
-    // ★ スコア表示用専用フォントハンドル（黒文字用）
+    // スコア表示用専用フォントハンドル（黒文字用）
     int fontScore = -1;
 
+    // 次の試合用に点数や進行状態を戻す
     void Reset() {
         gameState = 0;
         mainTimer = 100 * 60;
@@ -100,6 +110,7 @@ public:
         }
     }
 
+    // 稼いだ点数から死亡と必殺技の減点分を引く
     int FinalScore(int playerIndex) const {
         if (playerIndex < 0 || playerIndex >= 2) return 0;
         const int earned = playerIndex == 0 ? p1Score : p2Score;
@@ -122,19 +133,23 @@ public:
     bool SetGameResourceDirectory();
     // game.h 内
 void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr, int rollTimer = 0);
-    // ★ 敵の頭上HPバー描画関数を追加
+    // 敵の頭上HPバー描画関数を追加
     void DrawEnemyHPBars(int pIdx, const SCharaInfo* charainfo);
    // void DrawSingleEnemyHPBar(const VECTOR& enemyPos, int currentHp, int maxHp, float headOffset);
     // --- 閃光弾・アイテム管理 ---
     FlashItem flashItems[3];             // フィールド上に同時に存在できるアイテム最大数
     Flashbang flashbangs[4];             // 投擲中の弾
     int itemDropTimer = 0;               // アイテムが降ってくるインターバル用
+    // 各プレイヤーが持っている閃光弾の数
     int flashbangStock[2] = { 0, 0 };    // [0]:1Pの所持数, [1]:2Pの所持数
+    // 各プレイヤーが動けるようになるまでの時間
     int playerStunTimer[2] = { 0, 0 };   // スタン残り時間
-     // ★ 開幕カウントダウン変数（120FPS基準: 3秒カウント + 0.8秒START表示 = 460フレーム）
+     // 開幕カウントダウン変数（120FPS基準: 3秒カウント + 0.8秒START表示 = 460フレーム）
+    // 試合開始までのカウントダウン
     int startCountdownTimer = 0;
+    // この試合でもうボスが出たか
     bool bossSpawned = false;
-   // ★ 1.5秒演出用（120FPS基準で180フレーム、60FPS基準なら90に調整）
+   // 1.5秒演出用（120FPS基準で180フレーム、60FPS基準なら90に調整）
     static const int BOSS_CUTSCENE_TOTAL_FRAMES = 90;
     int bossCutsceneTimer;
     bool bossCutsceneDone; // ★ 1回演出したら二度と再起動しないフラグ
@@ -145,7 +160,7 @@ void DrawGameMenu(bool results, const GameManager& game, int selected, const TCH
     // カメラ座標計算（true: 演出中 / false: 通常カメラに戻す）
     bool ApplyBossCamera(VECTOR& outCamPos, VECTOR& outCamTarget, const SCharaInfo* enemyList);
     void DrawStartCountdown(int sw, int sh, int img3, int img2, int img1);
-    // ★ テロップ描画関数（DrawUI の中、または分割描画ループから呼ぶ）
+    // テロップ描画関数（DrawUI の中、または分割描画ループから呼ぶ）
     void DrawBossCutsceneUI(int startX, int endX, int screenHeight) const;
     void SpawnFlashItem();
     void UpdateFlashItems(SCharaInfo* players);

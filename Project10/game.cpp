@@ -14,6 +14,7 @@ int red_goblin_anim_attack = -1;
 int red_goblin_anim_walk = -1;
 int weaponBaseModel = -1;
 
+// 地面の高さを調べて敵をその上に置く
 bool PlaceEnemyOnGround(SCharaInfo& enemy) {
     if (stagedata < 0) return false;
     const float dx = enemy.pos.x - enemy.groundCachePosition.x;
@@ -37,6 +38,7 @@ bool PlaceEnemyOnGround(SCharaInfo& enemy) {
     return true;
 }
 
+// 試合開始用にタイマーと点数を戻す
 void GameManager::Init() {
     mainTimer = 99 * 60; // 60 Hz simulation
     startCountdownTimer = 0;
@@ -60,6 +62,7 @@ void GameManager::Init() {
     }
 }
 
+// 時間を進め、勝敗を決めたり敵を出したりする
 void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     // ==========================================
     // 1. タイマー更新 ＆ 勝敗判定（開幕カウントダウン中は減算停止）
@@ -176,6 +179,7 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     }
 }
 
+// 空いている枠に赤ゴブリンを出す
 void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
     for (int i = TEST_ENEMY_RED; i < MAX_CHARA; i++) {
         if (enemyList[i].mode == NONE) {
@@ -224,6 +228,7 @@ void GameManager::ActivateRedGoblin(SCharaInfo* enemyList, float x, float z) {
     }
 }
 
+// 空いている枠に通常の敵を出す
 void GameManager::ActivateEnemy(SCharaInfo* enemyList, float x, float z) {
     for (int i = TEST_ENEMY_INDEX; i < TEST_ENEMY_RED; i++) {
         if (i == TEST_ENEMY_GOLEM) continue;
@@ -274,6 +279,7 @@ void GameManager::RecordFrame(VECTOR p1, VECTOR p2, int act) {
     replayData.push_back(frame);
 }
 
+// プレイヤーのHPや点数を表示する
 void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBarTex,  bool isPvPActive, int pvpCooldown) {
     HudText hud;
     int xOffset = (pIdx == 0) ? 0 : sw / 2;
@@ -300,6 +306,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     int drawX = xOffset + 20;
     int drawY = startY + 30;
 
+    // 残りHPの割合 0〜1に収めてバーの幅を決める
     float hpRate = (float)players[pIdx].HP / (float)MAX_HP;
     if (hpRate < 0.0f) hpRate = 0.0f;
     if (hpRate > 1.0f) hpRate = 1.0f;
@@ -393,7 +400,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         scoreTextW = hud.Width(scoreStr, (int)strlen(scoreStr));
     }
 
-    // ★ プレイヤー1・プレイヤー2ともに各分割画面の右下に配置
+    // プレイヤー1・プレイヤー2ともに各分割画面の右下に配置
     int scoreX = xOffset + halfW - scoreTextW - 30;
     int scoreY = sh - 55;
 
@@ -439,6 +446,7 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
     }
 }
 
+// 残り時間を秒に直して表示する
 void GameManager::DrawTimer(int sw, int sh) {
     HudText hud;
     int seconds = mainTimer / 60;
@@ -474,6 +482,7 @@ void GameManager::DrawTimer(int sw, int sh) {
     hud.SetSize(20);
 }
 
+// 指定したプレイヤーに点数を足す
 void GameManager::AddScore(int playerIndex, int score) {
     if (playerIndex == 0) {
         p1Score += score;
@@ -485,6 +494,7 @@ void GameManager::AddScore(int playerIndex, int score) {
     }
 }
 
+// 点数表示に使える空き枠を探す
 void GameManager::AddScorePopup(int playerIdx, int score) {
     for (int i = 0; i < 20; i++) {
         if (!popups[i].active) {
@@ -517,6 +527,7 @@ static void MenuText(int y, int size, const char* text, unsigned int color) {
 // ========================================================
 // タイトル / リザルト画面描画
 // ========================================================
+// 開始メニューか試合結果を表示する
 void GameManager::DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot, int rollTimer) {
     SetDrawArea(0, 0, 900, 600);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
@@ -631,7 +642,7 @@ void GameManager::DrawGameMenu(bool results, const GameManager& game, int select
             MenuLabel(340, 150, 64, "限界ラッシュ", gold);
         }
 
-        // ★ スタート表示（滑らかなサイン波点滅）
+        // スタート表示（滑らかなサイン波点滅）
         float blinkRate = (sinf(now * 0.006f) + 1.0f) * 0.5f;
         int textAlpha = 70 + (int)(185.0f * blinkRate);
 
@@ -743,6 +754,7 @@ void GameManager::DrawGameMenu(bool results, const GameManager& game, int select
     ScreenFlip();
 }
 
+// 必殺技エネルギーがどれだけあるかゲージに出す
 void GameManager::DrawSpecialGauge(int pIdx, int startX, int endX, int screenHeight, int currentGauge, int maxGauge, int frameGraphHandle) {
     if (maxGauge <= 0) return;
     HudText hud;
@@ -807,6 +819,7 @@ void GameManager::DrawSpecialGauge(int pIdx, int startX, int endX, int screenHei
     }
 }
 
+// ボス登場中のカメラ位置を決める
 bool GameManager::ApplyBossCamera(VECTOR& outCamPos, VECTOR& outCamTarget, const SCharaInfo* enemyList) {
     if (bossCutsceneTimer <= 0) return false;
     if (enemyList[TEST_ENEMY_GOLEM].mode == NONE || enemyList[TEST_ENEMY_GOLEM].model1 == -1) return false;
@@ -898,6 +911,7 @@ void GameManager::DrawLoadingScreen() {
     ProcessMessage();
 }
 
+// 点数表示などのタイマーを進める
 void GameManager::UpdateVisualTimers() {
     for (auto& popup : popups) {
         if (!popup.active) continue;

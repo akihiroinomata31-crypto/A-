@@ -8,6 +8,7 @@
 #include <math.h>
 
 // Normalize Xbox face buttons to A=1, B=2, X=3, Y=4.
+// つながっていないパッドは何も押していない扱いにする
 int ReadPlayerPadState(int padType) {
     int buttons = GetJoypadInputState(padType);
     if (buttons < 0) buttons = 0;
@@ -74,7 +75,7 @@ void UpdateNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& stat
 }
 
 void StartHeavyAttackEffect(PlayerRuntimeState& state) {
-	// 重攻撃開始時にエフェクトの先頭フレームへ戻す。
+	// 重攻撃開始時にエフェクトの先頭フレームへ戻す
 	state.heavyAttackEffectFrame = 0;
 	state.heavyAttackEffectWait = 0;
 	state.isHeavyAttackEffectPlaying = true;
@@ -87,7 +88,7 @@ void StopHeavyAttackEffect(PlayerRuntimeState& state) {
 }
 
 void UpdateHeavyAttackEffect(PlayerRuntimeState& state) {
-	// 重攻撃エフェクトのスプライトシートを1フレームずつ進める。
+	// 重攻撃エフェクトのスプライトシートを1フレームずつ進める
 	if (!state.isHeavyAttackEffectPlaying) {
 		return;
 	}
@@ -123,7 +124,7 @@ void StartSpecialAttackEffect(
 	PlayerRuntimeState& state,
 	int effectResourceHandle
 ) {
-	// 必殺技ごとに判定時間、多重ヒット防止、Effekseer の再生位置を初期化する。
+	// 必殺技ごとに判定時間、多重ヒット防止、Effekseer の再生位置を初期化する
 	state.specialAttackEffectFrame = 0;
 	state.specialAttackEffectWait = 0;
 	state.isSpecialAttackEffectPlaying = true;
@@ -153,7 +154,7 @@ void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& sta
 		return;
 	}
 
-	// プレイヤー座標を毎フレーム反映し、1P/2P の各エフェクトを本人に追従させる。
+	// プレイヤー座標を毎フレーム反映し、1P/2P の各エフェクトを本人に追従させる
 	if (state.specialAttackPlayingHandle != -1) {
 		PositionSpecialAttackEffect(player, state);
         SetSpeedPlayingEffekseer3DEffect(state.specialAttackPlayingHandle, state.emberSpecial ? PLAYER_EMBER_EFFECT_SPEED : (state.bloodLanceSpecial ? PLAYER_BLOOD_LANCE_EFFECT_SPEED : 1.0f));
@@ -172,8 +173,9 @@ void UpdateSpecialAttackEffect(const SCharaInfo& player, PlayerRuntimeState& sta
 	}
 }
 
+// キーやパッドの入力から動く量を決める
 void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& input, float& inputX, float& inputZ) {
-	// 方向キー、十字キー、左スティックをまとめて移動入力に変換する。
+	// 方向キー、十字キー、左スティックをまとめて移動入力に変換する
 	bool moveDown = IsPadButtonDown(state.key, PAD_INPUT_DOWN) || IsKeyDown(input.downKey);
 	bool moveUp = IsPadButtonDown(state.key, PAD_INPUT_UP) || IsKeyDown(input.upKey);
 	bool moveLeft = IsPadButtonDown(state.key, PAD_INPUT_LEFT) || IsKeyDown(input.leftKey);
@@ -213,8 +215,9 @@ void GetMoveInput(const PlayerRuntimeState& state, const PlayerInputConfig& inpu
 	}
 }
 
+// 動く方向にキャラを向ける
 void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
-	// 移動方向に合わせてキャラクターの向きを変える。
+	// 動く方向にキャラを向ける
 	if (fabsf(inputX) > fabsf(inputZ)) {
 		player.direction = inputX < 0.0f ? Direction::LEFT : Direction::RIGHT;
 	}
@@ -223,8 +226,9 @@ void SetDirectionByMove(SCharaInfo& player, float inputX, float inputZ) {
 	}
 }
 
+// 通常攻撃か重攻撃を出す
 void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, bool isHeavyAttack, int animHeavyAttack) {
-	// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃と重攻撃を区別する。
+	// 重攻撃は3段目の攻撃アニメーションを使い、通常攻撃と重攻撃を区別する
 	state.attackIndex = isHeavyAttack ? PLAYER_ATTACK_ANIM_COUNT - 1 : 0;
 	state.isAttackBuffered = false;
 	state.isHeavyAttack = isHeavyAttack;
@@ -244,8 +248,9 @@ void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int 
 	PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
 }
 
+// 必殺技のアニメとエフェクトを出す
 void StartPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, const int animAttack[], int seAttackHandle, int effectResourceHandle, int animSpecialAttack, bool energyAttack = false) {
-	// 専用モデルアニメーションができるまでは3段目の攻撃動作を流用する。
+	// 専用モデルアニメーションができるまでは3段目の攻撃動作を流用する
 	state.attackIndex = PLAYER_ATTACK_ANIM_COUNT - 1;
 	state.isAttackBuffered = false;
 	state.isHeavyAttack = false;
@@ -292,11 +297,13 @@ void ApplyAttackStepMove(SCharaInfo& player, PlayerRuntimeState& state, const Pl
 
 } // namespace
 
+// 今スキルを出せるか
 bool CanPlayerStartSkill(const SCharaInfo& player, const PlayerRuntimeState& state) {
     if (state.isSpecialAttack || state.isHeavyAttack || state.isSpecialAttackEffectPlaying) return false;
     return player.mode == STAND || player.mode == RUN || player.mode == ATTACK || player.mode == ATTACKOUT;
 }
 
+// 通常攻撃を途中でやめてスキルを出す
 bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& state,
     bool specialPressed, bool whirlwindPressed, const int animations[],
     int whirlwindAnimation, int specialAnimation, int sound, int effect) {
@@ -315,6 +322,7 @@ void PlayPlayerSpecialAttack(SCharaInfo& player, PlayerRuntimeState& state, int 
     StartPlayerSpecialAttack(player, state, nullptr, sound, effect, animation);
 }
 
+// エネルギーが足りるか調べ、技が出たら消費する
 bool TryPlayPlayerEnergyAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound,
     int effect, int& energy, int requiredEnergy) {
     if (requiredEnergy < 0 || energy < requiredEnergy || effect < 0 || !CanPlayerStartSkill(player, state)) return false;
@@ -328,6 +336,7 @@ bool TryPlayPlayerEnergyAttack(SCharaInfo& player, PlayerRuntimeState& state, in
     return true;
 }
 
+// 攻撃した側から離れる方向に敵を飛ばす
 void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float speed) {
     float dx = target.pos.x - attacker.pos.x;
     float dz = target.pos.z - attacker.pos.z;
@@ -344,6 +353,7 @@ void StartEnemyKnockback(const SCharaInfo& attacker, SCharaInfo& target, float s
     target.knockbackFrames = PLAYER_COMBO_FINISHER_KNOCKBACK_FRAMES;
 }
 
+// 敵を吹き飛ばし、残り時間を減らす
 void UpdateEnemyKnockback(SCharaInfo& target) {
     if (target.mode != DAMAGE || target.enemyHP <= 0) {
         target.knockbackFrames = 0;
@@ -356,12 +366,14 @@ void UpdateEnemyKnockback(SCharaInfo& target) {
     if (--target.knockbackFrames == 0) target.knockbackVelocity = VGet(0, 0, 0);
 }
 
+// 移動量を0に戻す
 void ResetMove(SCharaInfo& chara) {
 	chara.move.x = 0.0f;
 	chara.move.y = 0.0f;
 	chara.move.z = 0.0f;
 }
 
+// アニメを切り替えて再生位置を決める
 void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 	if (chara.model1 < 0 || animHandle < 0) return;
 	if (chara.attachidx >= 0) MV1DetachAnim(chara.model1, chara.attachidx);
@@ -370,6 +382,7 @@ void SetCharacterAnimation(SCharaInfo& chara, int animHandle, float playtime) {
 	chara.playtime = playtime;
 }
 
+// 攻撃をやめてエフェクトも止める
 void CancelPlayerCombat(PlayerRuntimeState& state) {
     state.sprint.Reset();
     state.sprintHeld = false;
@@ -382,33 +395,7 @@ void CancelPlayerCombat(PlayerRuntimeState& state) {
     state.attackIndex = 0;
     state.movementAnimation = -1;
 }
-void UpdatePlayerGuardAnimation(SCharaInfo& player, PlayerRuntimeState& state,
-    int animation, bool active) {
-    if (player.model1 < 0) return;
-    const bool locomotion = player.mode == STAND || player.mode == RUN;
-    active = active && locomotion && animation >= 0;
-    if (active && state.guardAnimationAttachment < 0) {
-        state.guardAnimationAttachment = MV1AttachAnim(player.model1, 0, animation);
-        state.guardAnimationTime = 0.0f;
-        state.guardAnimationBlend = 0.0f;
-    }
-    if (state.guardAnimationAttachment < 0) return;
-    state.guardAnimationBlend = active ? fminf(1.0f, state.guardAnimationBlend + 0.5f)
-        : (locomotion ? fmaxf(0.0f, state.guardAnimationBlend - 0.34f) : 0.0f);
-    if (state.guardAnimationBlend <= 0.0f) {
-        MV1DetachAnim(player.model1, state.guardAnimationAttachment);
-        state.guardAnimationAttachment = -1;
-        if (player.attachidx >= 0) MV1SetAttachAnimBlendRate(player.model1, player.attachidx, 1.0f);
-        return;
-    }
-    const float duration = MV1GetAttachAnimTotalTime(player.model1, state.guardAnimationAttachment);
-    state.guardAnimationTime = fminf(duration, state.guardAnimationTime + PlayerAnimationStep);
-    MV1SetAttachAnimTime(player.model1, state.guardAnimationAttachment, state.guardAnimationTime);
-    MV1SetAttachAnimBlendRate(player.model1, state.guardAnimationAttachment, state.guardAnimationBlend);
-    if (player.attachidx >= 0)
-        MV1SetAttachAnimBlendRate(player.model1, player.attachidx, 1.0f - state.guardAnimationBlend);
-}
-
+// アニメを進め、動きが終わったら次の状態にする
 void UpdatePlayerAnimationProgress(SCharaInfo& player, PlayerRuntimeState& state, int animNeutral) {
 	if (player.mode == DAMAGE || player.mode == DOWNMODE) {
         CancelPlayerCombat(state);
@@ -491,7 +478,7 @@ void PlayPlayerNormalAttackEffect(const SCharaInfo& player, PlayerRuntimeState& 
 }
 
 void DrawPlayerHeavyAttackEffect(const SCharaInfo& player, const PlayerRuntimeState& state, const int effectHandles[]) {
-	// 重攻撃中だけ、プレイヤー位置にエフェクトを表示する。
+	// 重攻撃中だけ、プレイヤー位置にエフェクトを表示する
 	if (!state.isHeavyAttackEffectPlaying) {
 		return;
 	}
@@ -507,6 +494,7 @@ void DrawPlayerHeavyAttackEffect(const SCharaInfo& player, const PlayerRuntimeSt
 	SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 }
 
+// 当たる時間と範囲を調べ、同じ相手に何度も当てないようにする
 void CheckPlayerSpecialAttackHit(
 	GameManager& game,
 	SCharaInfo& attacker,
@@ -517,7 +505,7 @@ void CheckPlayerSpecialAttackHit(
 	int playerIndex,
 	int targetIndex
 ) {
-	// 水波が見えるフレームだけ、プレイヤー中心の円形判定を有効にする。
+	// 水波が見えるフレームだけ、プレイヤー中心の円形判定を有効にする
 	if (!state.isSpecialAttack || !state.isSpecialAttackEffectPlaying || targetIndex < 0 || targetIndex >= MAX_CHARA || state.specialHitTargets[targetIndex]) {
 		return;
 	}
@@ -534,7 +522,7 @@ void CheckPlayerSpecialAttackHit(
 		return;
 	}
 
-	// 波紋の広がりに合わせ、開始フレームから最大半径まで判定を拡大する。
+	// 波紋の広がりに合わせ、開始フレームから最大半径まで判定を拡大する
 	// The first impact is a forward capsule; the sword shower expands around the effect.
 	const float yaw = DX_PI_F * 0.5f * attacker.direction;
 	const float forwardX = -sinf(yaw), forwardZ = -cosf(yaw);
@@ -583,6 +571,7 @@ void CheckPlayerSpecialAttackHit(
 	}
 }
 
+// 入力に合わせて移動や攻撃を行い、次の攻撃も受け付ける
 void UpdatePlayerInput(
 	SCharaInfo& player,
 	PlayerRuntimeState& state,
@@ -597,7 +586,7 @@ void UpdatePlayerInput(
 	int seJumpHandle,
 	int specialAttackEffectResourceHandle
 ) {
-	// プレイヤーを操作できる状態か確認する。
+	// プレイヤーを操作できる状態か確認する
 	state.moveInput = false;
     state.sprintHeld = false;
 	bool attackPressed = false;
@@ -608,10 +597,10 @@ void UpdatePlayerInput(
 		state.key = ReadPlayerPadState(input.padType);
         state.sprintHeld = IsPadOrKeyDown(state.key, input.sprintPadButton, input.sprintKey);
 		if (state.key < 0) {
-			// パッド未接続時は入力なしとして扱う。
+			// パッド未接続時は入力なしとして扱う
 			state.key = 0;
 		}
-		// 攻撃、重攻撃、ジャンプは押した瞬間だけ反応させる。
+		// 攻撃、重攻撃、ジャンプは押した瞬間だけ反応させる
 		const int currentAttackButton = (IsPadOrKeyDown(state.key, input.attackPadButton, input.attackKey) ||
 			IsPadButtonDown(state.key, PAD_INPUT_10)) ? 1 : 0;
 		const int currentHeavyAttackButton = IsPadOrKeyDown(state.key, input.heavyAttackPadButton, input.heavyAttackKey) ? 1 : 0;
@@ -647,7 +636,7 @@ void UpdatePlayerInput(
 			StartPlayerAttack(player, state, animAttack, seAttackHandle, false, animHeavyAttack);
 		}
 		else {
-			// キーボード、十字キー、左スティック入力を移動量に変換する。
+			// キーボード、十字キー、左スティック入力を移動量に変換する
 			float inputX = 0.0f;
 			float inputZ = 0.0f;
 			GetMoveInput(state, input, inputX, inputZ);
@@ -660,14 +649,14 @@ void UpdatePlayerInput(
 		}
 	}
 
-	// 攻撃中にもう一度押したら次の攻撃を予約する。
+	// 攻撃中にもう一度押したら次の攻撃を予約する
 	if (player.mode == ATTACK && !state.isHeavyAttack && !state.isSpecialAttack && attackPressed && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 		state.isAttackBuffered = true;
 	}
 
 	MV1SetRotationXYZ(player.model1, VGet(0.0f, DX_PI_F * 0.5f * player.direction, 0.0f));
 
-	// 入力の有無で待機/走りアニメを切り替える。
+	// 入力の有無で待機/走りアニメを切り替える
 	if (!state.moveInput) {
         state.sprint.Reset();
 		if (player.mode == RUN) {
@@ -684,6 +673,7 @@ void UpdatePlayerInput(
 	}
 }
 
+// 攻撃中に動かし、次の攻撃につなげる
 void UpdatePlayerAttackState(
 	SCharaInfo& player,
 	PlayerRuntimeState& state,
@@ -692,12 +682,12 @@ void UpdatePlayerAttackState(
 	const float attackEndTime[],
 	int seAttackHandle
 ) {
-	// 攻撃アニメーション中の移動と連撃遷移を処理する。
+	// 攻撃アニメーション中の移動と連撃遷移を処理する
 	if (player.mode != ATTACK) {
 		return;
 	}
 
-	// 必殺技中は移動を止め、エフェクトの終了と同時に攻撃後状態へ移る。
+	// 必殺技中は移動を止め、エフェクトの終了と同時に攻撃後状態へ移る
 	if (state.isSpecialAttack) {
 		ResetMove(player);
 		if (!state.isSpecialAttackEffectPlaying) {
@@ -733,12 +723,12 @@ void UpdatePlayerAttackState(
     const float chainTime = !state.isHeavyAttack && state.isAttackBuffered ? endTime * 0.78f : endTime;
 	if (player.playtime >= chainTime) {
 		if (state.isHeavyAttack) {
-			// 重攻撃は単発で終了させる。
+			// 重攻撃は単発で終了させる
 			state.isAttackBuffered = false;
 			state.isHeavyAttack = false;
 			player.mode = ATTACKOUT;
 		}
-		// 予約入力があれば次の攻撃アニメへつなげる。
+		// 予約入力があれば次の攻撃アニメへつなげる
 		else if (state.isAttackBuffered && state.attackIndex < PLAYER_ATTACK_ANIM_COUNT - 1) {
 			ApplyAttackStepMove(player, state, input);
 			state.attackIndex++;
@@ -755,6 +745,7 @@ void UpdatePlayerAttackState(
 	}
 }
 
+// アニメで足元がずれないようにする
 void ApplyPlayerMotionRoot(SCharaInfo& player, const PlayerRuntimeState& state) {
 	if (!PLAYER_USE_NEW_MODEL || state.motionRootFrame < 0 || player.attachidx < 0) return;
 	MV1ResetFrameUserLocalMatrix(player.model1, state.motionRootFrame);
@@ -764,6 +755,7 @@ void ApplyPlayerMotionRoot(SCharaInfo& player, const PlayerRuntimeState& state) 
 	MV1SetFrameUserLocalMatrix(player.model1, state.motionRootFrame, root);
 }
 
+// ダッシュの速さを移動量にかける
 void UpdatePlayerMovement(SCharaInfo& player, PlayerRuntimeState& state,
 	float inputX, float inputZ, int animRun) {
 	if ((player.mode != STAND && player.mode != RUN) || (inputX == 0.0f && inputZ == 0.0f)) {
@@ -783,6 +775,7 @@ void UpdatePlayerMovement(SCharaInfo& player, PlayerRuntimeState& state,
 	}
 }
 
+// 範囲内で一番近い旋風を出しているプレイヤーを探す
 int FindWhirlwindPullPlayer(const SCharaInfo players[], const PlayerRuntimeState states[], const SCharaInfo& target) {
 	if (target.mode == NONE || target.mode == DOWNMODE || target.enemyHP <= 0) return -1;
 	int closest = -1;
@@ -803,6 +796,7 @@ int FindWhirlwindPullPlayer(const SCharaInfo players[], const PlayerRuntimeState
 	return closest;
 }
 
+// 敵を旋風に引き寄せ、近づきすぎない所で止める
 void UpdateWhirlwindPull(const SCharaInfo players[], const PlayerRuntimeState states[], SCharaInfo& target) {
 	const int owner = FindWhirlwindPullPlayer(players, states, target);
 	if (owner < 0) return;
@@ -819,6 +813,7 @@ void UpdateWhirlwindPull(const SCharaInfo players[], const PlayerRuntimeState st
 	target.charahitinfo.CenterPosition = target.pos;
 	if (target.model1 != -1) MV1SetPosition(target.model1, target.pos);
 }
+// 敵が止まっているか歩いているかでアニメを変える
 void UpdateEnemyLocomotionAnimation(SCharaInfo& enemy, bool moving) {
 	if (enemy.mode != STAND) {
 		enemy.enemyWalking = false;
