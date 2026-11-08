@@ -1,0 +1,1 @@
+automatic guard: five seconds, release persistence, repeated blocks, no refresh, expiry, fresh press and unavailable states: PASS

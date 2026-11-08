@@ -1,0 +1,5 @@
+P2 RT guard: first/last active tick blocks without movement or damage reaction; expired/unavailable guard takes knockback: PASS
+P1 release knockback, players only, momentum, guard/expiry, range/height, respawn and down: PASS
+P1 RT guard: first/last active tick blocks without movement or damage reaction; expired/unavailable guard takes knockback: PASS
+P2 release knockback, players only, momentum, guard/expiry, range/height, respawn and down: PASS
+simultaneous releases: PASS
