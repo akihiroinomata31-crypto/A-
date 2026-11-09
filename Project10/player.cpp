@@ -128,7 +128,10 @@ void StartSpecialAttackEffect(
 	state.specialAttackEffectFrame = 0;
 	state.specialAttackEffectWait = 0;
 	state.isSpecialAttackEffectPlaying = true;
-	for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
+	for (int i = 0; i < MAX_CHARA; ++i) {
+        state.specialHitTargets[i] = false;
+        state.specialFinishHitTargets[i] = false;
+    }
     state.specialEffectOrigin = player.pos;
     state.specialEffectDirection = player.direction;
 	state.specialAttackPlayingHandle = PlayEffekseer3DEffect(effectResourceHandle);
@@ -233,7 +236,10 @@ void StartPlayerAttack(SCharaInfo& player, PlayerRuntimeState& state, const int 
 	state.isAttackBuffered = false;
 	state.isHeavyAttack = isHeavyAttack;
 	state.isSpecialAttack = false;
-	for (int i = 0; i < MAX_CHARA; ++i) state.specialHitTargets[i] = false;
+	for (int i = 0; i < MAX_CHARA; ++i) {
+        state.specialHitTargets[i] = false;
+        state.specialFinishHitTargets[i] = false;
+    }
 	StopSpecialAttackEffect(state);
 	if (isHeavyAttack) {
 		StopNormalAttackEffect(state);
@@ -306,13 +312,13 @@ bool CanPlayerStartSkill(const SCharaInfo& player, const PlayerRuntimeState& sta
 // 通常攻撃を途中でやめてスキルを出す
 bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& state,
     bool specialPressed, bool whirlwindPressed, const int animations[],
-    int whirlwindAnimation, int specialAnimation, int sound, int effect) {
+    int whirlwindAnimation, int specialAnimation, int sound, int swordFormationSound, int effect) {
     if ((player.mode != ATTACK && player.mode != ATTACKOUT) ||
         !CanPlayerStartSkill(player, state) || (!specialPressed && !whirlwindPressed)) return false;
     ResetMove(player);
     for (int i = 0; i < MAX_CHARA; ++i) state.normalHitTargets[i] = false;
     if (specialPressed)
-        StartPlayerSpecialAttack(player, state, animations, sound, effect, specialAnimation);
+        StartPlayerSpecialAttack(player, state, animations, swordFormationSound, effect, specialAnimation);
     else
         StartPlayerAttack(player, state, animations, sound, true, whirlwindAnimation);
     return true;
@@ -506,9 +512,13 @@ void CheckPlayerSpecialAttackHit(
 	int targetIndex
 ) {
 	// 水波が見えるフレームだけ、プレイヤー中心の円形判定を有効にする
-	if (!state.isSpecialAttack || !state.isSpecialAttackEffectPlaying || targetIndex < 0 || targetIndex >= MAX_CHARA || state.specialHitTargets[targetIndex]) {
+	if (!state.isSpecialAttack || !state.isSpecialAttackEffectPlaying || targetIndex < 0 || targetIndex >= MAX_CHARA) {
 		return;
 	}
+    const bool isSwordFinish = !state.emberSpecial && !state.bloodLanceSpecial &&
+        state.specialAttackEffectFrame >= PLAYER_SPECIAL_ATTACK_FINISH_START_FRAME;
+    bool& hitDone = isSwordFinish ? state.specialFinishHitTargets[targetIndex] : state.specialHitTargets[targetIndex];
+    if (hitDone) return;
     if (state.emberSpecial) {
         const int frame = state.specialAttackEffectFrame;
         if (!((frame >= PLAYER_EMBER_STRIKE_START && frame <= PLAYER_EMBER_STRIKE_END) ||
@@ -534,7 +544,7 @@ void CheckPlayerSpecialAttackHit(
 	float centerX, centerZ, attackRadius;
     if (state.emberSpecial) {
         centerX = centerZ = 0.0f;
-        attackRadius = state.specialAttackEffectFrame >= PLAYER_EMBER_FINISH_START ? 300.0f : 200.0f;
+        attackRadius = state.specialAttackEffectFrame >= PLAYER_EMBER_FINISH_START ? PLAYER_EMBER_FINISH_RADIUS : PLAYER_EMBER_STRIKE_RADIUS;
     } else if (state.bloodLanceSpecial) {
         // BloodLance emerges in a ring around the caster.
         centerX = centerZ = 0.0f;
@@ -555,8 +565,8 @@ void CheckPlayerSpecialAttackHit(
     const float hitDistance = attackRadius + targetRadius;
 	const float distanceX = dx - centerX, distanceZ = dz - centerZ;
 	if (distanceX * distanceX + distanceZ * distanceZ > hitDistance * hitDistance) return;
-	// Each target takes damage once per cast.
-	state.specialHitTargets[targetIndex] = true;
+	// The final SwordMega impact has its own one-hit-per-target record.
+	hitDone = true;
 	SetCharacterAnimation(target, target.enemyDamageAnimation >= 0 ? target.enemyDamageAnimation : animDamage);
     target.hurtRecoveryTicks = 0;
 	target.mode = DAMAGE;
@@ -583,6 +593,8 @@ void UpdatePlayerInput(
 	int animRun,
 	int animJumpIn,
 	int seAttackHandle,
+	int swordFormationSound,
+	int normalAttackSound,
 	int seJumpHandle,
 	int specialAttackEffectResourceHandle
 ) {
@@ -621,19 +633,19 @@ void UpdatePlayerInput(
 	}
 
     TryInterruptPlayerNormalAttack(player, state, specialAttackPressed, heavyAttackPressed,
-        animAttack, animHeavyAttack, animSpecialAttack, seAttackHandle, specialAttackEffectResourceHandle);
+        animAttack, animHeavyAttack, animSpecialAttack, seAttackHandle, swordFormationSound, specialAttackEffectResourceHandle);
 
 	if (player.mode == STAND || player.mode == RUN) {
 		ResetMove(player);
 
 		if (specialAttackPressed && !state.isSpecialAttack) {
-			StartPlayerSpecialAttack(player, state, animAttack, seAttackHandle, specialAttackEffectResourceHandle, animSpecialAttack);
+			StartPlayerSpecialAttack(player, state, animAttack, swordFormationSound, specialAttackEffectResourceHandle, animSpecialAttack);
 		}
 		else if (heavyAttackPressed && !state.isSpecialAttack) {
 			StartPlayerAttack(player, state, animAttack, seAttackHandle, true, animHeavyAttack);
 		}
 		else if (attackPressed && !state.isSpecialAttack) {
-			StartPlayerAttack(player, state, animAttack, seAttackHandle, false, animHeavyAttack);
+			StartPlayerAttack(player, state, animAttack, normalAttackSound, false, animHeavyAttack);
 		}
 		else {
 			// キーボード、十字キー、左スティック入力を移動量に変換する
@@ -680,7 +692,8 @@ void UpdatePlayerAttackState(
 	const PlayerInputConfig& input,
 	const int animAttack[],
 	const float attackEndTime[],
-	int seAttackHandle
+	int normalAttackSound,
+	int normalAttackFinisherSound
 ) {
 	// 攻撃アニメーション中の移動と連撃遷移を処理する
 	if (player.mode != ATTACK) {
@@ -736,7 +749,9 @@ void UpdatePlayerAttackState(
 			player.isHit = false;
 			PlayPlayerNormalAttackEffect(player, state);
 			SetCharacterAnimation(player, animAttack[state.attackIndex]);
-			PlaySoundMem(seAttackHandle, DX_PLAYTYPE_BACK);
+			const int sound = state.attackIndex == PLAYER_ATTACK_ANIM_COUNT - 1
+				? normalAttackFinisherSound : normalAttackSound;
+			PlaySoundMem(sound, DX_PLAYTYPE_BACK);
 		}
 		else {
 			state.isAttackBuffered = false;

@@ -50,7 +50,9 @@ constexpr float PLAYER_SPECIAL_ATTACK_EFFECT_HEIGHT_OFFSET = 4.0f * PLAYER_SPECI
 constexpr int PLAYER_SPECIAL_ATTACK_ACTIVE_START_FRAME = 40;
 constexpr int PLAYER_SPECIAL_ATTACK_FULL_RADIUS_FRAME = 100;
 // 必殺技が当たらなくなるフレーム
-constexpr int PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME = 165;
+// Final shower impact: generation offset 70 + 19 * 3 + attack delay 40.
+constexpr int PLAYER_SPECIAL_ATTACK_FINISH_START_FRAME = 167;
+constexpr int PLAYER_SPECIAL_ATTACK_ACTIVE_END_FRAME = 187;
 constexpr float PLAYER_SPECIAL_ATTACK_MAX_RADIUS = 336.0f;
 // 現在のテスト用HPでは通常攻撃1回を1としているため、必殺技300は2ダメージに換算する
 // 必殺技1ヒットのダメージ
@@ -65,6 +67,8 @@ constexpr int PLAYER_EMBER_STRIKE_START = 43;
 constexpr int PLAYER_EMBER_STRIKE_END = 100;
 constexpr int PLAYER_EMBER_FINISH_START = 150;
 constexpr int PLAYER_EMBER_FINISH_END = 165;
+constexpr float PLAYER_EMBER_STRIKE_RADIUS = 300.0f;
+constexpr float PLAYER_EMBER_FINISH_RADIUS = 450.0f;
 constexpr float PLAYER_BLOOD_LANCE_EFFECT_SCALE = 20.0f;
 constexpr float PLAYER_BLOOD_LANCE_EFFECT_SPEED = 2.0f;
 constexpr int PLAYER_BLOOD_LANCE_EFFECT_FRAMES = 195;
@@ -141,6 +145,7 @@ struct PlayerRuntimeState {
 	bool normalHitTargets[MAX_CHARA] = {};
 	// この必殺技がすでに当たった相手
 	bool specialHitTargets[MAX_CHARA] = {};
+	bool specialFinishHitTargets[MAX_CHARA] = {};
 	// 今、移動ボタンを押しているか
 	bool moveInput = false;
 };
@@ -184,6 +189,8 @@ void UpdatePlayerInput(
 	int animRun,
 	int animJumpIn,
 	int seAttackHandle,
+	int swordFormationSound,
+	int normalAttackSound,
 	int seJumpHandle,
 	int specialAttackEffectResourceHandle
 );
@@ -195,7 +202,8 @@ void UpdatePlayerAttackState(
 	const PlayerInputConfig& input,
 	const int animAttack[],
 	const float attackEndTime[],
-	int seAttackHandle
+	int normalAttackSound,
+	int normalAttackFinisherSound
 );
 // Keep animation root translation aligned with the gameplay position.
 void ApplyPlayerMotionRoot(SCharaInfo& player, const PlayerRuntimeState& state);
@@ -218,7 +226,7 @@ void CancelPlayerCombat(PlayerRuntimeState& state);
 bool CanPlayerStartSkill(const SCharaInfo& player, const PlayerRuntimeState& state);
 bool TryInterruptPlayerNormalAttack(SCharaInfo& player, PlayerRuntimeState& state,
     bool specialPressed, bool whirlwindPressed, const int animations[],
-    int whirlwindAnimation, int specialAnimation, int sound, int effect);
+    int whirlwindAnimation, int specialAnimation, int sound, int swordFormationSound, int effect);
 
 bool TryPlayPlayerEnergyAttack(SCharaInfo& player, PlayerRuntimeState& state, int animation, int sound,
     int effect, int& energy, int requiredEnergy);
