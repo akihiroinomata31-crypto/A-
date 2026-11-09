@@ -68,7 +68,7 @@ public:
     int p2Score = 0;
     std::vector<ReplayFrame> replayData;
 
-    static constexpr int DeathPenalty = 1000;
+    static constexpr int DeathPenalty = 2000;
  
 
     int specialUseCount[2] = { 0, 0 };
@@ -108,8 +108,8 @@ public:
     bool SetGameResourceDirectory();
     // game.h 内
 void DrawGameMenu(bool results, const GameManager& game, int selected, const TCHAR* snapshot = nullptr, int rollTimer = 0);
-    // ★ 敵の頭上HPバー描画関数を追加
-    void DrawEnemyHPBars(int pIdx, const SCharaInfo* charainfo);
+  
+
    // void DrawSingleEnemyHPBar(const VECTOR& enemyPos, int currentHp, int maxHp, float headOffset);
     // --- 閃光弾・アイテム管理 ---
     FlashItem flashItems[3];             // フィールド上に同時に存在できるアイテム最大数

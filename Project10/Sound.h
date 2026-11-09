@@ -7,7 +7,15 @@ void InitSound();
 void PlayMenuDecideSE();
 
 // BGMä÷òA
-void LoadAndPlayBGM();
+//void LoadAndPlayBGM();
 void PlayInGameBGM();
-void LoadAndPlayTitleBGM(); // Å© Ç±ÇÍÇ™Ç†ÇÈÇ©
+//void LoadAndPlayTitleBGM(); 
 void StopTitleBGM();
+void PlayFlash();
+void Dram();
+void Stun();
+void Start();
+void Ristart();
+void UP1();
+void UP2();
+void TiTle();

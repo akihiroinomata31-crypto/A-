@@ -5,6 +5,8 @@
 #include <math.h>
 #include <string.h>
 #include "../DXLib/DxLib.h"
+#include "golem.h"
+#include "Sound.h"
 
 int stagedata = -1;
 int enemy_anim_attack = -1;
@@ -38,7 +40,7 @@ bool PlaceEnemyOnGround(SCharaInfo& enemy) {
 }
 
 void GameManager::Init() {
-    mainTimer = 10 * 60; // 60 Hz simulation
+    mainTimer = 99 * 60; // 60 Hz simulation
     startCountdownTimer = 0;
     bossSpawned = false;
     bossCutsceneTimer = 0;
@@ -136,21 +138,31 @@ void GameManager::Update(SCharaInfo* enemyList, SCharaInfo* players) {
     }
 
     // ==========================================
-    // 3. 残り75秒以下でゴーレム（ボス）を1体出現
-    // ==========================================
+   // 3. 残り75秒以下でゴーレム（ボス）を1体出現
+   // ==========================================
     int seconds = mainTimer / 60;
-    if (seconds <= 95 && gameState == 0) {
+    if (seconds <= 70 && gameState == 0) {
         if (!bossSpawned && enemyList[TEST_ENEMY_GOLEM].mode == NONE) {
             bossSpawned = true;
-            // ★★★ ここで初めてボスのモデルを読み込む！ ★★★
+
             if (enemyList[TEST_ENEMY_GOLEM].model1 == -1) {
-                enemyList[TEST_ENEMY_GOLEM].model1 = MV1LoadModel("..\\Data\\Golem\\Boss.mv1");
+                enemyList[TEST_ENEMY_GOLEM].model1 =
+                    MV1LoadModel("..\\Data\\Golem\\Boss.mv1");
+
+                // 阿井追加
+                if (enemyList[TEST_ENEMY_GOLEM].model1 != -1) {
+                    InitGolemAnimations(enemyList[TEST_ENEMY_GOLEM]);
+                }
             }
             enemyList[TEST_ENEMY_GOLEM].pos = VGet(750.0f, 30.0f, -150.0f);
             enemyList[TEST_ENEMY_GOLEM].mode = STAND;
             enemyList[TEST_ENEMY_GOLEM].enemyHP = 20;
             enemyList[TEST_ENEMY_GOLEM].playtime = 0.0f;
             enemyList[TEST_ENEMY_GOLEM].isHit = false;
+
+            // 阿井追加
+            // ゴーレムの大きさ
+            MV1SetScale(enemyList[TEST_ENEMY_GOLEM].model1, VGet(2.5f, 2.5f, 2.5f));
 
             if (enemyList[TEST_ENEMY_GOLEM].model1 != -1) {
                 MV1SetPosition(enemyList[TEST_ENEMY_GOLEM].model1, enemyList[TEST_ENEMY_GOLEM].pos);
@@ -287,8 +299,8 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
         hud.SetSize(60);
         int color = GetColor(255, 255, 0);
         if (gameState == 1)      hud.Draw(xOffset + 50, sh / 2 - 30, "PLAYER 1 WIN!", color);
-        else if (gameState == 2) hud.Draw(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
-        else                     hud.Draw(xOffset + 100, sh / 2 - 30, "DRAW", color);
+        else if  (gameState == 2) hud.Draw(xOffset + 50, sh / 2 - 30, "PLAYER 2 WIN!", color);
+       // else                     hud.Draw(xOffset + 100, sh / 2 - 30, "DRAW", color);
         hud.SetSize(20);
     }
 
@@ -383,32 +395,31 @@ void GameManager::DrawUI(int pIdx, int sw, int sh, SCharaInfo* players, int hpBa
 
     // スコア加算ポップアップ
     for (int i = 0; i < 20; i++) {
-        if (popups[i].active && popups[i].playerIdx == pIdx) {
-            int popupBaseX = scoreX + 30;
-            int popupBaseY = scoreY - 10 - (int)popups[i].offsetY;
+        if (!popups[i].active || popups[i].playerIdx != pIdx) continue;
 
-            int alpha = 255;
-            if (popups[i].timer < 20) {
-                alpha = (popups[i].timer * 255) / 20;
-            }
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
-            hud.SetSize(22);
+        int popupBaseX = scoreX + 30;
+        int popupBaseY = scoreY - 10 - (int)popups[i].offsetY;
 
-            if (gameState == 0 && seconds <= 30 && seconds > 0) {
-                hud.Format(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+?");
-            }
-            else {
-                if (popups[i].score > 0) {
-                    hud.Format(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+%d", popups[i].score);
-                }
-                else {
-                    hud.Format(popupBaseX, popupBaseY, GetColor(255, 0, 0), "%d", popups[i].score);
-                }
-            }
-
-            hud.SetSize(20);
-            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        // フェードアウト計算
+        int alpha = 255;
+        if (popups[i].timer < 20) {
+            alpha = (popups[i].timer * 255) / 20;
         }
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        hud.SetSize(22);
+
+        // 文字の選択と描画
+        if (gameState == 0 && seconds <= 30 && seconds > 0) {
+            hud.Format(popupBaseX, popupBaseY, GetColor(255, 60, 60), "+?");
+        }
+        else {
+            unsigned int col = (popups[i].score > 0) ? GetColor(255, 60, 60) : GetColor(255, 0, 0);
+            const char* fmt = (popups[i].score > 0) ? "+%d" : "%d";
+            hud.Format(popupBaseX, popupBaseY, col, fmt, popups[i].score);
+        }
+
+        hud.SetSize(20);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 }
 
@@ -650,6 +661,9 @@ void GameManager::DrawGameMenu(bool results, const GameManager& game, int select
         // ① 獲得スコア（2秒後）
         // ----------------------------------------------------
         if (s_rollTimer >= STEP_EARNED) {
+            if (s_rollTimer == STEP_EARNED) {
+                Dram();
+            }
             // 左端に項目名
             MenuLabel(COL_LABEL, 175, 20, "獲得スコア", white);
 
@@ -970,19 +984,19 @@ void GameManager::DrawStartCountdown(int sw, int sh, int img3, int img2, int img
 
     if (startCountdownTimer > 330) {
         currentPhase = 3;
-        phaseTimer = 450 - startCountdownTimer;
+        phaseTimer = 420 - startCountdownTimer;
     }
-    else if (startCountdownTimer > 210) {
+    else if (startCountdownTimer > 250) {
         currentPhase = 2;
         phaseTimer = 330 - startCountdownTimer;
     }
-    else if (startCountdownTimer > 90) {
+    else if (startCountdownTimer > 140) {
         currentPhase = 1;
-        phaseTimer = 210 - startCountdownTimer;
+        phaseTimer = 250 - startCountdownTimer;
     }
     else {
         currentPhase = 0;
-        phaseTimer = 90 - startCountdownTimer;
+        phaseTimer = 140 - startCountdownTimer;
     }
 
     if (currentPhase >= 1) {
