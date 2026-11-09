@@ -1031,5 +1031,7 @@ void GameManager::DrawStartCountdown(int sw, int sh, int img3, int img2, int img
 
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         SetFontSize(20);
+
+
     }
 }

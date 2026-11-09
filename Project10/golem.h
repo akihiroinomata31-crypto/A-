@@ -4,14 +4,16 @@
 #include "game.h"
 #include "player.h"
 
-extern int golemShockwaveEffectResourceHandle;
+extern int golemChargePrepareSE;
+extern int golemChargeSE;
+extern int golemSpinSE;
 
 enum GolemAttackState
 {
     GOLEM_IDLE,
-    GOLEM_SHOCKWAVE,
     GOLEM_SPIN,
-    GOLEM_CHARGE
+    GOLEM_CHARGE,
+    GOLEM_DEATH
 };
 
 class GolemManager
@@ -54,15 +56,12 @@ public:
         GameManager& game
     );
 
-    void AddDamage(int playerIndex);
-
-    void AwardScore(GameManager& game);
+    void AddDamage(int playerIndex, int damage);
 
     GolemAttackState GetState() const
     {
         return state;
     }
-
 
     // アニメーション管理
     int animAttach = -1;
@@ -71,41 +70,57 @@ public:
     int idleAnimAttach = -1;
     float idleAnimTime = 0.0f;
 
-    int shockwaveAnimAttach = -1;
-    float shockwaveAnimTime = 0.0f;
-
     int spinAnimAttach = -1;
     float spinAnimTime = 0.0f;
 
     int chargeAnimAttach = -1;
     float chargeAnimTime = 0.0f;
 
+    int chargePrepareAnimAttach = -1;
+    float chargePrepareAnimTime = 0.0f;
+
     int walkAnimAttach = -1;
     float walkAnimTime = 0.0f;
 
+    int deathAnimAttach = -1;
+    float deathAnimTime = 0.0f;
+
     // アニメーション用モデルのハンドル
     int idleAnimModel = -1;
-    int shockwaveAnimModel = -1;
     int spinAnimModel = -1;
     int chargeAnimModel = -1;
+    int chargePrepareAnimModel = -1;
     int walkAnimModel = -1;
+    int deathAnimModel = -1;
 
     // 現在再生中のアニメーション
     int currentAnimAttach = -1;
 
     // アニメーション再生速度
     float idleAnimSpeed = 1.0f;
-    float walkAnimSpeed = 0.2f;
-    float shockwaveAnimSpeed = 0.7f;
+    float walkAnimSpeed = 0.5f;
     float spinAnimSpeed = 0.7f;
     float chargeAnimSpeed = 0.4f;
+    float chargePrepareAnimSpeed = 2.0f;
+    float deathAnimSpeed = 1.0f;
 
     // アニメーション切り替え
     void ChangeAnimation(SCharaInfo& golem, int attach);
 
-   
+    // 時間帯ごとの行動モード 
+    int currentTimePhase = -1;
+
+    // 退場アニメーションの再生状態
+    bool deathAnimationFinished = false;
+
+    int chargeCount = 0;
+
     // 行動選択用タイマー
     int decisionTimer = 0;
+
+    int recoveryTimer = 0;
+
+    int chargeTargetCount = 0;
 
     // 次の行動を決める間隔
     int decisionInterval = 60;
@@ -117,3 +132,4 @@ public:
 void InitGolemAnimations(SCharaInfo& golem);
 
 extern GolemManager golemManager;
+

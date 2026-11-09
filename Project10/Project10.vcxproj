@@ -167,6 +167,7 @@
   <ItemGroup>
     <ClCompile Include="boost.cpp" />
     <ClCompile Include="draw.cpp" />
+    <ClCompile Include="Sound.cpp" />
     <ClCompile Include="golem.cpp" />
     <ClCompile Include="main.cpp">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)ThirdParty\EffekseerForDXLib;$(ProjectDir)..\DXLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -181,6 +182,7 @@
   <ItemGroup>
     <ClInclude Include="boost.h" />
     <ClInclude Include="CharacterCombat.h" />
+    <ClInclude Include="Sound.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="golem.h" />
     <ClInclude Include="main.h" />

@@ -17,6 +17,7 @@
 #include "../DXLib/DxLib.h"
 
 #include "golem.h"
+#include "Sound.h"
 
 
 
@@ -240,6 +241,9 @@ static int player1MoonAttackEffectResourceHandle = -1;
 
 int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 {
+
+
+
     GameRuntimeCleanup runtimeCleanup;
     GameManager gameManager;
     int smokeLongRangeMoves = 0;
@@ -301,6 +305,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     GameManager game;
     game.Init();
     VECTOR stagepos = VGet(0.0f, 0.0f, 1200.0f);
+
+  
 
     MV1_COLL_RESULT_POLY_DIM HitDim;
     int WallNum;
@@ -369,7 +375,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     // 画面モードリセット時のグラフィックシステムリセットを抑制（不要な再確保を防ぐ）
     SetChangeScreenModeGraphicsSystemResetFlag(FALSE);
     if (DxLib_Init() == -1) return -1;
-    
+    InitSound();              // 音全体の初期化とSE・ステージBGMのロード
+    LoadAndPlayTitleBGM();    // タイトルBGMを鳴らす場合
 
     runtimeCleanup.dxReady = true;
     if (Effekseer_Init(2000) == -1) {
@@ -599,15 +606,15 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
     SetDrawScreen(DX_SCREEN_BACK);
 
-    sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
-    BGMSoundHandle = LoadSoundMem(String);
-    if (BGMSoundHandle != -1) PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP);
+    //sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
+    //BGMSoundHandle = LoadSoundMem(String);
+    //if (BGMSoundHandle != -1) PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP);
 
-    int BGMInGameHandle = -1;
-    bool isBGMInGameStarted = false; // 再生開始済みフラグ
+    //int BGMInGameHandle = -1;
+    //bool isBGMInGameStarted = false; // 再生開始済みフラグ
 
-    // 音源ファイルのロード（"BGM_ingame.wav" や "BGM_ingame.mp3" 等、実際のファイル名に合わせてください）
-    BGMInGameHandle = LoadSoundMem("..\\Data\\BGM\\Stage_1.wav");
+    //// 音源ファイルのロード（"BGM_ingame.wav" や "BGM_ingame.mp3" 等、実際のファイル名に合わせてください）
+    //BGMInGameHandle = LoadSoundMem("..\\Data\\BGM\\Stage_1.wav");
 
     sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Weapon\\Sword\\%s", SEattack_FilePath);
     SEattackHandle = LoadSoundMem(String);
@@ -648,7 +655,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     RuntimeProfile runtimeProfile;
     int simulationTicks = 0;
     const LONGLONG simulationWallStart = GetNowHiPerformanceCount();
-    int SEmenuDecideHandle = LoadSoundMem("..\\Data\\SE\\click.wav");
+   
     int imgCount3 = LoadGraph("..\\Data\\UI\\3.png");
     int imgCount2 = LoadGraph("..\\Data\\UI\\2.png");
     int imgCount1 = LoadGraph("..\\Data\\UI\\1.png");
@@ -656,7 +663,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
 
     auto resetMatch = [&]() {
-        if (SEmenuDecideHandle >= 0) PlaySoundMem(SEmenuDecideHandle, DX_PLAYTYPE_BACK);
+        PlayMenuDecideSE();
         game.Init();
         game.GetResultRollTimer(true);
         game.startCountdownTimer = gameSmoke ? 0 : 450;
@@ -666,10 +673,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             item.active = false;
             if (item.model >= 0) MV1SetVisible(item.model, FALSE);
         }
-        if (BGMInGameHandle != -1) {
-            StopSoundMem(BGMInGameHandle);
-        }
-        isBGMInGameStarted = false;
+        StopTitleBGM();
+        LoadAndPlayTitleBGM();
         for (int p = 0; p < PLAYER_COUNT; ++p) {
             auto old = playerStates[p];
             if (old.guardAnimationAttachment >= 0)
@@ -1755,10 +1760,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             );
         }
 
-        if (currentJKey == 1 && prevJKey == 0) {
-            if (isBGMPlaying) { StopSoundMem(BGMSoundHandle); isBGMPlaying = 0; }
-            else { PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP); isBGMPlaying = 1; }
-        }
+      
         prevJKey = currentJKey;
 
         for (int i = 0; i < PLAYER_COUNT; i++) {
@@ -1782,10 +1784,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 spGauge[i] = 0;
             }
         }
-        if (currentJKey == 1 && prevJKey == 0) {
-            if (isBGMPlaying) { StopSoundMem(BGMSoundHandle); isBGMPlaying = 0; }
-            else { PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP); isBGMPlaying = 1; }
-        }
+     
         prevJKey = currentJKey;
 
 
@@ -2006,7 +2005,17 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         ++effectUpdates;
         skyRot += 0.001f;
         MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
-        if (game.startCountdownTimer > 0) --game.startCountdownTimer;
+
+        if (game.startCountdownTimer > 0) {
+            --game.startCountdownTimer;
+
+            // ★【ここに追加！】カウントダウンがちょうど 0 になった瞬間
+            if (game.startCountdownTimer == 0) {
+                StopTitleBGM();  // タイトルBGMを止める
+                PlayInGameBGM(); // ステージBGMに切り替える！
+            }
+        }
+
         if (game.startCountdownTimer <= 90) game.Update(charainfo, charainfo);
         game.UpdateVisualTimers();
         for (int p = 0; p < PLAYER_COUNT; ++p) if (playerWhiteoutTimer[p] > 0) --playerWhiteoutTimer[p];
@@ -2095,6 +2104,8 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 if (playerWeaponModel[i] != -1) MV1DrawModel(playerWeaponModel[i]);
                 if (playerSayaModel[i] != -1)   MV1DrawModel(playerSayaModel[i]);
             }
+
+            //てんなん
             SyncEffekseerDrawAreaProjection();
 			for (int i = 0; i < PLAYER_COUNT; i++) {
 				DrawPlayerHeavyAttackEffect(charainfo[i], playerStates[i], heavyAttackEffectHandle);
@@ -2102,6 +2113,11 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
             const LONGLONG effectDrawStart = GetNowHiPerformanceCount();
 			DrawEffekseer3D();
             effectDrawMs += (GetNowHiPerformanceCount() - effectDrawStart) / 1000.0;
+
+
+
+
+
             for (int f = 0; f < MAX_THROWN_FLASH; f++) {
                 if (thrownFlashes[f].active && thrownFlashes[f].model != -1) {
                     MV1DrawModel(thrownFlashes[f].model);
@@ -2139,9 +2155,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                         }
 
                         SetFontSize(16);
-                        int textW = GetDrawStringWidth("STUN!", 5);
-                        DrawString(hx - textW / 2, hy - 32, "STUN!", GetColor(255, 240, 50));
-                        SetFontSize(20);
+                      
                     }
                 }
             }
@@ -2261,6 +2275,8 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
 		}
 		game.DrawStartCountdown(900, 600, imgCount3, imgCount2, imgCount1);
         game.DrawTimer(900, 600);
+
+        //てんなん
         if (shadowSmoke && smokeFrames == 60) {
             SaveDrawScreenToPNG(0, 0, 900, 600, "..\\work\\shadow-preview.png");
             FILE* shadowReport = nullptr;
@@ -2303,7 +2319,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         if (perf) fprintf(perf, "effect update/tick=%.3fms effect draw/view=%.3fms world draw/view=%.3fms\n", effectUpdateMs / (effectUpdates ? effectUpdates : 1), effectDrawMs / (worldDraws ? worldDraws : 1), worldDrawMs / (worldDraws ? worldDraws : 1));
         if (perf) { fprintf(perf, "simulation ticks=%d remaining=%d wall=%.3fs\n", simulationTicks, game.mainTimer, (GetNowHiPerformanceCount() - simulationWallStart) / 1000000.0); fclose(perf); }
   }*/
-
+    //てんなん
     if (player1MoonAttackEffectResourceHandle != -1) DeleteEffekseerEffect(player1MoonAttackEffectResourceHandle);
     if (normalAttackEffectResourceHandle != -1) DeleteEffekseerEffect(normalAttackEffectResourceHandle);
     for (int i = 0; i < PLAYER_HEAVY_ATTACK_EFFECT_FRAME_COUNT; i++) {
@@ -2423,17 +2439,15 @@ void CheckAttackHit(GameManager& game, SCharaInfo* charainfo, SCharaInfo* attack
                     MV1SetVisible(target->model1, FALSE);
 
                     const bool isFeverTime = (game.mainTimer <= 15 * 60);
-                    //const int baseScore = (targetIndex == TEST_ENEMY_GOLEM) ? 500 : 100;
+                    const int baseScore = (targetIndex == TEST_ENEMY_GOLEM) ? 500 : 100;
 
-                    // 基本スコアを計算
-                    int earnedScore ;
+                    // ★ 宣言と同時に初期化する！
+                    int earnedScore = baseScore;
 
-                    // ① 残り15秒以下（フィーバータイム）なら 2倍
                     if (isFeverTime) {
                         earnedScore *= 2;
                     }
 
-                    // ② バフ状態（リベンジブースト中）ならさらに 2倍！（これで合計4倍に！）
                     if (attackerIdx != -1 && revengeBoost[attackerIdx].active) {
                         earnedScore *= 2;
                     }
