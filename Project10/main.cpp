@@ -2572,11 +2572,12 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                         const bool normalSwing = !playerStates[i].isHeavyAttack && !isPlayerInterferenceActive[i];
                         auto& hitTargets = playerStates[i].normalHitTargets;
                         if (!normalSwing || !hitTargets[opp]) {
+                            constexpr float playerFinisherKnockbackSpeed = 14.0f;
                             CheckAttackHit(game, charainfo, &charainfo[i], &charainfo[opp],
                                 wpPosStart[i], wpPosEnd[i], SEdamageHandle, anim_damage,
                                 normalSwing ? hitTargets : nullptr,
                                 normalSwing && playerStates[i].attackIndex == PLAYER_ATTACK_ANIM_COUNT - 1
-                                    ? PLAYER_COMBO_FINISHER_KNOCKBACK_SPEED : 0.0f);
+                                    ? playerFinisherKnockbackSpeed : 0.0f);
                             if (normalSwing && hitTargets[opp]) {
                                 CancelPlayerCombat(playerStates[opp]);
                                 isAiming[opp] = false;
