@@ -10,6 +10,7 @@
     <ClCompile Include="senk.cpp" />
     <ClCompile Include="boost.cpp" />
     <ClCompile Include="golem.cpp" />
+    <ClCompile Include="Sound.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CharacterCombat.h" />
@@ -28,5 +29,6 @@
     <ClInclude Include="senk.h" />
     <ClInclude Include="boost.h" />
     <ClInclude Include="golem.h" />
+    <ClInclude Include="Sound.h" />
   </ItemGroup>
 </Project>

@@ -15,6 +15,7 @@
 #include "../DXLib/DxLib.h"
 #include "senk.h"
 #include "golem.h"
+#include "Sound.h"
 float aimPitchAngle[PLAYER_COUNT] = { 0.25f, 0.25f };
 struct RevengeBoostState {
     bool isUsed = false;     // 1??1???
@@ -305,10 +306,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     MV1_COLL_RESULT_POLY* Poly;
     HITRESULT_LINE LineRes;
 
-    char BGM0_FilePath[] = "BGM_stg0.ogg";
     char String[256];
-    int BGMSoundHandle;
-    int BGMLoopStartPosition = -1;
 
     char SEattack_FilePath[] = "swish_00.wav", SEjump_FilePath[] = "jumpIn_00.wav", SEdamage_FilePath[] = "dmg_bySword_00.wav";
     char NormalAttackEffect_FilePath[] = "MoonFullMoon\\SwordGlowMoonFullMoonFree.efkefc";
@@ -1390,9 +1388,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
 
     SetDrawScreen(DX_SCREEN_BACK);
 
-    sprintf_s(String, SOUND_DIRECTORY_PATH "BGM\\%s", BGM0_FilePath);
-    BGMSoundHandle = LoadSoundMem(String);
-    if (BGMSoundHandle != -1) PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP);
+    InitSound();
 
     sprintf_s(String, SOUND_DIRECTORY_PATH "SE\\Weapon\\Sword\\%s", SEattack_FilePath);
     SEattackHandle = LoadSoundMem(String);
@@ -1443,12 +1439,11 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     RuntimeProfile runtimeProfile;
     int simulationTicks = 0;
     const LONGLONG simulationWallStart = GetNowHiPerformanceCount();
-    const int SEmenuDecideHandle = LoadSoundMem("..\\Data\\SE\\click.wav");
     const int imgCount3 = LoadGraph("..\\Data\\UI\\3.png");
     const int imgCount2 = LoadGraph("..\\Data\\UI\\2.png");
     const int imgCount1 = LoadGraph("..\\Data\\UI\\1.png");
     auto resetMatch = [&]() {
-        if (SEmenuDecideHandle >= 0) PlaySoundMem(SEmenuDecideHandle, DX_PLAYTYPE_BACK);
+        PlayMenuDecideSE();
         game.Init();
         game.startCountdownTimer = gameSmoke ? 0 : 450;
         for (auto& camera : orbitCameras) camera = OrbitCamera{};
@@ -1577,6 +1572,8 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
     while (ProcessMessage() == 0 && CheckHitKey(KEY_INPUT_ESCAPE) == 0 && (!gameSmoke || (performanceSmoke ? simulationTicks < (longPerformance ? 1800 : 720) : smokeFrames++ < (uiSmoke ? 180 : (deathSmoke ? 1800 : (mergeSmoke ? 520 : 360)))))) {
         if (uiSmoke && screen == Screen::Playing && smokeFrames == 60) game.mainTimer = 1;
         if (screen == Screen::Playing && game.gameState != 0) {
+            StopTitleBGM();
+            Dram();
             screen = Screen::Results; menuSelection = 0; prevMenuConfirm = true; uiResults = true;
         }
         if (screen == Screen::Menu || screen == Screen::Results) {
@@ -1590,6 +1587,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             if (confirm && !prevMenuConfirm) {
                 if (menuSelection == 1) break; // ??
                 if (screen == Screen::Results) {
+                    if (isBGMPlaying) TiTle();
                     screen = Screen::Menu; uiReturned = true;
                 }
                 else {
@@ -1618,6 +1616,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
             // ????????????!
             if (loadingTimer <= 0) {
                 screen = Screen::Playing;
+                Start();
             }
             WaitTimer(16);
             continue;
@@ -1661,6 +1660,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                 if (!revengeBoost[p].isUsed && remainSec <= 75 && remainSec > 0 && game.gameState == 0) {
                     if (oppScore - myScore >= 3000) {
                         revengeBoost[p].active = true;
+                        UP1();
                         revengeBoost[p].isUsed = true;
                         revengeBoost[p].timer = 60 * 32; // 12??
                     }
@@ -1672,6 +1672,7 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
                     // ??(???????)???????????
                     if (myScore >= oppScore || revengeBoost[p].timer <= 0) {
                         revengeBoost[p].active = false;
+                        UP2();
                         if (charainfo[p].model1 != -1) {
                             if (p == PLAYER2_INDEX) MV1SetMaterialDrawAddColorAll(charainfo[p].model1, 0, 0, 60);
                             else                    MV1SetMaterialDrawAddColorAll(charainfo[p].model1, 0, 0, 0);
@@ -1899,6 +1900,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                 thrownFlashes[f].active = false;
                 MV1SetVisible(thrownFlashes[f].model, FALSE);
 
+                PlayFlash();
                 const float FLASH_RANGE_SQ = 450.0f * 450.0f;
                 // Preserve the enemy stun response, with duration measured in logic ticks.
                 for (int e = TEST_ENEMY_INDEX; e < MAX_CHARA; ++e) {
@@ -1937,6 +1939,7 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
                             charainfo[p].attachidx = MV1AttachAnim(charainfo[p].model1, 0, playerDamageAnimation);
                             charainfo[p].anim_totaltime = MV1GetAttachAnimTotalTime(charainfo[p].model1, charainfo[p].attachidx);
                             playerWhiteoutTimer[p] = 120;
+                            Stun();
                         }
                         else {
                             playerWhiteoutTimer[p] = 20;
@@ -2353,8 +2356,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         }
 
         if (currentJKey == 1 && prevJKey == 0) {
-            if (isBGMPlaying) { StopSoundMem(BGMSoundHandle); isBGMPlaying = 0; }
-            else { PlaySoundMem(BGMSoundHandle, DX_PLAYTYPE_LOOP); isBGMPlaying = 1; }
+            isBGMPlaying = !isBGMPlaying;
+            if (!isBGMPlaying) StopTitleBGM();
+            else if (game.startCountdownTimer > 0) TiTle();
+            else PlayInGameBGM();
         }
         prevJKey = currentJKey;
 
@@ -2622,7 +2627,10 @@ for (int p = 0; p < PLAYER_COUNT; ++p) playerStates[p].key = ReadPlayerPadState(
         ++effectUpdates;
         skyRot += 0.001f;
         MV1SetRotationXYZ(sky, VGet(0, skyRot, 0));
-        if (game.startCountdownTimer > 0) --game.startCountdownTimer;
+        if (game.startCountdownTimer > 0 && --game.startCountdownTimer == 0 && isBGMPlaying) {
+            StopTitleBGM();
+            PlayInGameBGM();
+        }
         if (game.startCountdownTimer <= 90) game.Update(charainfo, charainfo);
         game.UpdateVisualTimers();
         for (int p = 0; p < PLAYER_COUNT; ++p) if (playerWhiteoutTimer[p] > 0) --playerWhiteoutTimer[p];
