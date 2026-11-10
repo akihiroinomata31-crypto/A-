@@ -822,7 +822,9 @@ int WINAPI WinMain(HINSTANCE hI, HINSTANCE hP, LPSTR lpC, int nC)
         }
         if (screen == Screen::Menu || screen == Screen::Results) {
 
-            TiTle();
+            if (screen == Screen::Menu) {
+                TiTle();
+            }
 
             // フラグや入力チェックを行うかどうかの判定用フラグ
             bool canAcceptInput = true;
