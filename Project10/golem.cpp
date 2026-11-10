@@ -1,6 +1,5 @@
 #include "golem.h"
 #include <math.h>
-#include <EffekseerForDXLib.h>
 
 GolemManager golemManager;
 
@@ -13,47 +12,44 @@ void FaceGolemToPlayer(SCharaInfo& golem, SCharaInfo& player)
 
     float angle = atan2f(dx, dz);
 
-    // モデルの正面が逆向きの場合は180度回転
+    // モデルの正面が反対向きの場合に備えて180度補正
     angle += DX_PI_F;
 
+    // ゴーレムの向きを保存
     golem.dir = angle;
 
+    // モデルを回転させる
     MV1SetRotationXYZ(
         golem.model1,
-        VGet(0.0f, golem.dir, 0.0f)
+        VGet(0.0f, angle, 0.0f)
     );
 }
 
+
 void InitGolemAnimations(SCharaInfo& golem) {
 
-    // アニメーション
-    golemManager.idleAnimModel = MV1LoadModel("..\\Data\\Golem\\Idle.mv1");
+    golemManager.idleAnimModel =
+        MV1LoadModel("..\\Data\\Golem\\Idle.mv1");
 
-    golemManager.spinAnimModel = MV1LoadModel("..\\Data\\Golem\\Spin.mv1");
+    golemManager.shockwaveAnimModel =
+        MV1LoadModel("..\\Data\\Golem\\Shockwave.mv1");
 
-    golemManager.chargeAnimModel = MV1LoadModel("..\\Data\\Golem\\charge.mv1");
+    golemManager.spinAnimModel =
+        MV1LoadModel("..\\Data\\Golem\\Spin.mv1");
 
-    golemManager.chargePrepareAnimModel = MV1LoadModel("..\\Data\\Golem\\ChargePrepare.mv1");
+    golemManager.chargeAnimModel =
+        MV1LoadModel("..\\Data\\Golem\\charge.mv1");
 
-    golemManager.walkAnimModel = MV1LoadModel("..\\Data\\Golem\\Walk.mv1");
-
-    golemManager.deathAnimModel = MV1LoadModel("..\\Data\\Golem\\Death.mv1");
-
-    // 効果音
-    golemChargePrepareSE = LoadSoundMem("..\\Data\\Golem\\");
-
-    golemChargeSE = LoadSoundMem("..\\Data\\Golem\\");
-
-    golemSpinSE = LoadSoundMem("..\\Data\\Golem\\");
+    golemManager.walkAnimModel =
+        MV1LoadModel("..\\Data\\Golem\\Walk.mv1");
 
     if (golemManager.idleAnimModel == -1 ||
+        golemManager.shockwaveAnimModel == -1 ||
         golemManager.spinAnimModel == -1 ||
         golemManager.chargeAnimModel == -1 ||
-        golemManager.chargePrepareAnimModel == -1)
-
+        golemManager.walkAnimModel == -1)
     {
-
-        //    printfDx("Golem animation model load failed\n");
+        printfDx("Golem animation model load failed\n");
         return;
     }
 
@@ -61,6 +57,11 @@ void InitGolemAnimations(SCharaInfo& golem) {
         MV1AttachAnim(
             golem.model1, 0,
             golemManager.idleAnimModel, -1
+        );
+
+    golemManager.shockwaveAnimAttach =
+        MV1AttachAnim(golem.model1, 0,
+            golemManager.shockwaveAnimModel, -1
         );
 
     golemManager.spinAnimAttach =
@@ -73,24 +74,16 @@ void InitGolemAnimations(SCharaInfo& golem) {
             golemManager.chargeAnimModel, -1
         );
 
-    golemManager.chargePrepareAnimAttach =
-        MV1AttachAnim(
-            golem.model1, 0,
-            golemManager.chargePrepareAnimModel, -1
-        );
-
     golemManager.walkAnimAttach =
         MV1AttachAnim(golem.model1, 0,
             golemManager.walkAnimModel, -1
         );
 
-    golemManager.deathAnimAttach =
-        MV1AttachAnim(golem.model1, 0,
-            golemManager.deathAnimModel, -1
-        );
-
     if (golemManager.idleAnimAttach != -1)
         MV1SetAttachAnimBlendRate(golem.model1, golemManager.idleAnimAttach, 0.0f);
+
+    if (golemManager.shockwaveAnimAttach != -1)
+        MV1SetAttachAnimBlendRate(golem.model1, golemManager.shockwaveAnimAttach, 0.0f);
 
     if (golemManager.spinAnimAttach != -1)
         MV1SetAttachAnimBlendRate(golem.model1, golemManager.spinAnimAttach, 0.0f);
@@ -98,27 +91,29 @@ void InitGolemAnimations(SCharaInfo& golem) {
     if (golemManager.chargeAnimAttach != -1)
         MV1SetAttachAnimBlendRate(golem.model1, golemManager.chargeAnimAttach, 0.0f);
 
-    if (golemManager.chargePrepareAnimAttach != -1)
-        MV1SetAttachAnimBlendRate(golem.model1, golemManager.chargePrepareAnimAttach, 0.0f);
-
     if (golemManager.walkAnimAttach != -1)
         MV1SetAttachAnimBlendRate(golem.model1, golemManager.walkAnimAttach, 0.0f);
-
-    if (golemManager.deathAnimAttach != -1) { MV1SetAttachAnimBlendRate(golem.model1, golemManager.deathAnimAttach, 0.0f); }
 
 
     // 待機アニメーションだけ有効にする
     golemManager.currentAnimAttach = -1;
+    golemManager.ChangeAnimation(
+        golem,
+        golemManager.idleAnimAttach
+    );
 
     golemManager.idleAnimTime = 0.0f;
+    golemManager.shockwaveAnimTime = 0.0f;
     golemManager.spinAnimTime = 0.0f;
     golemManager.chargeAnimTime = 0.0f;
     golemManager.walkAnimTime = 0.0f;
+    golemManager.currentAnimAttach = -1;
 
-    golemManager.ChangeAnimation(golem, golemManager.idleAnimAttach);
+
+    golemManager.ChangeAnimation(golem, golemManager.idleAnimAttach
+    );
 
     //  printfDx("Golem animations initialized\n");
-
 }
 
 void GolemManager::ChangeAnimation(
@@ -144,12 +139,12 @@ void GolemManager::ChangeAnimation(
 
     if (attach == idleAnimAttach)
         idleAnimTime = 0.0f;
+    else if (attach == shockwaveAnimAttach)
+        shockwaveAnimTime = 0.0f;
     else if (attach == spinAnimAttach)
         spinAnimTime = 0.0f;
     else if (attach == chargeAnimAttach)
         chargeAnimTime = 0.0f;
-    else if (attach == chargePrepareAnimAttach)
-        chargePrepareAnimTime = 0.0f;
     else if (attach == walkAnimAttach)
         walkAnimTime = 0.0f;
 
@@ -167,44 +162,12 @@ void GolemManager::ChangeAnimation(
 }
 
 
-void UpdateGolemAnimation(SCharaInfo& golem, float speedMultiplier)
+void UpdateGolemAnimation(SCharaInfo& golem)
 {
     int attach = golemManager.currentAnimAttach;
 
     if (attach == -1)
         return;
-
-    // 退場アニメーションはループさせない
-    if (attach == golemManager.deathAnimAttach)
-    {
-        float totalTime = MV1GetAttachAnimTotalTime(
-            golem.model1,
-            attach
-        );
-
-        if (totalTime <= 0.0f)
-            return;
-
-        if (!golemManager.deathAnimationFinished)
-        {
-            golemManager.deathAnimTime +=
-                golemManager.deathAnimSpeed;
-
-            if (golemManager.deathAnimTime >= totalTime)
-            {
-                golemManager.deathAnimTime = totalTime;
-                golemManager.deathAnimationFinished = true;
-            }
-
-            MV1SetAttachAnimTime(
-                golem.model1,
-                attach,
-                golemManager.deathAnimTime
-            );
-        }
-
-        return;
-    }
 
     float* animTime = nullptr;
     float animSpeed = 1.0f;
@@ -213,6 +176,11 @@ void UpdateGolemAnimation(SCharaInfo& golem, float speedMultiplier)
     {
         animTime = &golemManager.idleAnimTime;
         animSpeed = golemManager.idleAnimSpeed;
+    }
+    else if (attach == golemManager.shockwaveAnimAttach)
+    {
+        animTime = &golemManager.shockwaveAnimTime;
+        animSpeed = golemManager.shockwaveAnimSpeed;
     }
     else if (attach == golemManager.spinAnimAttach)
     {
@@ -223,11 +191,6 @@ void UpdateGolemAnimation(SCharaInfo& golem, float speedMultiplier)
     {
         animTime = &golemManager.chargeAnimTime;
         animSpeed = golemManager.chargeAnimSpeed;
-    }
-    else if (attach == golemManager.chargePrepareAnimAttach)
-    {
-        animTime = &golemManager.chargePrepareAnimTime;
-        animSpeed = golemManager.chargePrepareAnimSpeed;
     }
     else if (attach == golemManager.walkAnimAttach)
     {
@@ -246,14 +209,11 @@ void UpdateGolemAnimation(SCharaInfo& golem, float speedMultiplier)
     if (totalTime <= 0.0f)
         return;
 
-    // アニメーション再生時間を進める
-    *animTime += animSpeed * speedMultiplier;
+    *animTime += animSpeed;
 
-    // ループ再生
-    while (*animTime >= totalTime)
-    {
-        *animTime -= totalTime;
-    }
+    // アニメーションループ
+    if (*animTime >= totalTime)
+        *animTime = fmodf(*animTime, totalTime);
 
     MV1SetAttachAnimTime(
         golem.model1,
@@ -262,69 +222,18 @@ void UpdateGolemAnimation(SCharaInfo& golem, float speedMultiplier)
     );
 }
 
-int golemChargePrepareSE = -1;
-int golemChargeSE = -1;
-int golemSpinSE = -1;
-
-
 // ダメージ記録
-void GolemManager::AddDamage(int playerIndex, int damage)
+void GolemManager::AddDamage(int playerIndex)
 {
     if (playerIndex < 0 || playerIndex >= PLAYER_COUNT)
         return;
 
-    damageDealt[playerIndex] += damage;
+    damageDealt[playerIndex]++;
 }
 
 
 void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& game)
 {
-    // ゴーレムがすでに消えている場合
-    if (golem.mode == NONE)
-    {
-        appearanceTimer = 0;
-        return;
-    }
-    int remainingSeconds = game.mainTimer / 60;
-
-    // 退場の秒数
-    if ((golem.enemyHP <= 0 || remainingSeconds <= 14) &&
-        state != GOLEM_DEATH)
-    {
-        state = GOLEM_DEATH;
-        attackTimer = 0;
-
-        deathAnimTime = 0.0f;
-        deathAnimationFinished = false;
-
-        if (deathAnimAttach != -1)
-        {
-            ChangeAnimation(golem, deathAnimAttach);
-        }
-        else
-        {
-            // アニメーションを読み込めなかった場合
-            deathAnimationFinished = true;
-        }
-    }
-
-    // 退場中は通常の攻撃処理を実行しない
-    if (state == GOLEM_DEATH)
-    {
-        if (deathAnimAttach != -1 &&
-            !deathAnimationFinished)
-        {
-            UpdateGolemAnimation(golem, 1.0f);
-        }
-
-        if (deathAnimationFinished)
-        {
-            MV1SetVisible(golem.model1, FALSE);
-            golem.mode = NONE;
-        }
-
-        return;
-    }
 
     if (golem.mode == NONE) {
         appearanceTimer = 0;
@@ -339,15 +248,16 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
             ChangeAnimation(golem, idleAnimAttach);
         }
 
-        UpdateGolemAnimation(golem, 1.0f);
+        UpdateGolemAnimation(golem);
         return;
     }
 
     // 登場後は通常処理
-    UpdateGolemAnimation(golem, 1.0f);
+    UpdateGolemAnimation(golem);
 
     if (game.gameState != 0)
     {
+        AwardScore(game);
         return;
     }
 
@@ -368,9 +278,6 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
 
     if (attackCooldown > 0)
         attackCooldown--;
-
-    if (attackCooldown < 0)
-        attackCooldown = 0;
 
     float nearestDistance = 999999.0f;
     int nearestPlayer = -1;
@@ -395,7 +302,119 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
         }
     }
 
-    // 近接攻撃 
+    // 衝撃波
+    if (state == GOLEM_SHOCKWAVE)
+    {
+        attackTimer++;
+
+        // 衝撃波が発生するまで
+        const int SHOCKWAVE_DELAY = 120;
+
+        if (attackTimer <= SHOCKWAVE_DELAY)
+        {
+            shockwaveRadius = 0.0f;
+            return;
+        }
+
+        const float SHOCKWAVE_MAX_RADIUS = 9999.0f;
+        const int SHOCKWAVE_DURATION = 100;
+
+        int elapsed = attackTimer - SHOCKWAVE_DELAY;
+
+        shockwaveRadius =
+            SHOCKWAVE_MAX_RADIUS *
+            ((float)elapsed / (float)SHOCKWAVE_DURATION);
+
+        // ジャンプに合わせて前へ
+        const int JUMP_MOVE_START = 20;  // 移動開始
+        const int JUMP_MOVE_END = 45;    // 移動終了
+        const float JUMP_MOVE_SPEED = 40.0f;
+
+        if (attackTimer >= JUMP_MOVE_START &&
+            attackTimer <= JUMP_MOVE_END)
+        {
+            float forwardX = -sinf(golem.dir);
+            float forwardZ = -cosf(golem.dir);
+
+            golem.pos.x += forwardX * JUMP_MOVE_SPEED;
+            golem.pos.z += forwardZ * JUMP_MOVE_SPEED;
+
+            MV1SetPosition(golem.model1, golem.pos);
+
+            MV1SetPosition(golem.model1, golem.pos);
+        }
+
+        shockwaveRadius =
+            SHOCKWAVE_MAX_RADIUS *
+            ((float)attackTimer / (float)SHOCKWAVE_DURATION);
+
+        for (int i = 0; i < PLAYER_COUNT; i++)
+        {
+            if (players[i].mode == DOWNMODE)
+                continue;
+
+            if (shockwaveHit[i])
+                continue;
+
+            float dx = players[i].pos.x - golem.pos.x;
+            float dz = players[i].pos.z - golem.pos.z;
+
+            float distance = sqrtf(dx * dx + dz * dz);
+
+            if (distance <= shockwaveRadius)
+            {
+
+
+                // ジャンプ中なら回避
+                if (players[i].mode == JUMPIN ||
+                    players[i].mode == JUMPLOOP ||
+                    players[i].mode == JUMPOUT)
+                {
+                    shockwaveHit[i] = true;
+                    continue;
+                }
+
+                shockwaveHit[i] = true;
+
+                float length = sqrtf(dx * dx + dz * dz);
+
+                if (length > 0.001f)
+                {
+                    float knockback = 60.0f;
+
+                    knockbackVelocity[i][0] =
+                        (dx / length) * knockback;
+
+                    knockbackVelocity[i][1] =
+                        (dz / length) * knockback;
+
+                    knockbackTimer[i] = 20;
+                }
+            }
+        }
+
+        // 衝撃波終了
+        if (attackTimer >= SHOCKWAVE_DURATION)
+        {
+            state = GOLEM_IDLE;
+            attackTimer = 0;
+
+            ChangeAnimation(golem, idleAnimAttach);
+
+            shockwaveRadius = 0.0f;
+
+            attackCooldown = 100;
+
+            for (int i = 0; i < PLAYER_COUNT; i++)
+            {
+                shockwaveHit[i] = false;
+            }
+        }
+
+        return;
+    }
+
+    // 回転攻撃
     if (state == GOLEM_SPIN)
     {
         attackTimer++;
@@ -416,7 +435,7 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
 
                     float distanceSq = dx * dx + dz * dz;
 
-                    const float SPIN_RANGE = 500.0f;
+                    const float SPIN_RANGE = 450.0f;
 
                     if (distanceSq <= SPIN_RANGE * SPIN_RANGE)
                     {
@@ -434,7 +453,7 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
                         if (distance > 0.001f)
                         {
                             // ノックバック量
-                            float knockback = 80.0f;
+                            float knockback = 40.0f;
 
                             knockbackVelocity[i][0] =
                                 (dx / distance) * knockback;
@@ -451,7 +470,7 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
         // 攻撃判定
 
 
-        // 近接攻撃終了
+        // 回転終了
         if (attackTimer >= 120)
         {
             state = GOLEM_IDLE;
@@ -459,7 +478,7 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
 
             ChangeAnimation(golem, idleAnimAttach);
 
-            attackCooldown = 120;
+            attackCooldown = 240;
 
             for (int i = 0; i < PLAYER_COUNT; i++)
             {
@@ -473,49 +492,29 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
     // 突進攻撃
     if (state == GOLEM_CHARGE)
     {
-        // 突進攻撃は強化モードでも通常速度
         attackTimer++;
 
-        const int CHARGE_PREPARE_TIME = 50;
-        const int CHARGE_DURATION = 200;
-        const float CHARGE_SPEED = 25.0f;
+        // 予備動作
+        const int CHARGE_PREPARE_TIME = 20;
 
-        // 最初の突進だけタメアニメーションを再生
-        if (chargeCount == 0 &&
-            attackTimer <= CHARGE_PREPARE_TIME)
-        {
-            if (currentAnimAttach != chargePrepareAnimAttach)
-            {
-                ChangeAnimation(golem, chargePrepareAnimAttach);
-                // タメ開始SE
-                PlaySoundMem(golemChargePrepareSE, DX_PLAYTYPE_BACK);
-            }
-        }
+        // 突進時間
+        const int CHARGE_DURATION = 35;
 
-        // タメ終了後、突進アニメーションに切り替える
-        if (chargeCount == 0 &&
-            attackTimer == CHARGE_PREPARE_TIME + 1)
-        {
-            ChangeAnimation(golem, chargeAnimAttach);
-            // 突進開始SE
-            PlaySoundMem(golemChargeSE, DX_PLAYTYPE_BACK);
-        }
+        // 突進速度
+        const float CHARGE_SPEED = 15.0f;
 
-        // タメが終わったら突進
-        if (attackTimer > CHARGE_PREPARE_TIME ||
-            chargeCount > 0)
+        // 予備動作が終わったら突進
+        if (attackTimer > CHARGE_PREPARE_TIME &&
+            attackTimer <= CHARGE_PREPARE_TIME + CHARGE_DURATION)
         {
             chargeSpeed = CHARGE_SPEED;
 
             golem.pos.x += chargeDirX * chargeSpeed;
             golem.pos.z += chargeDirZ * chargeSpeed;
 
-            MV1SetPosition(golem.model1, golem.pos);
-
             for (int i = 0; i < PLAYER_COUNT; i++)
             {
-                if (players[i].mode == NONE ||
-                    players[i].mode == DOWNMODE)
+                if (players[i].mode == DOWNMODE)
                     continue;
 
                 if (chargeHit[i])
@@ -523,79 +522,51 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
 
                 float dx = players[i].pos.x - golem.pos.x;
                 float dz = players[i].pos.z - golem.pos.z;
+
                 float distanceSq = dx * dx + dz * dz;
 
-                const float CHARGE_RANGE = 300.0f;
+                const float CHARGE_RANGE = 250.0f;
 
                 if (distanceSq <= CHARGE_RANGE * CHARGE_RANGE)
                 {
                     chargeHit[i] = true;
 
+                    // HPを-1
                     if (players[i].HP > 0)
+                    {
                         players[i].HP--;
+                    }
 
-                    knockbackVelocity[i][0] = chargeDirX * 200.0f;
-                    knockbackVelocity[i][1] = chargeDirZ * 200.0f;
+                    // ノックバック
+                    knockbackVelocity[i][0] = chargeDirX * 40.0f;
+                    knockbackVelocity[i][1] = chargeDirZ * 40.0f;
+
                     knockbackTimer[i] = 15;
+
+                    //           printfDx("GOLEM CHARGE HIT PLAYER %d\n", i);
                 }
             }
         }
 
-        // 1回の突進が終了
+        // 突進終了
         if (attackTimer >= CHARGE_PREPARE_TIME + CHARGE_DURATION)
         {
-            chargeCount++;
+            state = GOLEM_IDLE;
+            attackTimer = 0;
 
-            int maxChargeCount = 1;
+            ChangeAnimation(golem, idleAnimAttach);
 
-            if (chargeCount < maxChargeCount)
+            chargeSpeed = 0.0f;
+            attackCooldown = 240;
+
+            for (int i = 0; i < PLAYER_COUNT; i++)
             {
-                attackTimer = 0;
-
-                // 次の突進前にプレイヤーの方向を取り直す
-                if (nearestPlayer != -1)
-                {
-                    float dx = players[nearestPlayer].pos.x - golem.pos.x;
-                    float dz = players[nearestPlayer].pos.z - golem.pos.z;
-                    float length = sqrtf(dx * dx + dz * dz);
-
-                    if (length > 0.001f)
-                    {
-                        chargeDirX = dx / length;
-                        chargeDirZ = dz / length;
-                    }
-                }
-
-                for (int i = 0; i < PLAYER_COUNT; i++)
-                    chargeHit[i] = false;
-            }
-            else
-            {
-                // 突進終了
-                chargeCount = 0;
-                state = GOLEM_IDLE;
-                attackTimer = 0;
-
-                ChangeAnimation(golem, idleAnimAttach);
-
-                chargeSpeed = 0.0f;
-                attackCooldown = 120;
-                recoveryTimer = 60;
-
-                for (int i = 0; i < PLAYER_COUNT; i++)
-                    chargeHit[i] = false;
+                chargeHit[i] = false;
             }
 
+            //    printfDx("GOLEM CHARGE END\n");
         }
 
-
-        return;
-    }
-
-    // 突進後の硬直
-    if (recoveryTimer > 0)
-    {
-        recoveryTimer--;
         return;
     }
 
@@ -607,8 +578,7 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
 
         FaceGolemToPlayer(golem, players[nearestPlayer]);
 
-        // 移動速度
-        const float GOLEM_MOVE_SPEED = 6.0f;
+        const float GOLEM_MOVE_SPEED = 0.7f;
         const float GOLEM_STOP_DISTANCE = 500.0f;
 
         // 移動・アニメーション切り替え
@@ -649,77 +619,143 @@ void GolemManager::Update(SCharaInfo& golem, SCharaInfo* players, GameManager& g
         int action = GetRand(99);
 
         // 確率で何もしない
-        if (action < 10)
+        if (action < 40)
         {
             return;
         }
 
-        // 距離によって攻撃を使い分ける
-        if (nearestDistance >= 700.0f || GetRand(99) < 30)
+        // 遠距離なら衝撃波
+        if (nearestDistance > 1000.0f)
         {
-            // 中・遠距離、または近距離に確率で突進攻撃
+            // 確率で衝撃波
+            if (GetRand(99) < 50)
+            {
+                state = GOLEM_SHOCKWAVE;
+                attackTimer = 0;
+
+                ChangeAnimation(golem, shockwaveAnimAttach);
+
+                shockwaveRadius = 0.0f;
+
+                for (int i = 0; i < PLAYER_COUNT; i++)
+                {
+                    shockwaveHit[i] = false;
+                }
+
+                printfDx("衝撃波スタート\n");
+            }
+
+            return;
+        }
+
+        // 遠距離・中距離・近距離で攻撃を使い分ける
+        if (nearestDistance >= 1000.0f)
+        {
+            // 遠距離：衝撃波
+            state = GOLEM_SHOCKWAVE;
+            attackTimer = 0;
+
+            ChangeAnimation(golem, shockwaveAnimAttach);
+
+            shockwaveRadius = 0.0f;
+
+            for (int i = 0; i < PLAYER_COUNT; i++)
+            {
+                shockwaveHit[i] = false;
+            }
+
+            printfDx("衝撃波スタート\n");
+        }
+        else if (nearestDistance >= 700.0f)
+        {
+            // 中距離：突進
             state = GOLEM_CHARGE;
             attackTimer = 0;
-            chargeCount = 0;
 
-            ChangeAnimation(golem, chargePrepareAnimAttach);
+            ChangeAnimation(golem, chargeAnimAttach);
 
-            chargeTargetCount++;
+            // プレイヤーの方向を記録
+            float dx = players[nearestPlayer].pos.x - golem.pos.x;
+            float dz = players[nearestPlayer].pos.z - golem.pos.z;
 
-            // 3回に1回は必ずプレイヤーを狙う
-            // それ以外は50%の確率でプレイヤーを狙う
-            bool targetPlayer = false;
+            float length = sqrtf(dx * dx + dz * dz);
 
-            if (chargeTargetCount % 3 == 0)
+            if (length > 0.001f)
             {
-                targetPlayer = true;
+                chargeDirX = dx / length;
+                chargeDirZ = dz / length;
             }
             else
             {
-                targetPlayer = (GetRand(99) < 50);
+                chargeDirX = 0.0f;
+                chargeDirZ = 0.0f;
             }
 
-            if (targetPlayer)
+            for (int i = 0; i < PLAYER_COUNT; i++)
             {
-                // プレイヤーの方向
-                float dx = players[nearestPlayer].pos.x - golem.pos.x;
-                float dz = players[nearestPlayer].pos.z - golem.pos.z;
-                float length = sqrtf(dx * dx + dz * dz);
-
-                if (length > 0.001f)
-                {
-                    chargeDirX = dx / length;
-                    chargeDirZ = dz / length;
-                }
-            }
-            else
-            {
-                // ランダムな方向
-                float angle = GetRand(6283) / 1000.0f;
-                chargeDirX = sinf(angle);
-                chargeDirZ = cosf(angle);
+                chargeHit[i] = false;
             }
 
-            golem.dir = atan2f(chargeDirX, chargeDirZ) + DX_PI_F;
-
-            MV1SetRotationXYZ(
-                golem.model1,
-                VGet(0.0f, golem.dir, 0.0f)
-            );
         }
         else
         {
-            // 近距離：近接攻撃
+            // 近距離：前方攻撃
             state = GOLEM_SPIN;
             attackTimer = 0;
 
-            spinHit[0] = false;
-            spinHit[1] = false;
-
             ChangeAnimation(golem, spinAnimAttach);
-            // 近接攻撃SE
-            PlaySoundMem(golemSpinSE, DX_PLAYTYPE_BACK);
 
+            for (int i = 0; i < PLAYER_COUNT; i++)
+            {
+                spinHit[i] = false;
+            }
         }
+    }
+}
+
+
+//ゴーレムへのダメージ割合で10000点を分配
+void GolemManager::AwardScore(GameManager& game)
+{
+    if (scoreAwarded)
+        return;
+
+    scoreAwarded = true;
+
+    int p1Damage = damageDealt[0];
+    int p2Damage = damageDealt[1];
+
+    int totalDamage = p1Damage + p2Damage;
+
+    //誰も攻撃していない
+    if (totalDamage <= 0)
+        return;
+
+    //P1が多く攻撃
+    if (p1Damage > p2Damage)
+    {
+        int score = p1Damage * 10000 / totalDamage;
+
+        game.AddScore(PLAYER1_INDEX, score);
+        game.AddScorePopup(PLAYER1_INDEX, score);
+    }
+
+    //P2が多く攻撃
+    else if (p2Damage > p1Damage)
+    {
+        int score = p2Damage * 10000 / totalDamage;
+
+        game.AddScore(PLAYER2_INDEX, score);
+        game.AddScorePopup(PLAYER2_INDEX, score);
+    }
+
+    //同じなら両方に5000点
+    else
+    {
+        game.AddScore(PLAYER1_INDEX, 5000);
+        game.AddScorePopup(PLAYER1_INDEX, 5000);
+
+        game.AddScore(PLAYER2_INDEX, 5000);
+        game.AddScorePopup(PLAYER2_INDEX, 5000);
     }
 }

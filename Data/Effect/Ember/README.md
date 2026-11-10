@@ -10,7 +10,7 @@ Playback: 3x source speed. Scale: 20. Maximum lifetime: 300 fixed ticks (5 secon
 Cast movement lock: 165 ticks (2.75 seconds); the effect stays at the original cast position.
 Source slash events at frames 127/180/240/271 map to ticks 43..100.
 The source finisher at frame 450 maps to tick 150. Damage is disabled during charging.
-Damage stays at the existing two HP per target, once per cast.
+Damage stays at the existing two HP per target, once per cast. Slash radius: 300; finisher radius: 450 (both increased by 50%). Target body radius is included.
 
 The NEW attack uses P1 R / P2 Numpad5 / each controller R3, requires 100 energy, and clears
 that player's energy only after successful playback starts. Match restart resets both bars.

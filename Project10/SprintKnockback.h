@@ -1,6 +1,5 @@
 #pragma once
 #include "player.h"
-#include "JustGuard.h"
 #include <cmath>
 
 namespace SprintKnockback {
@@ -31,11 +30,11 @@ inline Release Capture(const SCharaInfo& player, const PlayerRuntimeState& state
     return result;
 }
 
-enum class Result { Miss, Blocked, Hit };
+enum class Result { Miss, Hit };
 
 // Only ever selects the other player: mobs and bosses do not participate.
 inline Result Resolve(const Release& release, int source, SCharaInfo* players,
-    PlayerRuntimeState* states, JustGuardState* guards, bool canGuard, int damageAnimation) {
+    PlayerRuntimeState* states, int damageAnimation) {
     if (!release.active || source < 0 || source >= PLAYER_COUNT) return Result::Miss;
     const int targetIndex = 1 - source;
     auto& attacker = players[source];
@@ -49,7 +48,6 @@ inline Result Resolve(const Release& release, int source, SCharaInfo* players,
     const float forward = dx * release.direction.x + dz * release.direction.z;
     const float sideways = dx * release.direction.z - dz * release.direction.x;
     if (forward < 0 || forward > Reach || std::fabs(sideways) > HalfWidth) return Result::Miss;
-    if (guards[targetIndex].TryBlock(canGuard)) return Result::Blocked;
     CancelPlayerCombat(states[targetIndex]);
     ResetMove(target);
     SetCharacterAnimation(target, damageAnimation);
